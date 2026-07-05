@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrgSession } from "@/lib/auth";
 import {
+  getOrgEmbedScriptUrl,
   getOrgIndeedFeedUrl,
   getOrgJobUrl,
   getOrgJsonFeedUrl,
+  getOrgSitemapUrl,
   getOrgXmlFeedUrl,
 } from "@/lib/env";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -46,6 +48,8 @@ export default async function SyndicationPage({ params }: PageProps) {
   const automaticCount = SYNDICATION_BOARDS.filter((b) => b.tier === "automatic").length;
   const registerCount = SYNDICATION_BOARDS.filter((b) => b.tier === "register").length;
 
+  const embedSnippet = `<div data-eas-jobs></div>\n<script src="${getOrgEmbedScriptUrl(orgSlug)}" async></script>`;
+
   return (
     <div className="page-shell space-y-8">
       <div>
@@ -85,6 +89,41 @@ export default async function SyndicationPage({ params }: PageProps) {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-zinc-900">Embed on your website</h2>
+        <p className="text-sm text-zinc-600">
+          Paste this snippet into your company site to show your live openings — updates automatically as you post and
+          close jobs. Reaches everyone already visiting your own website.
+        </p>
+        <pre className="overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-900 p-3 text-xs text-zinc-100">
+          {embedSnippet}
+        </pre>
+        <a href={`/o/${orgSlug}/embed`} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+          Preview the widget →
+        </a>
+      </section>
+
+      <section className="card space-y-2">
+        <h2 className="text-lg font-semibold text-zinc-900">Search &amp; social visibility</h2>
+        <ul className="space-y-2 text-sm text-zinc-600">
+          <li>
+            <span className="font-medium text-zinc-900">Sitemap:</span>{" "}
+            <a href={getOrgSitemapUrl(orgSlug)} target="_blank" rel="noreferrer" className="break-all text-blue-600 hover:underline">
+              {getOrgSitemapUrl(orgSlug)}
+            </a>{" "}
+            — submit to Google Search Console &amp; Bing Webmaster Tools so every job gets indexed.
+          </li>
+          <li>
+            <span className="font-medium text-zinc-900">Social cards:</span> job and careers pages include Open Graph /
+            Twitter tags, so links shared to LinkedIn, Slack, and X render a rich preview automatically.
+          </li>
+          <li>
+            <span className="font-medium text-zinc-900">QR codes:</span> every published job has a scannable QR
+            (linked from the Jobs list) for flyers, job fairs, and trade shows.
+          </li>
+        </ul>
       </section>
 
       <section className="space-y-3">

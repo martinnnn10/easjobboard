@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublishedJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
-import { getPlatformName } from "@/lib/env";
+import { getOrgUrl, getPlatformName } from "@/lib/env";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
 
@@ -11,9 +11,16 @@ export async function generateMetadata({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) return { title: "Not found" };
 
+  const title = `${organization.name} Careers`;
+  const description = `Open positions at ${organization.name} on ${getPlatformName()}.`;
+  const url = getOrgUrl(orgSlug);
+
   return {
-    title: `${organization.name} Careers`,
-    description: `Open positions at ${organization.name} on ${getPlatformName()}.`,
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url, siteName: organization.name, type: "website" },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 

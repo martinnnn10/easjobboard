@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
 import { ApplicationForm } from "@/components/ApplicationForm";
+import { getOrgJobUrl } from "@/lib/env";
 import { buildGoogleJobPostingJsonLd } from "@/lib/feeds/google-jobs";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -16,9 +17,28 @@ export async function generateMetadata({ params }: PageProps) {
   const job = getJobByOrgAndSlug(organization.id, jobSlug);
   if (!job || job.status !== "published") return { title: "Not found" };
 
+  const title = `${job.title} — ${organization.name}`;
+  const description = job.description.slice(0, 200).replace(/\s+/g, " ").trim();
+  const url = getOrgJobUrl(orgSlug, job.slug);
+
+  // Rich cards so links shared to LinkedIn/Slack/Twitter/Facebook render a
+  // preview instead of a bare URL — a low-cost visibility multiplier.
   return {
-    title: `${job.title} — ${organization.name}`,
-    description: job.description.slice(0, 160),
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title,
+      description,
+      url,
+      siteName: organization.name,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

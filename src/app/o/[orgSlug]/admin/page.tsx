@@ -9,7 +9,7 @@ import {
 } from "@/lib/applications";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
-import { getOrgIndeedFeedUrl, getOrgJobUrl, getOrgUrl } from "@/lib/env";
+import { getJobQrUrl, getOrgIndeedFeedUrl, getOrgJobUrl, getOrgUrl } from "@/lib/env";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
@@ -143,9 +143,14 @@ export default async function OrgAdminPage({ params }: PageProps) {
                           Source
                         </Link>
                         {job.status === "published" ? (
-                          <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
-                            View
-                          </a>
+                          <>
+                            <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
+                              View
+                            </a>
+                            <a href={getJobQrUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
+                              QR
+                            </a>
+                          </>
                         ) : null}
                       </div>
                     </td>

@@ -60,3 +60,15 @@ export function getOrgXmlFeedUrl(orgSlug: string): string {
 export function getOrgJsonFeedUrl(orgSlug: string): string {
   return `${getBaseUrl()}/o/${orgSlug}/feed/jobs.json`;
 }
+
+export function getOrgSitemapUrl(orgSlug: string): string {
+  return `${getBaseUrl()}/o/${orgSlug}/sitemap.xml`;
+}
+
+export function getOrgEmbedScriptUrl(orgSlug: string): string {
+  return `${getBaseUrl()}/o/${orgSlug}/embed.js`;
+}
+
+export function getJobQrUrl(orgSlug: string, jobSlug: string): string {
+  return `${getBaseUrl()}/o/${orgSlug}/jobs/${jobSlug}/qr.svg`;
+}
