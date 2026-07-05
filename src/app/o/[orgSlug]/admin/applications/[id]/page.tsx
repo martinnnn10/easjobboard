@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
+import { EmailPanel } from "@/components/EmailPanel";
 import { MatchScore } from "@/components/MatchScore";
 import { NoteForm } from "@/components/NoteForm";
 import { getApplicationDetail } from "@/lib/applications";
@@ -22,7 +23,7 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const sessionContext = await requireOrgSession(orgSlug);
 
   const application = getApplicationDetail(id, organization.id);
   if (!application) notFound();
@@ -80,6 +81,21 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
           <section className="card space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Notes</h2>
             <NoteForm orgSlug={orgSlug} applicationId={application.id} />
+          </section>
+
+          <section className="card space-y-3">
+            <h2 className="text-lg font-semibold text-zinc-900">Email the candidate</h2>
+            <EmailPanel
+              orgSlug={orgSlug}
+              applicationId={application.id}
+              currentStatus={application.status}
+              tokens={{
+                candidateName: application.applicant_name,
+                jobTitle: application.job_title,
+                orgName: organization.name,
+                recruiterName: sessionContext.user.name,
+              }}
+            />
           </section>
         </div>
 

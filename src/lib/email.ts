@@ -66,6 +66,27 @@ export async function sendApplicationEmail(input: ApplicationEmailInput): Promis
   });
 }
 
+/**
+ * Recruiter-composed email to a candidate, sent from the platform on behalf of
+ * the organization. Replies go to the org's hiring inbox.
+ */
+export async function sendCandidateEmail(input: {
+  organization: Organization;
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<void> {
+  const { smtp, transporter } = createTransport();
+
+  await transporter.sendMail({
+    from: `"${input.organization.name}" <${smtp.fromEmail}>`,
+    to: input.to,
+    replyTo: input.organization.application_email,
+    subject: input.subject,
+    text: input.body,
+  });
+}
+
 type ConfirmationEmailInput = {
   organization: Organization;
   job: Job;
