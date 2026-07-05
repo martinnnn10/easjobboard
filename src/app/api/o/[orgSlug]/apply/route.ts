@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createApplication } from "@/lib/applications";
-import { sendApplicationEmail } from "@/lib/email";
+import { sendApplicantConfirmationEmail, sendApplicationEmail } from "@/lib/email";
 import { detectResumeKind } from "@/lib/file-validation";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -137,6 +137,16 @@ export async function POST(request: Request, context: RouteContext) {
       },
     }).catch((emailError) => {
       console.error("SMTP delivery failed (application still saved):", emailError);
+    });
+
+    // Confirmation to the candidate — also fire-and-forget.
+    void sendApplicantConfirmationEmail({
+      organization,
+      job,
+      applicantName: name,
+      applicantEmail: email,
+    }).catch((emailError) => {
+      console.error("Applicant confirmation email failed:", emailError);
     });
 
     return NextResponse.json({ ok: true });
