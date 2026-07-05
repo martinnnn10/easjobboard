@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /o/
+Disallow: /o/*/admin/
