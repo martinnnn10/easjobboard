@@ -127,6 +127,9 @@ export default async function OrgAdminPage({ params }: PageProps) {
                         <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="text-blue-600 hover:underline">
                           Edit
                         </Link>
+                        <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-blue-600 hover:underline">
+                          Source
+                        </Link>
                         {job.status === "published" ? (
                           <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
                             View
