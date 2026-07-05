@@ -10,6 +10,23 @@ import { scoreResume } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 
+/**
+ * Next.js 16 standalone mode wraps the incoming Request in a Proxy. Calling
+ * `request.formData()` on that Proxy returns File/Blob entries that are broken
+ * objects with no prototype — no `arrayBuffer()`, no `size`. Workaround: read
+ * the raw body bytes, construct a fresh standard Request with the same headers
+ * and body, and call `formData()` on that.
+ */
+async function parseFormData(request: Request): Promise<FormData> {
+  const body = await request.arrayBuffer();
+  const freshRequest = new Request("http://localhost/upload", {
+    method: "POST",
+    headers: request.headers,
+    body,
+  });
+  return freshRequest.formData();
+}
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set([
   "application/pdf",
@@ -39,7 +56,7 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const formData = await request.formData();
+    const formData = await parseFormData(request);
     const jobSlug = String(formData.get("jobSlug") ?? "");
     const name = String(formData.get("name") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();

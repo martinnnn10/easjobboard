@@ -151,20 +151,161 @@ const US_CITIES: CityEntry[] = [
   { city: "Albuquerque", state: "New Mexico", stateCode: "NM", zip: "87101" },
   // Connecticut
   { city: "Hartford", state: "Connecticut", stateCode: "CT", zip: "06101" },
+  // Additional major cities across all states (quick-pick suggestions)
+  { city: "Seattle", state: "Washington", stateCode: "WA", zip: "98101" },
+  { city: "Tacoma", state: "Washington", stateCode: "WA", zip: "98402" },
+  { city: "Spokane", state: "Washington", stateCode: "WA", zip: "99201" },
+  { city: "Portland", state: "Oregon", stateCode: "OR", zip: "97201" },
+  { city: "Salem", state: "Oregon", stateCode: "OR", zip: "97301" },
+  { city: "Eugene", state: "Oregon", stateCode: "OR", zip: "97401" },
+  { city: "Denver", state: "Colorado", stateCode: "CO", zip: "80202" },
+  { city: "Colorado Springs", state: "Colorado", stateCode: "CO", zip: "80903" },
+  { city: "Aurora", state: "Colorado", stateCode: "CO", zip: "80010" },
+  { city: "Phoenix", state: "Arizona", stateCode: "AZ", zip: "85004" },
+  { city: "Tucson", state: "Arizona", stateCode: "AZ", zip: "85701" },
+  { city: "Mesa", state: "Arizona", stateCode: "AZ", zip: "85201" },
+  { city: "Las Vegas", state: "Nevada", stateCode: "NV", zip: "89101" },
+  { city: "Reno", state: "Nevada", stateCode: "NV", zip: "89501" },
+  { city: "Henderson", state: "Nevada", stateCode: "NV", zip: "89002" },
+  { city: "Salt Lake City", state: "Utah", stateCode: "UT", zip: "84101" },
+  { city: "Boise", state: "Idaho", stateCode: "ID", zip: "83702" },
+  { city: "Houston", state: "Texas", stateCode: "TX", zip: "77002" },
+  { city: "Dallas", state: "Texas", stateCode: "TX", zip: "75201" },
+  { city: "Austin", state: "Texas", stateCode: "TX", zip: "78701" },
+  { city: "San Antonio", state: "Texas", stateCode: "TX", zip: "78205" },
+  { city: "Fort Worth", state: "Texas", stateCode: "TX", zip: "76102" },
+  { city: "El Paso", state: "Texas", stateCode: "TX", zip: "79901" },
+  { city: "Arlington", state: "Texas", stateCode: "TX", zip: "76010" },
+  { city: "Chicago", state: "Illinois", stateCode: "IL", zip: "60601" },
+  { city: "Aurora", state: "Illinois", stateCode: "IL", zip: "60505" },
+  { city: "Detroit", state: "Michigan", stateCode: "MI", zip: "48226" },
+  { city: "Grand Rapids", state: "Michigan", stateCode: "MI", zip: "49503" },
+  { city: "Warren", state: "Michigan", stateCode: "MI", zip: "48088" },
+  { city: "Minneapolis", state: "Minnesota", stateCode: "MN", zip: "55401" },
+  { city: "St. Paul", state: "Minnesota", stateCode: "MN", zip: "55102" },
+  { city: "Milwaukee", state: "Wisconsin", stateCode: "WI", zip: "53202" },
+  { city: "Madison", state: "Wisconsin", stateCode: "WI", zip: "53703" },
+  { city: "Indianapolis", state: "Indiana", stateCode: "IN", zip: "46204" },
+  { city: "Fort Wayne", state: "Indiana", stateCode: "IN", zip: "46802" },
+  { city: "Columbus", state: "Ohio", stateCode: "OH", zip: "43215" },
+  { city: "Cleveland", state: "Ohio", stateCode: "OH", zip: "44113" },
+  { city: "Cincinnati", state: "Ohio", stateCode: "OH", zip: "45202" },
+  { city: "Toledo", state: "Ohio", stateCode: "OH", zip: "43604" },
+  { city: "Kansas City", state: "Missouri", stateCode: "MO", zip: "64106" },
+  { city: "St. Louis", state: "Missouri", stateCode: "MO", zip: "63101" },
+  { city: "Wichita", state: "Kansas", stateCode: "KS", zip: "67202" },
+  { city: "Omaha", state: "Nebraska", stateCode: "NE", zip: "68102" },
+  { city: "Des Moines", state: "Iowa", stateCode: "IA", zip: "50309" },
+  { city: "Nashville", state: "Tennessee", stateCode: "TN", zip: "37203" },
+  { city: "Memphis", state: "Tennessee", stateCode: "TN", zip: "38103" },
+  { city: "Knoxville", state: "Tennessee", stateCode: "TN", zip: "37902" },
+  { city: "Louisville", state: "Kentucky", stateCode: "KY", zip: "40202" },
+  { city: "Atlanta", state: "Georgia", stateCode: "GA", zip: "30303" },
+  { city: "Savannah", state: "Georgia", stateCode: "GA", zip: "31401" },
+  { city: "Charlotte", state: "North Carolina", stateCode: "NC", zip: "28202" },
+  { city: "Raleigh", state: "North Carolina", stateCode: "NC", zip: "27601" },
+  { city: "Greensboro", state: "North Carolina", stateCode: "NC", zip: "27401" },
+  { city: "Columbia", state: "South Carolina", stateCode: "SC", zip: "29201" },
+  { city: "Charleston", state: "South Carolina", stateCode: "SC", zip: "29401" },
+  { city: "Birmingham", state: "Alabama", stateCode: "AL", zip: "35203" },
+  { city: "Montgomery", state: "Alabama", stateCode: "AL", zip: "36104" },
+  { city: "Jackson", state: "Mississippi", stateCode: "MS", zip: "39201" },
+  { city: "New Orleans", state: "Louisiana", stateCode: "LA", zip: "70112" },
+  { city: "Baton Rouge", state: "Louisiana", stateCode: "LA", zip: "70802" },
+  { city: "Little Rock", state: "Arkansas", stateCode: "AR", zip: "72201" },
+  { city: "Oklahoma City", state: "Oklahoma", stateCode: "OK", zip: "73102" },
+  { city: "Tulsa", state: "Oklahoma", stateCode: "OK", zip: "74103" },
+  { city: "Miami", state: "Florida", stateCode: "FL", zip: "33128" },
+  { city: "Orlando", state: "Florida", stateCode: "FL", zip: "32801" },
+  { city: "Tampa", state: "Florida", stateCode: "FL", zip: "33602" },
+  { city: "Jacksonville", state: "Florida", stateCode: "FL", zip: "32202" },
+  { city: "Fort Lauderdale", state: "Florida", stateCode: "FL", zip: "33301" },
+  { city: "New York", state: "New York", stateCode: "NY", zip: "10007" },
+  { city: "Brooklyn", state: "New York", stateCode: "NY", zip: "11201" },
+  { city: "Buffalo", state: "New York", stateCode: "NY", zip: "14202" },
+  { city: "Rochester", state: "New York", stateCode: "NY", zip: "14604" },
+  { city: "Newark", state: "New Jersey", stateCode: "NJ", zip: "07102" },
+  { city: "Jersey City", state: "New Jersey", stateCode: "NJ", zip: "07302" },
+  { city: "Boston", state: "Massachusetts", stateCode: "MA", zip: "02108" },
+  { city: "Worcester", state: "Massachusetts", stateCode: "MA", zip: "01608" },
+  { city: "Providence", state: "Rhode Island", stateCode: "RI", zip: "02903" },
+  { city: "Philadelphia", state: "Pennsylvania", stateCode: "PA", zip: "19107" },
+  { city: "Pittsburgh", state: "Pennsylvania", stateCode: "PA", zip: "15222" },
+  { city: "Baltimore", state: "Maryland", stateCode: "MD", zip: "21201" },
+  { city: "Washington", state: "District of Columbia", stateCode: "DC", zip: "20001" },
+  { city: "Richmond", state: "Virginia", stateCode: "VA", zip: "23219" },
+  { city: "Virginia Beach", state: "Virginia", stateCode: "VA", zip: "23451" },
+  { city: "Norfolk", state: "Virginia", stateCode: "VA", zip: "23510" },
+  { city: "Charleston", state: "West Virginia", stateCode: "WV", zip: "25301" },
+  { city: "Portland", state: "Maine", stateCode: "ME", zip: "04101" },
+  { city: "Manchester", state: "New Hampshire", stateCode: "NH", zip: "03101" },
+  { city: "Burlington", state: "Vermont", stateCode: "VT", zip: "05401" },
+  { city: "Wilmington", state: "Delaware", stateCode: "DE", zip: "19801" },
+  { city: "Billings", state: "Montana", stateCode: "MT", zip: "59101" },
+  { city: "Cheyenne", state: "Wyoming", stateCode: "WY", zip: "82001" },
+  { city: "Fargo", state: "North Dakota", stateCode: "ND", zip: "58102" },
+  { city: "Sioux Falls", state: "South Dakota", stateCode: "SD", zip: "57104" },
+  { city: "Honolulu", state: "Hawaii", stateCode: "HI", zip: "96813" },
+  { city: "Anchorage", state: "Alaska", stateCode: "AK", zip: "99501" },
 ];
+
+// All US states + DC for the state dropdown, so any typed city resolves to a
+// clean "City, ST" label even when it isn't in the quick-pick list above.
+const US_STATES: { name: string; code: string }[] = [
+  { name: "Alabama", code: "AL" }, { name: "Alaska", code: "AK" }, { name: "Arizona", code: "AZ" },
+  { name: "Arkansas", code: "AR" }, { name: "California", code: "CA" }, { name: "Colorado", code: "CO" },
+  { name: "Connecticut", code: "CT" }, { name: "Delaware", code: "DE" }, { name: "District of Columbia", code: "DC" },
+  { name: "Florida", code: "FL" }, { name: "Georgia", code: "GA" }, { name: "Hawaii", code: "HI" },
+  { name: "Idaho", code: "ID" }, { name: "Illinois", code: "IL" }, { name: "Indiana", code: "IN" },
+  { name: "Iowa", code: "IA" }, { name: "Kansas", code: "KS" }, { name: "Kentucky", code: "KY" },
+  { name: "Louisiana", code: "LA" }, { name: "Maine", code: "ME" }, { name: "Maryland", code: "MD" },
+  { name: "Massachusetts", code: "MA" }, { name: "Michigan", code: "MI" }, { name: "Minnesota", code: "MN" },
+  { name: "Mississippi", code: "MS" }, { name: "Missouri", code: "MO" }, { name: "Montana", code: "MT" },
+  { name: "Nebraska", code: "NE" }, { name: "Nevada", code: "NV" }, { name: "New Hampshire", code: "NH" },
+  { name: "New Jersey", code: "NJ" }, { name: "New Mexico", code: "NM" }, { name: "New York", code: "NY" },
+  { name: "North Carolina", code: "NC" }, { name: "North Dakota", code: "ND" }, { name: "Ohio", code: "OH" },
+  { name: "Oklahoma", code: "OK" }, { name: "Oregon", code: "OR" }, { name: "Pennsylvania", code: "PA" },
+  { name: "Rhode Island", code: "RI" }, { name: "South Carolina", code: "SC" }, { name: "South Dakota", code: "SD" },
+  { name: "Tennessee", code: "TN" }, { name: "Texas", code: "TX" }, { name: "Utah", code: "UT" },
+  { name: "Vermont", code: "VT" }, { name: "Virginia", code: "VA" }, { name: "Washington", code: "WA" },
+  { name: "West Virginia", code: "WV" }, { name: "Wisconsin", code: "WI" }, { name: "Wyoming", code: "WY" },
+];
+
+/** Builds the posted location label from city + state, e.g. "Fremont, CA". */
+function deriveLocation(city: string, stateCode: string): string {
+  const c = city.trim();
+  const s = stateCode.trim();
+  if (c && s) return `${c}, ${s}`;
+  return c;
+}
 
 // Job-title → template intelligence now lives in @/lib/jd-templates so the same
 // library powers both the browsable picker and title-match auto-fill.
 
 // ─── Location Search ───────────────────────────────────────────────────────
+// Deduplicated quick-pick list (some cities are listed more than once across the
+// dataset) — keyed by city+state so suggestions never repeat.
+const CITY_SUGGESTIONS: CityEntry[] = (() => {
+  const seen = new Set<string>();
+  const unique: CityEntry[] = [];
+  for (const entry of US_CITIES) {
+    const key = `${entry.city.toLowerCase()}|${entry.stateCode}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(entry);
+  }
+  return unique;
+})();
+
 function searchCities(query: string): CityEntry[] {
   if (!query || query.length < 2) return [];
   const lower = query.toLowerCase();
-  return US_CITIES.filter(
-    (entry) =>
-      entry.city.toLowerCase().startsWith(lower) ||
-      entry.city.toLowerCase().includes(lower)
-  ).slice(0, 8);
+  // Prefer prefix matches, then substring matches.
+  const prefix = CITY_SUGGESTIONS.filter((entry) => entry.city.toLowerCase().startsWith(lower));
+  const contains = CITY_SUGGESTIONS.filter(
+    (entry) => !entry.city.toLowerCase().startsWith(lower) && entry.city.toLowerCase().includes(lower),
+  );
+  return [...prefix, ...contains].slice(0, 8);
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────
@@ -272,14 +413,29 @@ export function JobForm({
     []
   );
 
-  // Handle city input with autocomplete
+  // Handle city input with autocomplete. Always keeps the posted location label
+  // in sync with the typed city (+ current state), so any city works — not just
+  // ones in the quick-pick list.
   const handleCityInput = useCallback((value: string) => {
-    updateField("city", value);
+    setValues((current) => ({
+      ...current,
+      city: value,
+      location: deriveLocation(value, current.state),
+    }));
     const results = searchCities(value);
     setCitySuggestions(results);
     setShowCitySuggestions(results.length > 0);
     setActiveSuggestionIndex(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // State dropdown — re-derive the location label from the current city.
+  const handleStateSelect = useCallback((stateCode: string) => {
+    setValues((current) => ({
+      ...current,
+      state: stateCode,
+      location: deriveLocation(current.city, stateCode),
+    }));
   }, []);
 
   const selectCity = useCallback((entry: CityEntry) => {
@@ -390,13 +546,20 @@ export function JobForm({
     setLoading(true);
     setError("");
 
+    // Ensure the posted location label is populated from city + state even if
+    // the auto-fill was cleared. City is the required field that drives it.
+    const payload = {
+      ...values,
+      location: values.location.trim() || deriveLocation(values.city, values.state),
+    };
+
     const url = job ? `/api/o/${orgSlug}/jobs/${job.id}` : `/api/o/${orgSlug}/jobs`;
     const method = job ? "PUT" : "POST";
 
     const response = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify(payload),
     });
 
     setLoading(false);
@@ -509,20 +672,8 @@ export function JobForm({
         <legend className="px-2 text-sm font-semibold text-zinc-700">Location</legend>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Location label *</span>
-            <input
-              value={values.location}
-              onChange={(event) => handleLocationChange(event.target.value)}
-              placeholder="Newark, CA"
-              className="field-input"
-              required
-            />
-            <span className="text-xs text-zinc-500">Displayed on job boards (e.g. &quot;Newark, CA&quot; or &quot;Remote&quot;)</span>
-          </label>
-
           <div className="relative block space-y-1">
-            <span className="text-sm font-medium">City</span>
+            <span className="text-sm font-medium">City *</span>
             <input
               ref={cityInputRef}
               value={values.city}
@@ -531,11 +682,14 @@ export function JobForm({
                 if (citySuggestions.length > 0) setShowCitySuggestions(true);
               }}
               onKeyDown={handleCityKeyDown}
-              placeholder="Start typing a city name..."
+              placeholder="Start typing any city name..."
               className="field-input"
               autoComplete="off"
+              required
             />
-            <span className="text-xs text-zinc-500">Type a city to auto-fill State and ZIP</span>
+            <span className="text-xs text-zinc-500">
+              Pick a suggestion, or just keep typing — any city works.
+            </span>
 
             {showCitySuggestions && citySuggestions.length > 0 && (
               <div
@@ -561,14 +715,35 @@ export function JobForm({
           </div>
 
           <label className="block space-y-1">
-            <span className="text-sm font-medium">State</span>
-            <input
+            <span className="text-sm font-medium">State *</span>
+            <select
               value={values.state}
-              onChange={(event) => updateField("state", event.target.value)}
-              placeholder="Auto-filled from city"
+              onChange={(event) => handleStateSelect(event.target.value)}
+              className="field-input"
+              required
+            >
+              <option value="">Select a state…</option>
+              {US_STATES.map((state) => (
+                <option key={state.code} value={state.code}>
+                  {state.name} ({state.code})
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-zinc-500">Sets the posted location with your city.</span>
+          </label>
+
+          <label className="block space-y-1 md:col-span-2">
+            <span className="text-sm font-medium">Location label</span>
+            <input
+              value={values.location}
+              onChange={(event) => handleLocationChange(event.target.value)}
+              placeholder="Auto-filled from City and State"
               className="field-input bg-zinc-50"
-              readOnly={false}
             />
+            <span className="text-xs text-zinc-500">
+              This is what appears on job boards. Auto-filled from your city and state — edit it for a custom label like
+              &quot;Remote&quot; or &quot;Bay Area&quot;.
+            </span>
           </label>
 
           <label className="block space-y-1">
@@ -576,7 +751,7 @@ export function JobForm({
             <input
               value={values.zip}
               onChange={(event) => updateField("zip", event.target.value)}
-              placeholder="Auto-filled from city"
+              placeholder="Optional"
               className="field-input bg-zinc-50"
             />
           </label>
