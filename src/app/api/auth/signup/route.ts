@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 import { createOrganization } from "@/lib/organizations";
 import { createUser, getUserByEmail } from "@/lib/users";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSessionToken } from "@/lib/session";
 import { setSessionCookie } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+// Limit org/account creation per IP to curb automated signup abuse.
+const SIGNUP_RATE_LIMIT = 5;
+const SIGNUP_RATE_WINDOW_MS = 60 * 60 * 1000;
+
 export async function POST(request: Request) {
   try {
+    const limit = rateLimit(`signup:${getClientIp(request)}`, SIGNUP_RATE_LIMIT, SIGNUP_RATE_WINDOW_MS);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many signups from this network. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+      );
+    }
+
     const body = await request.json();
     const orgName = String(body.orgName ?? "").trim();
     const orgSlug = String(body.orgSlug ?? "").trim();

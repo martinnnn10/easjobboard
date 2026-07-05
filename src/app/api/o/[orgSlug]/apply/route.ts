@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { createApplication } from "@/lib/applications";
 import { sendApplicationEmail } from "@/lib/email";
+import { detectResumeKind } from "@/lib/file-validation";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -13,6 +15,10 @@ const ALLOWED_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
+// Cap application submissions per IP to blunt resume spam / abuse.
+const APPLY_RATE_LIMIT = 10;
+const APPLY_RATE_WINDOW_MS = 10 * 60 * 1000;
+
 type RouteContext = { params: Promise<{ orgSlug: string }> };
 
 export async function POST(request: Request, context: RouteContext) {
@@ -21,6 +27,14 @@ export async function POST(request: Request, context: RouteContext) {
     const organization = getOrganizationBySlug(orgSlug);
     if (!organization) {
       return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+    }
+
+    const limit = rateLimit(`apply:${orgSlug}:${getClientIp(request)}`, APPLY_RATE_LIMIT, APPLY_RATE_WINDOW_MS);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many applications. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+      );
     }
 
     const formData = await request.formData();
@@ -58,6 +72,15 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const buffer = Buffer.from(await resume.arrayBuffer());
+
+    // The MIME type above is client-supplied; confirm the actual file bytes match
+    // an allowed resume format so a renamed script can't be stored.
+    if (!detectResumeKind(buffer)) {
+      return NextResponse.json(
+        { error: "Resume file does not appear to be a valid PDF, DOC, or DOCX" },
+        { status: 400 },
+      );
+    }
 
     createApplication({
       organization_id: organization.id,
