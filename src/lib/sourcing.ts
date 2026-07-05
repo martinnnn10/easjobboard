@@ -17,7 +17,10 @@ const APOLLO_SEARCH_PATH = "/api/v1/mixed_people/search";
 const REQUEST_TIMEOUT_MS = 12_000;
 
 export type SourcedCandidate = {
+  apolloId: string | null;
   name: string;
+  firstName: string | null;
+  lastName: string | null;
   title: string;
   company: string;
   location: string;
@@ -60,6 +63,7 @@ export function buildSearchBody(job: Job, jobSkills: string[], perPage = 10): Re
 }
 
 type ApolloPerson = {
+  id?: string;
   name?: string;
   first_name?: string;
   last_name?: string;
@@ -84,7 +88,10 @@ function mapPerson(person: ApolloPerson, jobSkills: string[]): SourcedCandidate 
     jobSkills.length > 0 ? Math.round((matchedSkills.length / jobSkills.length) * 100) : null;
 
   return {
+    apolloId: person.id ?? null,
     name: person.name ?? [person.first_name, person.last_name].filter(Boolean).join(" ") ?? "Unknown",
+    firstName: person.first_name ?? null,
+    lastName: person.last_name ?? null,
     title: person.title ?? person.headline ?? "",
     company,
     location,
