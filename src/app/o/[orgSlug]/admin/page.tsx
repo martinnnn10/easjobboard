@@ -39,6 +39,9 @@ export default async function OrgAdminPage({ params }: PageProps) {
           <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
             New job
           </Link>
+          <Link href={`/o/${orgSlug}/admin/candidates`} className="btn-secondary">
+            Candidate pool
+          </Link>
           <LogoutButton orgSlug={orgSlug} />
         </div>
       </div>
