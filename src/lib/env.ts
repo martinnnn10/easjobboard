@@ -52,3 +52,11 @@ export function getOrgAdminUrl(orgSlug: string): string {
 export function getOrgIndeedFeedUrl(orgSlug: string): string {
   return `${getBaseUrl()}/o/${orgSlug}/feed/indeed.xml`;
 }
+
+export function getOrgXmlFeedUrl(orgSlug: string): string {
+  return `${getBaseUrl()}/o/${orgSlug}/feed/jobs.xml`;
+}
+
+export function getOrgJsonFeedUrl(orgSlug: string): string {
+  return `${getBaseUrl()}/o/${orgSlug}/feed/jobs.json`;
+}

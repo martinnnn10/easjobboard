@@ -80,7 +80,16 @@ export default async function OrgAdminPage({ params }: PageProps) {
       ) : null}
 
       <section className="card space-y-3">
-        <h2 className="text-lg font-semibold text-zinc-900">Syndication feeds</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-zinc-900">Job distribution</h2>
+          <Link href={`/o/${orgSlug}/admin/syndication`} className="text-sm text-blue-600 hover:underline">
+            Feeds &amp; board directory →
+          </Link>
+        </div>
+        <p className="text-sm text-zinc-600">
+          Published jobs syndicate to Indeed and Google for Jobs automatically. The distribution page lists every feed
+          URL and which additional boards accept them.
+        </p>
         <ul className="space-y-2 text-sm">
           <li>
             <span className="font-medium">Indeed XML:</span>{" "}
