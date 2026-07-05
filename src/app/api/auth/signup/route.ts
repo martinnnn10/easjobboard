@@ -25,6 +25,9 @@ export async function POST(request: Request) {
     const orgName = String(body.orgName ?? "").trim();
     const orgSlug = String(body.orgSlug ?? "").trim();
     const website = String(body.website ?? "").trim();
+    const rawBrandColor = String(body.brandColor ?? "").trim();
+    // Only accept a well-formed hex color; anything else falls back to default.
+    const brandColor = /^#[0-9a-fA-F]{6}$/.test(rawBrandColor) ? rawBrandColor : "";
     const applicationEmail = String(body.applicationEmail ?? "").trim();
     const adminName = String(body.adminName ?? "").trim();
     const adminEmail = String(body.adminEmail ?? "").trim();
@@ -51,6 +54,7 @@ export async function POST(request: Request) {
       slug: orgSlug || undefined,
       website,
       application_email: applicationEmail,
+      brand_color: brandColor,
     });
 
     const user = createUser({

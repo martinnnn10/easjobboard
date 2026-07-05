@@ -1,22 +1,24 @@
 import Link from "next/link";
-import { getPlatformCompany, getPlatformEmail, getPlatformName } from "@/lib/env";
+import { getPlatformEmail, getPlatformName } from "@/lib/env";
 
 export default function HomePage() {
   return (
     <div className="page-shell space-y-16 py-12">
       <section className="mx-auto max-w-3xl space-y-6 text-center">
-        <p className="text-sm font-medium uppercase tracking-wide text-blue-600">{getPlatformCompany()}</p>
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-900 md:text-5xl">{getPlatformName()}</h1>
+        <p className="text-sm font-medium uppercase tracking-wide text-blue-600">{getPlatformName()}</p>
+        <h1 className="text-4xl font-bold tracking-tight text-zinc-900 md:text-6xl">
+          Post once. Hire everywhere.
+        </h1>
         <p className="text-lg text-zinc-600">
-          Post jobs once, syndicate to major US job boards, and receive applicant resumes directly in each
-          organization&apos;s inbox — all from a private portal.
+          Publish a job in under a minute. It goes live on your branded careers page, syndicates to job boards,
+          and every applicant lands in your inbox — scored and ready to review.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <Link href="/signup" className="btn-primary">
-            Create organization
+            Start free
           </Link>
           <Link href="/login" className="btn-secondary">
-            Sign in to your portal
+            Sign in
           </Link>
         </div>
       </section>

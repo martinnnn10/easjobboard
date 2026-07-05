@@ -406,7 +406,10 @@ export function JobForm({
       return;
     }
 
-    router.push(`/o/${orgSlug}/admin`);
+    // Celebrate a freshly published job on the dashboard (share link, flyer, QR).
+    const data = (await response.json().catch(() => null)) as { job?: { slug?: string } } | null;
+    const publishedSlug = !job && values.status === "published" ? data?.job?.slug : undefined;
+    router.push(publishedSlug ? `/o/${orgSlug}/admin?published=${encodeURIComponent(publishedSlug)}` : `/o/${orgSlug}/admin`);
     router.refresh();
   }
 

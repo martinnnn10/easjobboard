@@ -22,19 +22,19 @@ const TIER_STYLES: Record<SyndicationTier, string> = {
 
 const FEEDS = [
   {
-    label: "Indeed XML feed",
+    label: "Indeed feed",
     get: getOrgIndeedFeedUrl,
-    description: "Indeed's standard <source> format. Register in Indeed's XML feed program.",
+    description: "Register this link with Indeed once — your jobs then appear on Indeed automatically.",
   },
   {
-    label: "Generic XML feed",
+    label: "Job boards feed",
     get: getOrgXmlFeedUrl,
-    description: "Same standard format under a neutral URL — submit to other aggregators.",
+    description: "The same link works for Jooble, Talent.com, Adzuna, and other boards — submit it once to each.",
   },
   {
-    label: "JSON feed",
+    label: "Developer feed (JSON)",
     get: getOrgJsonFeedUrl,
-    description: "Structured JSON for programmatic/custom integrations.",
+    description: "For custom integrations — your live jobs as structured data.",
   },
 ];
 

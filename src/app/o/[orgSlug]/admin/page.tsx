@@ -9,13 +9,16 @@ import {
 } from "@/lib/applications";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
-import { getJobQrUrl, getOrgIndeedFeedUrl, getOrgJobUrl, getOrgUrl } from "@/lib/env";
+import { getOrgIndeedFeedUrl, getOrgJobUrl, getOrgUrl } from "@/lib/env";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
-type PageProps = { params: Promise<{ orgSlug: string }> };
+type PageProps = {
+  params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ published?: string }>;
+};
 
-export default async function OrgAdminPage({ params }: PageProps) {
+export default async function OrgAdminPage({ params, searchParams }: PageProps) {
   const { orgSlug } = await params;
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
@@ -27,8 +30,29 @@ export default async function OrgAdminPage({ params }: PageProps) {
   const applicantCount = countApplicationsByOrganization(organization.id);
   const statusCounts = getApplicationStatusCounts(organization.id);
 
+  const publishedSlug = (await searchParams).published;
+  const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
+
   return (
     <div className="page-shell space-y-8">
+      {publishedJob ? (
+        <section className="rounded-xl border border-green-200 bg-green-50 p-6">
+          <h2 className="text-lg font-semibold text-green-900">🎉 Your job is live!</h2>
+          <p className="mt-1 text-sm text-green-800">
+            <span className="font-medium">{publishedJob.title}</span> is now on your careers page and syndicating to
+            job boards. Share it:
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
+            <code className="rounded bg-white px-2 py-1 text-green-900">{getJobPublicUrl(orgSlug, publishedJob.slug)}</code>
+            <a href={getJobPublicUrl(orgSlug, publishedJob.slug)} target="_blank" rel="noreferrer" className="font-medium text-green-800 underline">
+              View posting
+            </a>
+            <a href={`/o/${orgSlug}/jobs/${publishedJob.slug}/flyer`} target="_blank" rel="noreferrer" className="font-medium text-green-800 underline">
+              Print a flyer
+            </a>
+          </div>
+        </section>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-sm text-zinc-500">Signed in as {sessionContext.user.name}</p>
@@ -114,7 +138,22 @@ export default async function OrgAdminPage({ params }: PageProps) {
         </div>
 
         {jobs.length === 0 ? (
-          <div className="card text-zinc-600">No jobs yet.</div>
+          <div className="card space-y-4 py-10 text-center">
+            <p className="text-4xl">🚀</p>
+            <div>
+              <h3 className="text-lg font-semibold text-zinc-900">Post your first job in under a minute</h3>
+              <p className="mx-auto mt-1 max-w-md text-sm text-zinc-600">
+                Pick a role template, confirm the location, and publish. Your job goes live on your careers page and
+                starts syndicating to job boards immediately.
+              </p>
+            </div>
+            <div>
+              <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary inline-block">
+                Post your first job →
+              </Link>
+            </div>
+            <p className="text-xs text-zinc-500">1. Pick a template &nbsp;·&nbsp; 2. Set the location &nbsp;·&nbsp; 3. Publish</p>
+          </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
             <table className="min-w-full text-left text-sm">
@@ -147,8 +186,8 @@ export default async function OrgAdminPage({ params }: PageProps) {
                             <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
                               View
                             </a>
-                            <a href={getJobQrUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
-                              QR
+                            <a href={`/o/${orgSlug}/jobs/${job.slug}/flyer`} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">
+                              Flyer
                             </a>
                           </>
                         ) : null}

@@ -24,9 +24,10 @@ export async function generateJobDescription(params: {
     try {
       const description = await completeText({
         system:
-          "You write clear, compelling, inclusive job descriptions. Structure: a 2-3 sentence summary, " +
-          "a 'Responsibilities' bulleted list, and a 'Requirements' bulleted list. Plain text with '- ' bullets, " +
-          "no markdown headers or bold. Keep it realistic and specific; do not invent salary or company facts.",
+          "You write complete, compelling, inclusive job postings. Structure: a warm 2-3 sentence intro that sells " +
+          "the role, then 'Responsibilities:' with 5-7 bullets, 'Requirements:' with 4-6 bullets, and 'What we offer:' " +
+          "with 3-4 realistic benefits (growth, stability, team — never invent specific salary, PTO days, or insurance " +
+          "details). Plain text with '- ' bullets, no markdown headers or bold. Specific and credible, not fluffy.",
         prompt: [
           `Write a job description for: ${title}`,
           params.companyName ? `Company: ${params.companyName}` : "",

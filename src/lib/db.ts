@@ -15,6 +15,7 @@ export type Organization = {
   name: string;
   website: string;
   application_email: string;
+  brand_color: string;
   created_at: string;
   updated_at: string;
 };
@@ -176,6 +177,7 @@ function initDb(database: Database.Database): void {
       name TEXT NOT NULL,
       website TEXT NOT NULL DEFAULT '',
       application_email TEXT NOT NULL,
+      brand_color TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -192,6 +194,11 @@ function initDb(database: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_users_org ON users(organization_id);
   `);
+
+  // Migration: add branding to databases created before it existed.
+  if (!columnExists(database, "organizations", "brand_color")) {
+    database.exec("ALTER TABLE organizations ADD COLUMN brand_color TEXT NOT NULL DEFAULT ''");
+  }
 
   migrateLegacyJobs(database);
 
@@ -287,6 +294,7 @@ export function rowToOrganization(row: Record<string, unknown>): Organization {
     name: row.name as string,
     website: row.website as string,
     application_email: row.application_email as string,
+    brand_color: (row.brand_color as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
