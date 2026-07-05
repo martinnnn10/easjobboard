@@ -23,7 +23,7 @@ export default async function OrgAdminPage({ params }: PageProps) {
   const sessionContext = await requireOrgSession(orgSlug);
 
   const jobs = listJobsByOrganization(organization.id);
-  const applicants = listApplicationsByOrganization(organization.id).slice(0, 5);
+  const applicants = listApplicationsByOrganization(organization.id, { limit: 5 });
   const applicantCount = countApplicationsByOrganization(organization.id);
   const statusCounts = getApplicationStatusCounts(organization.id);
 

@@ -87,16 +87,33 @@ export function getApplicationResume(id: string, organizationId: string): {
   };
 }
 
+export type ListApplicationsOptions = {
+  orderBy?: "recent" | "score";
+  /** Max rows to return. Omit for all rows. */
+  limit?: number;
+  /** Rows to skip (for pagination). Ignored unless `limit` is set. */
+  offset?: number;
+};
+
 export function listApplicationsByOrganization(
   organizationId: string,
-  orderBy: "recent" | "score" = "recent",
+  options: ListApplicationsOptions = {},
 ): ApplicationWithJob[] {
+  const { orderBy = "recent", limit, offset = 0 } = options;
+
   // "score" surfaces the best-matching candidates first (nulls last); "recent"
   // keeps reverse-chronological order for the dashboard feed.
   const ordering =
     orderBy === "score"
       ? "a.match_score IS NULL, a.match_score DESC, a.created_at DESC"
       : "a.created_at DESC";
+
+  const params: Array<string | number> = [organizationId];
+  let limitClause = "";
+  if (limit != null) {
+    limitClause = " LIMIT ? OFFSET ?";
+    params.push(limit, Math.max(0, offset));
+  }
 
   return getDb()
     .prepare(
@@ -109,9 +126,9 @@ export function listApplicationsByOrganization(
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE a.organization_id = ?
-       ORDER BY ${ordering}`,
+       ORDER BY ${ordering}${limitClause}`,
     )
-    .all(organizationId)
+    .all(...params)
     .map((row) => {
       const application = rowToApplication(row as Record<string, unknown>);
       return {

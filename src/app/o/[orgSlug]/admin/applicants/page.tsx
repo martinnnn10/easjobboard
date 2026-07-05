@@ -2,20 +2,40 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
 import { MatchScore } from "@/components/MatchScore";
-import { listApplicationsByOrganization } from "@/lib/applications";
+import {
+  countApplicationsByOrganization,
+  listApplicationsByOrganization,
+} from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
-type PageProps = { params: Promise<{ orgSlug: string }> };
+const PAGE_SIZE = 25;
 
-export default async function OrgApplicantsPage({ params }: PageProps) {
+type PageProps = {
+  params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ page?: string }>;
+};
+
+export default async function OrgApplicantsPage({ params, searchParams }: PageProps) {
   const { orgSlug } = await params;
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
   await requireOrgSession(orgSlug);
 
-  const applicants = listApplicationsByOrganization(organization.id, "score");
+  const total = countApplicationsByOrganization(organization.id);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const requestedPage = Number.parseInt((await searchParams).page ?? "1", 10);
+  const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, requestedPage), pageCount) : 1;
+
+  const applicants = listApplicationsByOrganization(organization.id, {
+    orderBy: "score",
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = (page - 1) * PAGE_SIZE + applicants.length;
 
   return (
     <div className="page-shell space-y-6">
@@ -77,6 +97,36 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
           </table>
         </div>
       )}
+
+      {total > PAGE_SIZE ? (
+        <div className="flex items-center justify-between text-sm text-zinc-600">
+          <span>
+            Showing {rangeStart}–{rangeEnd} of {total}
+          </span>
+          <div className="flex gap-2">
+            {page > 1 ? (
+              <Link
+                href={`/o/${orgSlug}/admin/applicants?page=${page - 1}`}
+                className="btn-secondary px-3 py-1.5"
+              >
+                ← Previous
+              </Link>
+            ) : (
+              <span className="btn-secondary pointer-events-none px-3 py-1.5 opacity-50">← Previous</span>
+            )}
+            {page < pageCount ? (
+              <Link
+                href={`/o/${orgSlug}/admin/applicants?page=${page + 1}`}
+                className="btn-secondary px-3 py-1.5"
+              >
+                Next →
+              </Link>
+            ) : (
+              <span className="btn-secondary pointer-events-none px-3 py-1.5 opacity-50">Next →</span>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
