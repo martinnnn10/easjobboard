@@ -213,6 +213,10 @@ export function JobForm({
   const [titleSuggestion, setTitleSuggestion] = useState<JdTemplate | null>(null);
   const [showTitleHint, setShowTitleHint] = useState(false);
 
+  // AI description generation state
+  const [generating, setGenerating] = useState(false);
+  const [generateNote, setGenerateNote] = useState("");
+
   // Close suggestions on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -355,6 +359,32 @@ export function JobForm({
     setShowTitleHint(false);
   }, []);
 
+  async function handleGenerateDescription() {
+    if (!values.title.trim()) return;
+    setGenerating(true);
+    setGenerateNote("");
+    try {
+      const response = await fetch(`/api/o/${orgSlug}/jobs/generate-description`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: values.title, location: values.location }),
+      });
+      const data = (await response.json()) as { description?: string; source?: string; error?: string };
+      if (!response.ok || !data.description) {
+        setGenerateNote(data.error ?? "Couldn't generate a description. Add an ANTHROPIC_API_KEY or use a template.");
+        return;
+      }
+      updateField("description", data.description);
+      setGenerateNote(
+        data.source === "llm" ? "Generated with AI — review and edit before publishing." : "Filled from the closest template.",
+      );
+    } catch {
+      setGenerateNote("Generation failed. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
@@ -450,7 +480,17 @@ export function JobForm({
 
       {/* Description */}
       <label className="block space-y-1">
-        <span className="text-sm font-medium">Description *</span>
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Description *</span>
+          <button
+            type="button"
+            onClick={handleGenerateDescription}
+            disabled={generating || !values.title.trim()}
+            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+          >
+            {generating ? "Generating…" : "✨ Generate with AI"}
+          </button>
+        </div>
         <textarea
           value={values.description}
           onChange={(event) => updateField("description", event.target.value)}
@@ -458,6 +498,7 @@ export function JobForm({
           placeholder="Job responsibilities, requirements, and qualifications..."
           required
         />
+        {generateNote ? <span className="text-xs text-zinc-500">{generateNote}</span> : null}
       </label>
 
       {/* Location Section */}

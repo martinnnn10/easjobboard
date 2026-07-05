@@ -1,3 +1,4 @@
+import { completeJson, isLlmConfigured } from "./anthropic";
 import type { Job, Organization } from "./db";
 
 /**
@@ -130,4 +131,59 @@ function formatList(items: string[]): string {
   if (items.length <= 1) return items[0] ?? "";
   if (items.length === 2) return `${items[0]} and ${items[1]}`;
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+export type OutreachParams = {
+  candidateName: string;
+  candidateTitle: string;
+  matchedSkills: string[];
+  job: Job;
+  organization: Organization;
+  recruiterName?: string;
+};
+
+const OUTREACH_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    subject: { type: "string", description: "Concise email subject line" },
+    body: { type: "string", description: "Personalized plain-text email body" },
+  },
+  required: ["subject", "body"],
+} as const;
+
+/**
+ * Drafts outreach for a candidate. Uses Claude for a bespoke, personalized
+ * message when ANTHROPIC_API_KEY is configured; otherwise (or on error) falls
+ * back to the deterministic template above.
+ */
+export async function draftOutreachEmail(params: OutreachParams): Promise<OutreachDraft> {
+  if (isLlmConfigured()) {
+    try {
+      const draft = await completeJson<OutreachDraft>({
+        system:
+          "You are a recruiter writing a warm, concise, personalized first-touch outreach email to a passive candidate. " +
+          "Keep it under 120 words, specific, and non-spammy. Plain text only. No markdown.",
+        prompt: [
+          `Candidate: ${params.candidateName}${params.candidateTitle ? `, ${params.candidateTitle}` : ""}`,
+          params.matchedSkills.length ? `Relevant strengths: ${params.matchedSkills.join(", ")}` : "",
+          `Hiring company: ${params.organization.name}`,
+          `Role: ${params.job.title}${params.job.location ? ` (${params.job.location})` : ""}`,
+          "",
+          "Job description (for context):",
+          params.job.description.slice(0, 3000),
+          "",
+          `Sign the email as ${params.recruiterName || params.organization.name}. Invite a short reply. Return subject and body.`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        schema: OUTREACH_SCHEMA,
+        maxTokens: 800,
+      });
+      if (draft.subject && draft.body) return draft;
+    } catch (error) {
+      console.error("LLM outreach draft failed, using template:", error);
+    }
+  }
+  return buildOutreachEmail(params);
 }

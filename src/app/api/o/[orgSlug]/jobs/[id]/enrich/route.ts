@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
-import { buildOutreachEmail, enrichCandidate } from "@/lib/enrichment";
+import { draftOutreachEmail, enrichCandidate } from "@/lib/enrichment";
 import { getJobById } from "@/lib/jobs";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 
@@ -66,7 +66,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   // Draft outreach regardless of enrichment outcome — it's useful even if the
   // email couldn't be revealed (the recruiter can still use it via LinkedIn).
-  const outreach = buildOutreachEmail({
+  const outreach = await draftOutreachEmail({
     candidateName: body.candidateName || body.name || "there",
     candidateTitle: body.candidateTitle || "",
     matchedSkills: Array.isArray(body.matchedSkills) ? body.matchedSkills : [],

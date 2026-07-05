@@ -1,3 +1,4 @@
+import { completeJson, isLlmConfigured } from "./anthropic";
 import { extractSkills } from "./skills";
 
 export type ScoreResult = {
@@ -42,14 +43,80 @@ export function scoreResumeHeuristic(input: ScoreInput): ScoreResult {
   return { score, matchedSkills, missingSkills, resumeSkills, method: "heuristic" };
 }
 
+const LLM_SCORE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    score: { type: "integer", description: "0-100 overall match score" },
+    matchedSkills: {
+      type: "array",
+      items: { type: "string" },
+      description: "Key skills/requirements the candidate clearly meets",
+    },
+    missingSkills: {
+      type: "array",
+      items: { type: "string" },
+      description: "Key skills/requirements the candidate appears to lack",
+    },
+  },
+  required: ["score", "matchedSkills", "missingSkills"],
+} as const;
+
+type LlmScore = { score: number; matchedSkills: string[]; missingSkills: string[] };
+
+// Keep prompt inputs bounded so token usage stays predictable.
+function clamp(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 /**
- * Scores a resume against a job.
- *
- * Extension point: when an LLM provider is configured (e.g. ANTHROPIC_API_KEY),
- * a higher-quality semantic scorer can be plugged in here and fall back to the
- * heuristic on error or when the key is absent. Today it always uses the
- * offline heuristic, so behaviour is unchanged without configuration.
+ * LLM-backed semantic scorer. Higher quality than the keyword heuristic because
+ * it reasons about the whole resume against the whole JD. The stored
+ * `resumeSkills` still come from the deterministic dictionary so the candidate
+ * search/pool stay consistent; only the score + matched/missing come from Claude.
+ */
+async function scoreResumeLlm(input: ScoreInput): Promise<ScoreResult> {
+  const result = await completeJson<LlmScore>({
+    system:
+      "You are an expert technical recruiter. Score how well a candidate's resume matches a job. " +
+      "Be objective and specific. Return only the requested JSON.",
+    prompt: [
+      `JOB TITLE: ${input.jobTitle}`,
+      "",
+      "JOB DESCRIPTION:",
+      clamp(input.jobDescription, 6000),
+      "",
+      "CANDIDATE RESUME:",
+      clamp(input.resumeText, 8000),
+      "",
+      "Score 0-100 how well this candidate matches the job. List the key skills/requirements they clearly meet (matchedSkills) and the important ones they appear to lack (missingSkills).",
+    ].join("\n"),
+    schema: LLM_SCORE_SCHEMA,
+    maxTokens: 1024,
+  });
+
+  const score = Math.max(0, Math.min(100, Math.round(result.score)));
+  return {
+    score,
+    matchedSkills: Array.isArray(result.matchedSkills) ? result.matchedSkills : [],
+    missingSkills: Array.isArray(result.missingSkills) ? result.missingSkills : [],
+    resumeSkills: extractSkills(input.resumeText),
+    method: "llm",
+  };
+}
+
+/**
+ * Scores a resume against a job. Uses the Claude-backed scorer when
+ * ANTHROPIC_API_KEY is configured, falling back to the offline heuristic when
+ * it is absent or the API call fails — so behaviour is graceful either way.
  */
 export async function scoreResume(input: ScoreInput): Promise<ScoreResult> {
+  if (isLlmConfigured() && input.resumeText.trim()) {
+    try {
+      return await scoreResumeLlm(input);
+    } catch (error) {
+      console.error("LLM scoring failed, falling back to heuristic:", error);
+    }
+  }
   return scoreResumeHeuristic(input);
 }
