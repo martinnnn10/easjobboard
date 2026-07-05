@@ -72,17 +72,23 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <header className="border-b border-zinc-200 bg-white">
-          <div className="page-shell flex items-center justify-between py-4">
-            <Link href="/" className="text-lg font-semibold text-zinc-900">
-              {getPlatformName()}
+        <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3.5">
+            <Link href="/" className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-700 text-sm font-bold text-white">
+                ⚡
+              </span>
+              <span className="text-lg font-bold tracking-tight text-zinc-900">{getPlatformName()}</span>
             </Link>
             <HeaderNav />
           </div>
         </header>
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-zinc-200 bg-white py-6 text-center text-sm text-zinc-500">
-          {getPlatformName()} · A recruiting platform by {getPlatformCompany()}
+        <footer className="hero-dark mt-auto">
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-slate-400">
+            <span className="font-semibold text-white">{getPlatformName()}</span>
+            <span>A recruiting platform by {getPlatformCompany()}</span>
+          </div>
         </footer>
       </body>
     </html>
