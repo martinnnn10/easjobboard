@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, JobStatus } from "@/lib/db";
+import { JD_TEMPLATES, getTemplateById, matchTemplateByTitle, type JdTemplate } from "@/lib/jd-templates";
 
 type JobFormValues = {
   title: string;
@@ -152,135 +153,8 @@ const US_CITIES: CityEntry[] = [
   { city: "Hartford", state: "Connecticut", stateCode: "CT", zip: "06101" },
 ];
 
-// ─── Job Title Intelligence ────────────────────────────────────────────────
-type JobTitleSuggestion = {
-  employment_type: string;
-  salary_min: string;
-  salary_max: string;
-  salary_period: string;
-  descriptionHint: string;
-};
-
-const JOB_TITLE_PATTERNS: { pattern: RegExp; suggestion: JobTitleSuggestion }[] = [
-  {
-    pattern: /maintenance\s*(supervisor|manager)/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "85000",
-      salary_max: "110000",
-      salary_period: "YEAR",
-      descriptionHint: "Supervise and coordinate maintenance activities including preventive maintenance programs, equipment repairs, and facility upkeep. Manage maintenance staff scheduling, training, and performance. Ensure compliance with safety regulations and maintain documentation of all maintenance activities.\n\nRequirements:\n- 5+ years maintenance experience in industrial/manufacturing environment\n- Knowledge of PLCs, electrical systems, and mechanical systems\n- Experience with CMMS software\n- Strong leadership and communication skills\n- OSHA safety knowledge\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /maintenance\s*technician/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "55000",
-      salary_max: "75000",
-      salary_period: "YEAR",
-      descriptionHint: "Perform preventive and corrective maintenance on production equipment, HVAC systems, and facility infrastructure. Troubleshoot electrical, mechanical, pneumatic, and hydraulic systems. Complete work orders and maintain accurate maintenance records.\n\nRequirements:\n- 3+ years industrial maintenance experience\n- Knowledge of PLCs and electrical troubleshooting\n- Ability to read schematics, blueprints, and technical manuals\n- Experience with welding, fabrication, or machining preferred\n- Must be available for on-call rotation\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /electrician|electrical\s*technician/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "65000",
-      salary_max: "90000",
-      salary_period: "YEAR",
-      descriptionHint: "Install, maintain, and repair electrical systems including wiring, conduit, panels, motors, VFDs, and control systems. Perform troubleshooting using multimeters, meggars, and thermal imaging. Ensure all work meets NEC code requirements.\n\nRequirements:\n- Journeyman or Master Electrician license\n- Experience with 480V 3-phase systems\n- PLC programming knowledge (Allen-Bradley, Siemens)\n- Ability to read electrical drawings and schematics\n- NFPA 70E arc flash training\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /plc\s*programmer|controls\s*engineer|automation\s*engineer/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "90000",
-      salary_max: "130000",
-      salary_period: "YEAR",
-      descriptionHint: "Design, program, and commission PLC-based control systems for manufacturing automation. Develop HMI interfaces, configure industrial networks, and integrate SCADA systems. Support production with troubleshooting and continuous improvement projects.\n\nRequirements:\n- BS in Electrical Engineering or related field\n- 3+ years PLC programming (Allen-Bradley, Siemens, or Mitsubishi)\n- Experience with HMI development (FactoryTalk, WinCC)\n- Knowledge of industrial communication protocols (EtherNet/IP, Profinet, Modbus)\n- AutoCAD Electrical proficiency\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /machine\s*operator|production\s*operator/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "38000",
-      salary_max: "52000",
-      salary_period: "YEAR",
-      descriptionHint: "Operate and monitor production machinery to meet quality and output targets. Perform basic machine setup, changeovers, and minor adjustments. Conduct quality checks and maintain production logs.\n\nRequirements:\n- High school diploma or GED\n- 1+ years manufacturing experience preferred\n- Ability to read and follow work instructions\n- Basic math and measurement skills\n- Ability to lift 50 lbs and stand for extended periods\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /warehouse|material\s*handler|forklift/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "35000",
-      salary_max: "48000",
-      salary_period: "YEAR",
-      descriptionHint: "Receive, store, and distribute materials, equipment, and products within the warehouse. Operate forklifts and other material handling equipment. Maintain inventory accuracy and ensure proper storage conditions.\n\nRequirements:\n- Valid forklift certification\n- Experience with warehouse management systems (WMS)\n- Ability to lift 50+ lbs regularly\n- Basic computer skills for inventory tracking\n- Attention to detail for accurate order picking\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /welder|welding/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "50000",
-      salary_max: "72000",
-      salary_period: "YEAR",
-      descriptionHint: "Perform MIG, TIG, and stick welding on various metals including carbon steel, stainless steel, and aluminum. Read and interpret blueprints, welding symbols, and fabrication drawings. Ensure all welds meet quality standards and pass inspection.\n\nRequirements:\n- AWS certification preferred\n- 3+ years welding experience in industrial setting\n- Proficiency in multiple welding processes\n- Ability to read blueprints and welding symbols\n- Knowledge of metallurgy and heat treatment basics\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /hvac|refrigeration/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "55000",
-      salary_max: "80000",
-      salary_period: "YEAR",
-      descriptionHint: "Install, maintain, and repair HVAC and refrigeration systems in commercial and industrial facilities. Perform preventive maintenance, diagnose system failures, and ensure optimal performance. Handle refrigerant recovery and charging per EPA regulations.\n\nRequirements:\n- EPA 608 Universal Certification\n- 3+ years commercial/industrial HVAC experience\n- Knowledge of building automation systems (BAS)\n- Ability to read mechanical drawings and wiring diagrams\n- Valid driver's license\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /project\s*manager/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "95000",
-      salary_max: "130000",
-      salary_period: "YEAR",
-      descriptionHint: "Lead and manage capital projects from conception through commissioning. Develop project scopes, budgets, and schedules. Coordinate with engineering, operations, and contractors to ensure on-time, on-budget delivery.\n\nRequirements:\n- PMP certification preferred\n- 5+ years project management experience in industrial/manufacturing\n- Proficiency in MS Project or Primavera\n- Strong budget management and vendor negotiation skills\n- Bachelor's degree in Engineering or related field\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /safety\s*(manager|coordinator|specialist)/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "70000",
-      salary_max: "95000",
-      salary_period: "YEAR",
-      descriptionHint: "Develop and implement safety programs to ensure compliance with OSHA regulations and company policies. Conduct safety audits, incident investigations, and risk assessments. Lead safety training programs and maintain safety documentation.\n\nRequirements:\n- CSP or ASP certification preferred\n- 3+ years safety management in manufacturing/industrial\n- Knowledge of OSHA 29 CFR 1910 (General Industry)\n- Experience with LOTO, confined space, fall protection programs\n- Strong communication and training delivery skills\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /quality\s*(engineer|inspector|manager)/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "70000",
-      salary_max: "100000",
-      salary_period: "YEAR",
-      descriptionHint: "Develop and maintain quality management systems. Perform inspections, audits, and root cause analysis. Drive continuous improvement initiatives using statistical methods and lean principles.\n\nRequirements:\n- CQE or Six Sigma certification preferred\n- Experience with ISO 9001 / IATF 16949\n- Proficiency in SPC, FMEA, and 8D methodology\n- Knowledge of GD&T and CMM operation\n- Strong analytical and problem-solving skills\n\nJob Type: Full-time",
-    },
-  },
-];
-
-function getJobTitleSuggestion(title: string): JobTitleSuggestion | null {
-  if (!title || title.length < 3) return null;
-  for (const { pattern, suggestion } of JOB_TITLE_PATTERNS) {
-    if (pattern.test(title)) return suggestion;
-  }
-  return null;
-}
+// Job-title → template intelligence now lives in @/lib/jd-templates so the same
+// library powers both the browsable picker and title-match auto-fill.
 
 // ─── Location Search ───────────────────────────────────────────────────────
 function searchCities(query: string): CityEntry[] {
@@ -336,7 +210,7 @@ export function JobForm({
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Job title suggestion state
-  const [titleSuggestion, setTitleSuggestion] = useState<JobTitleSuggestion | null>(null);
+  const [titleSuggestion, setTitleSuggestion] = useState<JdTemplate | null>(null);
   const [showTitleHint, setShowTitleHint] = useState(false);
 
   // Close suggestions on outside click
@@ -443,7 +317,7 @@ export function JobForm({
   // Handle job title changes — suggest employment type and salary
   const handleTitleChange = useCallback((value: string) => {
     updateField("title", value);
-    const suggestion = getJobTitleSuggestion(value);
+    const suggestion = matchTemplateByTitle(value);
     setTitleSuggestion(suggestion);
     if (suggestion) {
       setShowTitleHint(true);
@@ -459,10 +333,27 @@ export function JobForm({
       salary_min: current.salary_min || titleSuggestion.salary_min,
       salary_max: current.salary_max || titleSuggestion.salary_max,
       salary_period: titleSuggestion.salary_period,
-      description: current.description || titleSuggestion.descriptionHint,
+      description: current.description || titleSuggestion.description,
     }));
     setShowTitleHint(false);
   }, [titleSuggestion]);
+
+  // Explicit template picker — fills title (if empty), salary, type, and body.
+  const applyTemplate = useCallback((templateId: string) => {
+    const template = getTemplateById(templateId);
+    if (!template) return;
+    setValues((current) => ({
+      ...current,
+      title: current.title || template.sampleTitle,
+      employment_type: template.employment_type,
+      salary_min: template.salary_min,
+      salary_max: template.salary_max,
+      salary_period: template.salary_period,
+      description: template.description,
+    }));
+    setTitleSuggestion(null);
+    setShowTitleHint(false);
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -491,6 +382,29 @@ export function JobForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Start-from-a-template picker */}
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Start from a template</span>
+        <select
+          defaultValue=""
+          onChange={(event) => {
+            if (event.target.value) applyTemplate(event.target.value);
+            event.target.value = "";
+          }}
+          className="field-input"
+        >
+          <option value="">Choose a role template…</option>
+          {JD_TEMPLATES.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-zinc-500">
+          Fills the title, employment type, salary range, and a starter description you can edit.
+        </span>
+      </label>
+
       {/* Job Title with Intelligence */}
       <div className="space-y-2">
         <label className="block space-y-1">
