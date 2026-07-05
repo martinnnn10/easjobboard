@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MatchScore } from "@/components/MatchScore";
+import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { getPoolSkills, searchCandidates } from "@/lib/candidates";
@@ -104,7 +104,15 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                     {candidate.phone ? ` · ${candidate.phone}` : ""}
                   </p>
                 </div>
-                <MatchScore score={candidate.bestScore} skills={candidate.skills} />
+                <div className="text-right">
+                  <ScreenScoreBadge
+                    score={candidate.bestScreenScore}
+                    status={candidate.bestScreenScore === null ? "none" : "completed"}
+                  />
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    {candidate.bestScore === null ? "" : `Resume kw: ${candidate.bestScore}%`}
+                  </p>
+                </div>
               </div>
 
               <div className="rounded-lg border border-zinc-200">
@@ -113,7 +121,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                     <tr>
                       <th className="px-3 py-2 font-medium">Applied to</th>
                       <th className="px-3 py-2 font-medium">Stage</th>
-                      <th className="px-3 py-2 font-medium">Score</th>
+                      <th className="px-3 py-2 font-medium">Skills screen</th>
                       <th className="px-3 py-2 font-medium">When</th>
                       <th className="px-3 py-2 font-medium">Resume</th>
                     </tr>
@@ -130,7 +138,9 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                           </Link>
                         </td>
                         <td className="px-3 py-2 text-zinc-600">{APPLICATION_STATUS_LABELS[app.status]}</td>
-                        <td className="px-3 py-2 text-zinc-600">{app.matchScore === null ? "—" : `${app.matchScore}%`}</td>
+                        <td className="px-3 py-2">
+                          <ScreenScoreBadge score={app.screenScore} status={app.screenStatus} />
+                        </td>
                         <td className="px-3 py-2 text-zinc-600">{new Date(app.createdAt).toLocaleDateString()}</td>
                         <td className="px-3 py-2">
                           <a

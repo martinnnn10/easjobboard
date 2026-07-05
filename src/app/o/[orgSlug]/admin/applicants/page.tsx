@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
-import { MatchScore } from "@/components/MatchScore";
+import { BadgeRow, ScreenScoreBadge } from "@/components/ScreenSignals";
 import {
   countApplicationsByOrganization,
   listApplicationsByOrganization,
 } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
 const PAGE_SIZE = 25;
@@ -45,8 +46,8 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-zinc-900">Applicants</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Ranked by how well each resume matches the job&apos;s skills. Resumes are also emailed to{" "}
-          {organization.application_email} when candidates apply.
+          Ranked by practical skills-screen score — who can actually do the work — not resume keywords. Resumes are
+          also emailed to {organization.application_email} when candidates apply.
         </p>
       </div>
 
@@ -59,9 +60,9 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
               <tr>
                 <th className="px-4 py-3 font-medium">Applicant</th>
                 <th className="px-4 py-3 font-medium">Job</th>
-                <th className="px-4 py-3 font-medium">Match</th>
+                <th className="px-4 py-3 font-medium">Skills screen</th>
+                <th className="px-4 py-3 font-medium">Signals</th>
                 <th className="px-4 py-3 font-medium">Stage</th>
-                <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Applied</th>
                 <th className="px-4 py-3 font-medium">Resume</th>
               </tr>
@@ -80,7 +81,13 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
                   <td className="px-4 py-3">
-                    <MatchScore score={application.match_score} skills={application.resume_skills} />
+                    <ScreenScoreBadge score={application.screen_score} status={application.screen_status} />
+                    <div className="mt-1 text-[11px] text-zinc-400">
+                      {application.match_score === null ? "" : `Resume kw: ${application.match_score}%`}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <BadgeRow badges={badgesForApplication(application)} max={3} />
                   </td>
                   <td className="px-4 py-3">
                     <ApplicationStatusSelect
@@ -89,7 +96,6 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                       initialStatus={application.status}
                     />
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">{application.applicant_phone || "—"}</td>
                   <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <a href={`/api/o/${orgSlug}/applications/${application.id}/resume`} className="text-blue-600 hover:underline">

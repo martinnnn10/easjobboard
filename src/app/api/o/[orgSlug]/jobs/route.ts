@@ -42,6 +42,7 @@ export async function POST(request: Request, context: RouteContext) {
       company_name: body.company_name,
       reference_number: body.reference_number,
       status: (body.status as JobStatus) ?? "draft",
+      screen_key: body.screen_key,
     });
 
     return NextResponse.json({ job }, { status: 201 });

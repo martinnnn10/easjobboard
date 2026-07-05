@@ -1,4 +1,4 @@
-import { getDb, type ApplicationStatus } from "./db";
+import { getDb, type ApplicationStatus, type ScreenStatus } from "./db";
 
 /**
  * Cross-job candidate directory: dedupes applications by email so the same
@@ -12,6 +12,8 @@ export type CandidateApplication = {
   jobSlug: string;
   status: ApplicationStatus;
   matchScore: number | null;
+  screenScore: number | null;
+  screenStatus: ScreenStatus;
   resumeFilename: string;
   createdAt: string;
 };
@@ -22,6 +24,7 @@ export type Candidate = {
   phone: string;
   skills: string[];
   bestScore: number | null;
+  bestScreenScore: number | null;
   lastAppliedAt: string;
   applications: CandidateApplication[];
 };
@@ -39,6 +42,8 @@ type Row = {
   applicant_phone: string;
   status: ApplicationStatus;
   match_score: number | null;
+  screen_score: number | null;
+  screen_status: ScreenStatus;
   resume_filename: string;
   resume_skills: string;
   created_at: string;
@@ -82,7 +87,7 @@ export function searchCandidates(organizationId: string, filters: CandidateFilte
   const rows = getDb()
     .prepare(
       `SELECT a.id, a.applicant_name, a.applicant_email, a.applicant_phone, a.status,
-              a.match_score, a.resume_filename, a.resume_skills, a.created_at,
+              a.match_score, a.screen_score, a.screen_status, a.resume_filename, a.resume_skills, a.created_at,
               j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
@@ -101,6 +106,8 @@ export function searchCandidates(organizationId: string, filters: CandidateFilte
       jobSlug: row.job_slug,
       status: row.status,
       matchScore: row.match_score,
+      screenScore: row.screen_score,
+      screenStatus: row.screen_status ?? "none",
       resumeFilename: row.resume_filename,
       createdAt: row.created_at,
     };
@@ -115,6 +122,7 @@ export function searchCandidates(organizationId: string, filters: CandidateFilte
         phone: row.applicant_phone,
         skills: rowSkills,
         bestScore: row.match_score,
+        bestScreenScore: row.screen_score,
         lastAppliedAt: row.created_at,
         applications: [application],
       });
@@ -128,9 +136,16 @@ export function searchCandidates(organizationId: string, filters: CandidateFilte
     if (row.match_score != null && (existing.bestScore == null || row.match_score > existing.bestScore)) {
       existing.bestScore = row.match_score;
     }
+    if (row.screen_score != null && (existing.bestScreenScore == null || row.screen_score > existing.bestScreenScore)) {
+      existing.bestScreenScore = row.screen_score;
+    }
   }
 
+  // Rank by best practical skills-screen score first (nulls last), then resume
+  // keyword match, then recency.
   return Array.from(byEmail.values()).sort((a, b) => {
+    const screenDiff = (b.bestScreenScore ?? -1) - (a.bestScreenScore ?? -1);
+    if (screenDiff !== 0) return screenDiff;
     const scoreDiff = (b.bestScore ?? -1) - (a.bestScore ?? -1);
     if (scoreDiff !== 0) return scoreDiff;
     return b.lastAppliedAt.localeCompare(a.lastAppliedAt);

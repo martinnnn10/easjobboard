@@ -1,6 +1,15 @@
 import { randomUUID } from "crypto";
 import { recordCandidateEvent } from "./candidate-events";
-import { getDb, rowToApplication, type Application, type ApplicationStatus } from "./db";
+import {
+  getDb,
+  rowToApplication,
+  type Application,
+  type ApplicationStatus,
+  type RiskFlagRecord,
+  type RiskLevelValue,
+  type ScreenStatus,
+  type ScreenSummaryRecord,
+} from "./db";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -24,6 +33,14 @@ export function createApplication(input: {
   resume_text?: string;
   resume_skills?: string[];
   match_score?: number | null;
+  applicant_location?: string;
+  desired_pay?: string;
+  screen_status?: ScreenStatus;
+  screen_score?: number | null;
+  risk_level?: RiskLevelValue;
+  risk_flags?: RiskFlagRecord[];
+  screen_summary?: ScreenSummaryRecord | null;
+  created_at?: string;
 }): Application {
   const database = getDb();
   const id = randomUUID();
@@ -33,11 +50,13 @@ export function createApplication(input: {
       `INSERT INTO applications (
         id, organization_id, job_id, applicant_name, applicant_email, applicant_phone,
         cover_letter, resume_filename, resume_content_type, resume_data,
-        resume_text, resume_skills, match_score, created_at
+        resume_text, resume_skills, match_score, applicant_location, desired_pay,
+        screen_status, screen_score, risk_level, risk_flags, screen_summary, created_at
       ) VALUES (
         @id, @organization_id, @job_id, @applicant_name, @applicant_email, @applicant_phone,
         @cover_letter, @resume_filename, @resume_content_type, @resume_data,
-        @resume_text, @resume_skills, @match_score, @created_at
+        @resume_text, @resume_skills, @match_score, @applicant_location, @desired_pay,
+        @screen_status, @screen_score, @risk_level, @risk_flags, @screen_summary, @created_at
       )`,
     )
     .run({
@@ -54,7 +73,14 @@ export function createApplication(input: {
       resume_text: input.resume_text ?? "",
       resume_skills: JSON.stringify(input.resume_skills ?? []),
       match_score: input.match_score ?? null,
-      created_at: nowIso(),
+      applicant_location: input.applicant_location ?? "",
+      desired_pay: input.desired_pay ?? "",
+      screen_status: input.screen_status ?? "none",
+      screen_score: input.screen_score ?? null,
+      risk_level: input.risk_level ?? "",
+      risk_flags: JSON.stringify(input.risk_flags ?? []),
+      screen_summary: input.screen_summary ? JSON.stringify(input.screen_summary) : "",
+      created_at: input.created_at ?? nowIso(),
     });
 
   const jobTitle = (
@@ -85,8 +111,9 @@ export function getApplicationDetail(id: string, organizationId: string): Applic
     .prepare(
       `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
               a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
-              a.status, a.resume_skills, a.match_score, a.created_at,
-              j.title AS job_title, j.slug AS job_slug
+              a.status, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
+              a.screen_status, a.screen_score, a.risk_level, a.risk_flags, a.screen_summary,
+              a.created_at, j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE a.id = ? AND a.organization_id = ?`,
@@ -138,11 +165,11 @@ export function listApplicationsByOrganization(
 ): ApplicationWithJob[] {
   const { orderBy = "recent", limit, offset = 0 } = options;
 
-  // "score" surfaces the best-matching candidates first (nulls last); "recent"
-  // keeps reverse-chronological order for the dashboard feed.
+  // "score" ranks by practical skills-screen score first (nulls last), then
+  // resume keyword match, then recency; "recent" is reverse-chronological.
   const ordering =
     orderBy === "score"
-      ? "a.match_score IS NULL, a.match_score DESC, a.created_at DESC"
+      ? "a.screen_score IS NULL, a.screen_score DESC, a.match_score IS NULL, a.match_score DESC, a.created_at DESC"
       : "a.created_at DESC";
 
   const params: Array<string | number> = [organizationId];
@@ -158,8 +185,9 @@ export function listApplicationsByOrganization(
       // memory for list views — only the small fields the table renders.
       `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
               a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
-              a.status, a.resume_skills, a.match_score, a.created_at,
-              j.title AS job_title, j.slug AS job_slug
+              a.status, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
+              a.screen_status, a.screen_score, a.risk_level, a.risk_flags, a.screen_summary,
+              a.created_at, j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE a.organization_id = ?
@@ -209,6 +237,97 @@ export function getApplicationStatusCounts(
     if (row.status in counts) counts[row.status] = row.count;
   }
   return counts;
+}
+
+// Thresholds shared across the intelligence views.
+const STRONG_FIT = 70;
+const REVIEW_FLOOR = 45;
+
+export type ScreeningStats = {
+  totalApplicants: number;
+  screened: number;
+  strongFit: number;
+  needsReview: number;
+  highRisk: number;
+  avgScore: number | null;
+};
+
+/**
+ * Manufacturing hiring-intelligence rollup for the dashboard: how many
+ * applicants were actually screened, how many are strong-fit, how many need a
+ * look, how many are high-risk, and the average practical score.
+ */
+export function getScreeningStats(organizationId: string): ScreeningStats {
+  const db = getDb();
+  const total = countApplicationsByOrganization(organizationId);
+
+  const row = db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN 1 ELSE 0 END) AS screened,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND risk_level != 'high' THEN 1 ELSE 0 END) AS strong,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND screen_score < ? THEN 1 ELSE 0 END) AS review,
+         SUM(CASE WHEN risk_level = 'high' THEN 1 ELSE 0 END) AS high_risk,
+         AVG(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN screen_score END) AS avg_score
+       FROM applications WHERE organization_id = ?`,
+    )
+    .get(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId) as {
+    screened: number | null;
+    strong: number | null;
+    review: number | null;
+    high_risk: number | null;
+    avg_score: number | null;
+  };
+
+  return {
+    totalApplicants: total,
+    screened: row.screened ?? 0,
+    strongFit: row.strong ?? 0,
+    needsReview: row.review ?? 0,
+    highRisk: row.high_risk ?? 0,
+    avgScore: row.avg_score == null ? null : Math.round(row.avg_score),
+  };
+}
+
+export type JobScreeningSummary = {
+  applicants: number;
+  completed: number;
+  strongFit: number;
+  needsReview: number;
+};
+
+/**
+ * Per-job screening rollup keyed by job id: applicants, completed screens,
+ * strong-fit, and needs-review counts. One grouped query for the whole org.
+ */
+export function getJobScreeningSummaries(organizationId: string): Record<string, JobScreeningSummary> {
+  const rows = getDb()
+    .prepare(
+      `SELECT job_id,
+         COUNT(*) AS applicants,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND risk_level != 'high' THEN 1 ELSE 0 END) AS strong,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND screen_score < ? THEN 1 ELSE 0 END) AS review
+       FROM applications WHERE organization_id = ? GROUP BY job_id`,
+    )
+    .all(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId) as Array<{
+    job_id: string;
+    applicants: number;
+    completed: number;
+    strong: number;
+    review: number;
+  }>;
+
+  const out: Record<string, JobScreeningSummary> = {};
+  for (const row of rows) {
+    out[row.job_id] = {
+      applicants: row.applicants,
+      completed: row.completed,
+      strongFit: row.strong,
+      needsReview: row.review,
+    };
+  }
+  return out;
 }
 
 /**

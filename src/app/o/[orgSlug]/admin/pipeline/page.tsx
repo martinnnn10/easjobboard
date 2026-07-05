@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { PipelineBoard, type PipelineCard } from "@/components/PipelineBoard";
 import { listApplicationsByOrganization } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
@@ -28,7 +29,9 @@ export default async function PipelinePage({ params }: PageProps) {
     name: application.applicant_name,
     email: application.applicant_email,
     jobTitle: application.job_title,
-    score: application.match_score,
+    screenScore: application.screen_score,
+    screenStatus: application.screen_status,
+    badges: badgesForApplication(application),
     status: application.status,
     appliedAt: application.created_at,
   }));
@@ -42,7 +45,7 @@ export default async function PipelinePage({ params }: PageProps) {
           </Link>
           <h1 className="mt-2 text-3xl font-bold text-zinc-900">Pipeline</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Every candidate, by stage. Drag cards to move people forward.
+            Ranked by practical skills-screen score within each stage. Drag cards to move people forward.
           </p>
         </div>
         <Link href={`/o/${orgSlug}/admin/candidates`} className="btn-secondary">

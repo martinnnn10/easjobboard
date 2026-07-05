@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, JobStatus } from "@/lib/db";
 import { JD_TEMPLATES, getTemplateById, matchTemplateByTitle, type JdTemplate } from "@/lib/jd-templates";
+import { getScreen, SCREEN_OPTIONS, suggestScreenForTitle } from "@/lib/screens";
 
 type JobFormValues = {
   title: string;
@@ -21,6 +22,15 @@ type JobFormValues = {
   company_name: string;
   reference_number: string;
   status: JobStatus;
+  screen_key: string;
+};
+
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  multiple_choice: "Multiple choice",
+  short_answer: "Short answer",
+  scenario: "Troubleshooting scenario",
+  ranking: "Order the steps",
+  experience: "Experience",
 };
 
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"];
@@ -308,6 +318,32 @@ function searchCities(query: string): CityEntry[] {
   return [...prefix, ...contains].slice(0, 8);
 }
 
+// Read-only preview of the questions an applicant will see for a given screen.
+function ScreenPreview({ screenKey }: { screenKey: string }) {
+  const screen = getScreen(screenKey);
+  if (!screen) return null;
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-4">
+      <p className="text-sm font-semibold text-zinc-900">{screen.label}</p>
+      <p className="mt-0.5 text-xs text-zinc-500">
+        {screen.questions.length} questions · applicants answer these when they apply
+      </p>
+      <ol className="mt-3 space-y-2.5">
+        {screen.questions.map((question, index) => (
+          <li key={question.id} className="text-sm">
+            <span className="font-medium text-zinc-800">
+              {index + 1}. {question.prompt}
+            </span>
+            <span className="ml-2 inline-flex rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+              {QUESTION_TYPE_LABELS[question.type] ?? question.type}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────
 function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
   return {
@@ -326,6 +362,9 @@ function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
     company_name: job?.company_name ?? defaultCompanyName ?? "",
     reference_number: job?.reference_number ?? "",
     status: job?.status ?? "draft",
+    // Default the screen ON for new jobs (suggested from the title once typed,
+    // otherwise the maintenance-tech screen); editing preserves the saved choice.
+    screen_key: job ? job.screen_key : "maintenance_tech",
   };
 }
 
@@ -353,6 +392,11 @@ export function JobForm({
   // Job title suggestion state
   const [titleSuggestion, setTitleSuggestion] = useState<JdTemplate | null>(null);
   const [showTitleHint, setShowTitleHint] = useState(false);
+
+  // Skills-screen picker state. Once the recruiter picks a screen manually we
+  // stop auto-suggesting from the title.
+  const [showScreenPreview, setShowScreenPreview] = useState(false);
+  const screenTouched = useRef(Boolean(job));
 
   // AI description generation state
   const [generating, setGenerating] = useState(false);
@@ -474,9 +518,15 @@ export function JobForm({
     [showCitySuggestions, citySuggestions, activeSuggestionIndex, selectCity]
   );
 
-  // Handle job title changes — suggest employment type and salary
+  // Handle job title changes — suggest employment type, salary, and screen
   const handleTitleChange = useCallback((value: string) => {
-    updateField("title", value);
+    const suggestedScreen = suggestScreenForTitle(value);
+    setValues((current) => ({
+      ...current,
+      title: value,
+      // Auto-track the best-fit screen until the recruiter overrides it.
+      screen_key: screenTouched.current ? current.screen_key : suggestedScreen ?? current.screen_key,
+    }));
     const suggestion = matchTemplateByTitle(value);
     setTitleSuggestion(suggestion);
     if (suggestion) {
@@ -502,6 +552,7 @@ export function JobForm({
   const applyTemplate = useCallback((templateId: string) => {
     const template = getTemplateById(templateId);
     if (!template) return;
+    const suggestedScreen = suggestScreenForTitle(template.sampleTitle);
     setValues((current) => ({
       ...current,
       title: current.title || template.sampleTitle,
@@ -510,6 +561,7 @@ export function JobForm({
       salary_max: template.salary_max,
       salary_period: template.salary_period,
       description: template.description,
+      screen_key: screenTouched.current ? current.screen_key : suggestedScreen ?? current.screen_key,
     }));
     setTitleSuggestion(null);
     setShowTitleHint(false);
@@ -666,6 +718,55 @@ export function JobForm({
         />
         {generateNote ? <span className="text-xs text-zinc-500">{generateNote}</span> : null}
       </label>
+
+      {/* Attach skills screen — the differentiator */}
+      <fieldset className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+        <legend className="px-2 text-sm font-semibold text-blue-800">Attach skills screen</legend>
+        <p className="text-sm text-zinc-700">
+          Every applicant answers a short, role-specific screen so you can see who can actually troubleshoot — before
+          you interview. This is what sets your postings apart from a plain job board.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Screen for this role</span>
+            <select
+              value={values.screen_key}
+              onChange={(event) => {
+                screenTouched.current = true;
+                updateField("screen_key", event.target.value);
+                setShowScreenPreview(false);
+              }}
+              className="field-input"
+            >
+              {SCREEN_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.shortLabel}
+                </option>
+              ))}
+              <option value="">No screen (not recommended)</option>
+            </select>
+          </label>
+          <div className="flex items-end">
+            {values.screen_key ? (
+              <button
+                type="button"
+                onClick={() => setShowScreenPreview((v) => !v)}
+                className="btn-secondary text-sm"
+              >
+                {showScreenPreview ? "Hide preview" : "Preview the screen"}
+              </button>
+            ) : (
+              <p className="text-xs text-amber-700">
+                Without a screen, this posting behaves like any other job board — applicants aren&apos;t qualified.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {showScreenPreview && values.screen_key ? (
+          <ScreenPreview screenKey={values.screen_key} />
+        ) : null}
+      </fieldset>
 
       {/* Location Section */}
       <fieldset className="space-y-3 rounded-lg border border-zinc-200 p-4">

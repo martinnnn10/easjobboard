@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { createApplication } from "@/lib/applications";
+import {
+  assessRisk,
+  deriveRecommendedAction,
+  type ScreenSummary,
+} from "@/lib/candidate-intel";
+import { recordCandidateEvent } from "@/lib/candidate-events";
 import { sendApplicantConfirmationEmail, sendApplicationEmail } from "@/lib/email";
 import { detectResumeKind } from "@/lib/file-validation";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
@@ -7,6 +13,9 @@ import { getOrganizationBySlug } from "@/lib/organizations";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { extractResumeText } from "@/lib/resume-parsing";
 import { scoreResume } from "@/lib/scoring";
+import { scoreScreen, type ScreenAnswers } from "@/lib/screen-scoring";
+import { saveScreenSubmission } from "@/lib/screen-submissions";
+import { getScreen } from "@/lib/screens";
 
 export const runtime = "nodejs";
 
@@ -62,6 +71,9 @@ export async function POST(request: Request, context: RouteContext) {
     const email = String(formData.get("email") ?? "").trim();
     const phone = String(formData.get("phone") ?? "").trim();
     const coverLetter = String(formData.get("coverLetter") ?? "").trim();
+    const applicantLocation = String(formData.get("applicantLocation") ?? "").trim();
+    const desiredPay = String(formData.get("desiredPay") ?? "").trim();
+    const screenAnswersRaw = String(formData.get("screenAnswers") ?? "");
     const resume = formData.get("resume");
 
     if (!jobSlug || !name || !email) {
@@ -122,7 +134,76 @@ export async function POST(request: Request, context: RouteContext) {
       console.error("Resume parsing/scoring failed (application still saved):", parseError);
     }
 
-    createApplication({
+    // ── Skills screen + candidate intelligence ──────────────────────────────
+    // Parse the candidate's screen answers (if the job has a screen attached),
+    // score them, and assess pay/commute/tenure risk. Never fail the submission
+    // over scoring problems — degrade to "pending"/no-score and store the rest.
+    const screen = getScreen(job.screen_key);
+    let screenAnswers: ScreenAnswers = {};
+    if (screenAnswersRaw) {
+      try {
+        const parsed = JSON.parse(screenAnswersRaw);
+        if (parsed && typeof parsed === "object") screenAnswers = parsed as ScreenAnswers;
+      } catch {
+        screenAnswers = {};
+      }
+    }
+    const answeredCount = Object.values(screenAnswers).filter(
+      (v) => v !== "" && v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0),
+    ).length;
+
+    let screenStatus: "none" | "pending" | "completed" = screen ? "pending" : "none";
+    let screenScore: number | null = null;
+    let screenResult = null;
+    let screenSummary: ScreenSummary | null = null;
+
+    if (screen && answeredCount > 0) {
+      try {
+        screenResult = await scoreScreen(job.screen_key, screenAnswers);
+        if (screenResult) {
+          screenStatus = "completed";
+          screenScore = screenResult.overallScore;
+        }
+      } catch (screenError) {
+        console.error("Screen scoring failed (application still saved):", screenError);
+      }
+    }
+
+    // Risk assessment runs whether or not a screen was completed.
+    const candidateIsLead = /supervisor|manager|superintendent|maintenance lead|reliability lead|team lead/i.test(
+      resumeText,
+    );
+    const risk = assessRisk({
+      job,
+      desiredPay,
+      applicantLocation,
+      resumeText,
+      screenScore,
+      jobIsLeadRole: job.screen_key === "maintenance_leader",
+      candidateIsLead,
+    });
+
+    if (screenResult) {
+      screenSummary = {
+        strengths: screenResult.strengths,
+        redFlags: screenResult.redFlags,
+        recommendedAction: deriveRecommendedAction(screenScore, screenStatus, risk.level),
+        strongDims: screenResult.strongDims,
+        weakDims: screenResult.weakDims,
+        method: screenResult.method,
+      };
+    } else {
+      screenSummary = {
+        strengths: [],
+        redFlags: [],
+        recommendedAction: deriveRecommendedAction(screenScore, screenStatus, risk.level),
+        strongDims: [],
+        weakDims: [],
+        method: "heuristic",
+      };
+    }
+
+    const application = createApplication({
       organization_id: organization.id,
       job_id: job.id,
       applicant_name: name,
@@ -135,7 +216,36 @@ export async function POST(request: Request, context: RouteContext) {
       resume_text: resumeText,
       resume_skills: resumeSkills,
       match_score: matchScore,
+      applicant_location: applicantLocation,
+      desired_pay: desiredPay,
+      screen_status: screenStatus,
+      screen_score: screenScore,
+      risk_level: risk.level,
+      risk_flags: risk.flags,
+      screen_summary: screenSummary,
     });
+
+    if (screenResult) {
+      try {
+        saveScreenSubmission({
+          organizationId: organization.id,
+          applicationId: application.id,
+          jobId: job.id,
+          screenKey: job.screen_key,
+          answers: screenAnswers,
+          result: screenResult,
+        });
+        recordCandidateEvent({
+          organization_id: organization.id,
+          application_id: application.id,
+          type: "note",
+          detail: `Completed the ${screen?.shortLabel ?? "skills"} screen — scored ${screenScore}/100.`,
+          actor: name,
+        });
+      } catch (subError) {
+        console.error("Saving screen submission failed (application still saved):", subError);
+      }
+    }
 
     // Fire-and-forget the notification email: the application is already saved,
     // so the applicant shouldn't wait on (or be failed by) a slow/unreachable

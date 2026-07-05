@@ -6,6 +6,7 @@ import { getOrgJobUrl } from "@/lib/env";
 import { buildGoogleJobPostingJsonLd } from "@/lib/feeds/google-jobs";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { getScreen, toPublicScreen } from "@/lib/screens";
 
 type PageProps = { params: Promise<{ orgSlug: string; jobSlug: string }> };
 
@@ -51,6 +52,8 @@ export default async function OrgJobPage({ params }: PageProps) {
   if (!job || job.status !== "published") notFound();
 
   const jsonLd = buildGoogleJobPostingJsonLd(organization, job);
+  const template = getScreen(job.screen_key);
+  const publicScreen = template ? toPublicScreen(template) : null;
 
   return (
     <div className="page-shell space-y-4">
@@ -81,7 +84,7 @@ export default async function OrgJobPage({ params }: PageProps) {
         </article>
 
         <aside>
-          <ApplicationForm orgSlug={orgSlug} jobSlug={job.slug} jobTitle={job.title} />
+          <ApplicationForm orgSlug={orgSlug} jobSlug={job.slug} jobTitle={job.title} screen={publicScreen} />
         </aside>
       </div>
     </div>

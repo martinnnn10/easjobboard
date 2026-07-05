@@ -1,17 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DemoSeedButton } from "@/components/DemoSeedButton";
 import { LogoutButton } from "@/components/LogoutButton";
+import { BadgeRow, ScreenScoreBadge } from "@/components/ScreenSignals";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   countApplicationsByOrganization,
   getApplicationStatusCounts,
+  getJobScreeningSummaries,
+  getScreeningStats,
   listApplicationsByOrganization,
 } from "@/lib/applications";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
+import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrgUrl } from "@/lib/env";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { getScreenLabel } from "@/lib/screens";
 
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
@@ -26,11 +32,19 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const sessionContext = await requireOrgSession(orgSlug);
 
   const jobs = listJobsByOrganization(organization.id);
-  const applicants = listApplicationsByOrganization(organization.id, { limit: 5 });
+  const applicants = listApplicationsByOrganization(organization.id, { orderBy: "score", limit: 5 });
   const applicantCount = countApplicationsByOrganization(organization.id);
   const statusCounts = getApplicationStatusCounts(organization.id);
   const activeInPipeline =
     statusCounts.new + statusCounts.screening + statusCounts.interview + statusCounts.offer;
+
+  // Manufacturing hiring-intelligence rollups.
+  const stats = getScreeningStats(organization.id);
+  const jobSummaries = getJobScreeningSummaries(organization.id);
+  const publishedJobs = jobs.filter((job) => job.status === "published");
+  const openRolesNoStrong = publishedJobs.filter(
+    (job) => (jobSummaries[job.id]?.strongFit ?? 0) === 0,
+  ).length;
 
   const publishedSlug = (await searchParams).published;
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
@@ -72,21 +86,43 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
         </div>
       </div>
 
-      {/* Mission-control stats */}
+      {/* Hiring-intelligence stats — who can actually do the job */}
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link href={`/o/${orgSlug}/admin/pipeline`} className="card card-hover block border-l-4 border-l-green-500">
+          <p className="section-label">Strong-fit candidates</p>
+          <p className="stat-value mt-2 text-green-700">{stats.strongFit}</p>
+          <p className="mt-1 text-xs text-zinc-500">Passed the screen · low risk · call these first →</p>
+        </Link>
+        <Link href={`/o/${orgSlug}/admin/pipeline`} className="card card-hover block border-l-4 border-l-amber-400">
+          <p className="section-label">Candidates needing review</p>
+          <p className="stat-value mt-2 text-amber-600">{stats.needsReview}</p>
+          <p className="mt-1 text-xs text-zinc-500">Borderline screens — worth a phone screen →</p>
+        </Link>
+        <div className="card border-l-4 border-l-red-400">
+          <p className="section-label">High-risk applicants</p>
+          <p className="stat-value mt-2 text-red-600">{stats.highRisk}</p>
+          <p className="mt-1 text-xs text-zinc-500">Pay, commute, or job-hop flags</p>
+        </div>
+      </section>
+
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card">
-          <p className="section-label">Published jobs</p>
-          <p className="stat-value mt-2">{jobs.filter((job) => job.status === "published").length}</p>
+          <p className="section-label">Applicants screened</p>
+          <p className="stat-value mt-2">
+            {stats.screened}
+            <span className="ml-1 text-base font-medium text-zinc-400">/ {stats.totalApplicants}</span>
+          </p>
         </div>
         <div className="card">
-          <p className="section-label">Total applicants</p>
-          <p className="stat-value mt-2">{applicantCount}</p>
+          <p className="section-label">Average skills score</p>
+          <p className="stat-value mt-2">{stats.avgScore === null ? "—" : `${stats.avgScore}`}</p>
         </div>
-        <Link href={`/o/${orgSlug}/admin/pipeline`} className="card card-hover block">
-          <p className="section-label">In pipeline</p>
-          <p className="stat-value mt-2 text-blue-700">{activeInPipeline}</p>
-          <p className="mt-1 text-xs text-zinc-500">Open the board →</p>
-        </Link>
+        <div className="card">
+          <p className="section-label">Open roles, no strong candidate</p>
+          <p className={`stat-value mt-2 ${openRolesNoStrong > 0 ? "text-amber-600" : "text-zinc-900"}`}>
+            {openRolesNoStrong}
+          </p>
+        </div>
         <div className="card">
           <p className="section-label">Hired</p>
           <p className="stat-value mt-2 text-green-700">{statusCounts.hired}</p>
@@ -170,12 +206,16 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
                 starts syndicating to job boards immediately.
               </p>
             </div>
-            <div>
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary inline-block">
                 Post your first job →
               </Link>
+              <DemoSeedButton orgSlug={orgSlug} />
             </div>
-            <p className="text-xs text-zinc-500">1. Pick a template &nbsp;·&nbsp; 2. Set the location &nbsp;·&nbsp; 3. Publish</p>
+            <p className="text-xs text-zinc-500">
+              1. Pick a role &amp; screen &nbsp;·&nbsp; 2. Publish &nbsp;·&nbsp; 3. Review who can actually do the job — or
+              load sample data to see it now.
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
@@ -184,18 +224,48 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
                 <tr>
                   <th className="px-4 py-3 font-medium">Title</th>
                   <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Location</th>
+                  <th className="px-4 py-3 font-medium">Screen</th>
+                  <th className="px-4 py-3 font-medium">Applicants → strong-fit</th>
                   <th className="px-4 py-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {jobs.map((job) => (
+                {jobs.map((job) => {
+                  const summary = jobSummaries[job.id];
+                  const screenLabel = getScreenLabel(job.screen_key);
+                  return (
                   <tr key={job.id} className="border-b border-zinc-100 last:border-0">
-                    <td className="px-4 py-3 font-medium text-zinc-900">{job.title}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-zinc-900">{job.title}</div>
+                      <div className="text-xs text-zinc-500">{job.location}</div>
+                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="px-4 py-3 text-zinc-600">{job.location}</td>
+                    <td className="px-4 py-3 text-zinc-600">
+                      {screenLabel ? (
+                        <span className="inline-flex rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                          {screenLabel}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-400">No screen</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-zinc-700">
+                      {summary ? (
+                        <span className="text-sm">
+                          {summary.applicants} applied
+                          {summary.completed > 0 ? ` · ${summary.completed} screened` : ""}
+                          {" · "}
+                          <span className={summary.strongFit > 0 ? "font-semibold text-green-700" : "text-zinc-400"}>
+                            {summary.strongFit} strong-fit
+                          </span>
+                          {summary.needsReview > 0 ? ` · ${summary.needsReview} to review` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-zinc-400">No applicants yet</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
                         <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="text-blue-600 hover:underline">
@@ -217,7 +287,8 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -226,31 +297,38 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
 
       {applicants.length > 0 ? (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-zinc-900">Recent applicants</h2>
+          <h2 className="text-lg font-semibold text-zinc-900">Top applicants by skills score</h2>
           <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
                 <tr>
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Job</th>
+                  <th className="px-4 py-3 font-medium">Skills screen</th>
+                  <th className="px-4 py-3 font-medium">Signals</th>
                   <th className="px-4 py-3 font-medium">Applied</th>
-                  <th className="px-4 py-3 font-medium">Resume</th>
                 </tr>
               </thead>
               <tbody>
                 {applicants.map((application) => (
                   <tr key={application.id} className="border-b border-zinc-100 last:border-0">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">{application.applicant_name}</div>
+                      <Link
+                        href={`/o/${orgSlug}/admin/applications/${application.id}`}
+                        className="font-medium text-zinc-900 hover:text-blue-700"
+                      >
+                        {application.applicant_name}
+                      </Link>
                       <div className="text-zinc-500">{application.applicant_email}</div>
                     </td>
                     <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
-                    <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3">
-                      <a href={`/api/o/${orgSlug}/applications/${application.id}/resume`} className="text-blue-600 hover:underline">
-                        Download
-                      </a>
+                      <ScreenScoreBadge score={application.screen_score} status={application.screen_status} />
                     </td>
+                    <td className="px-4 py-3">
+                      <BadgeRow badges={badgesForApplication(application)} max={2} />
+                    </td>
+                    <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleDateString()}</td>
                   </tr>
                 ))}
               </tbody>

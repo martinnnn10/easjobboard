@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     default: getPlatformName(),
     template: `%s | ${getPlatformName()}`,
   },
-  description: `Multi-organization recruiting platform by ${getPlatformCompany()}.`,
+  description: `Manufacturing hiring intelligence by ${getPlatformCompany()} — screen maintenance, controls, and skilled-trades applicants for real troubleshooting ability before you interview.`,
 };
 
 /**
@@ -87,7 +87,7 @@ export default function RootLayout({
         <footer className="hero-dark mt-auto">
           <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-slate-400">
             <span className="font-semibold text-white">{getPlatformName()}</span>
-            <span>A recruiting platform by {getPlatformCompany()}</span>
+            <span>Manufacturing hiring intelligence by {getPlatformCompany()}</span>
           </div>
         </footer>
       </body>
