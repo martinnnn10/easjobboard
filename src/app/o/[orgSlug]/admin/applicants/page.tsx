@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
+import { MatchScore } from "@/components/MatchScore";
 import { listApplicationsByOrganization } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -14,7 +15,7 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
 
   await requireOrgSession(orgSlug);
 
-  const applicants = listApplicationsByOrganization(organization.id);
+  const applicants = listApplicationsByOrganization(organization.id, "score");
 
   return (
     <div className="page-shell space-y-6">
@@ -24,7 +25,8 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-zinc-900">Applicants</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Resumes are also emailed to {organization.application_email} when candidates apply.
+          Ranked by how well each resume matches the job&apos;s skills. Resumes are also emailed to{" "}
+          {organization.application_email} when candidates apply.
         </p>
       </div>
 
@@ -37,6 +39,7 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
               <tr>
                 <th className="px-4 py-3 font-medium">Applicant</th>
                 <th className="px-4 py-3 font-medium">Job</th>
+                <th className="px-4 py-3 font-medium">Match</th>
                 <th className="px-4 py-3 font-medium">Stage</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Applied</th>
@@ -51,6 +54,9 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
                     <div className="text-zinc-500">{application.applicant_email}</div>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
+                  <td className="px-4 py-3">
+                    <MatchScore score={application.match_score} skills={application.resume_skills} />
+                  </td>
                   <td className="px-4 py-3">
                     <ApplicationStatusSelect
                       orgSlug={orgSlug}

@@ -20,6 +20,9 @@ export function createApplication(input: {
   resume_filename: string;
   resume_content_type: string;
   resume_data: Buffer;
+  resume_text?: string;
+  resume_skills?: string[];
+  match_score?: number | null;
 }): Application {
   const database = getDb();
   const id = randomUUID();
@@ -28,10 +31,12 @@ export function createApplication(input: {
     .prepare(
       `INSERT INTO applications (
         id, organization_id, job_id, applicant_name, applicant_email, applicant_phone,
-        cover_letter, resume_filename, resume_content_type, resume_data, created_at
+        cover_letter, resume_filename, resume_content_type, resume_data,
+        resume_text, resume_skills, match_score, created_at
       ) VALUES (
         @id, @organization_id, @job_id, @applicant_name, @applicant_email, @applicant_phone,
-        @cover_letter, @resume_filename, @resume_content_type, @resume_data, @created_at
+        @cover_letter, @resume_filename, @resume_content_type, @resume_data,
+        @resume_text, @resume_skills, @match_score, @created_at
       )`,
     )
     .run({
@@ -45,6 +50,9 @@ export function createApplication(input: {
       resume_filename: input.resume_filename,
       resume_content_type: input.resume_content_type,
       resume_data: input.resume_data,
+      resume_text: input.resume_text ?? "",
+      resume_skills: JSON.stringify(input.resume_skills ?? []),
+      match_score: input.match_score ?? null,
       created_at: nowIso(),
     });
 
@@ -79,14 +87,29 @@ export function getApplicationResume(id: string, organizationId: string): {
   };
 }
 
-export function listApplicationsByOrganization(organizationId: string): ApplicationWithJob[] {
+export function listApplicationsByOrganization(
+  organizationId: string,
+  orderBy: "recent" | "score" = "recent",
+): ApplicationWithJob[] {
+  // "score" surfaces the best-matching candidates first (nulls last); "recent"
+  // keeps reverse-chronological order for the dashboard feed.
+  const ordering =
+    orderBy === "score"
+      ? "a.match_score IS NULL, a.match_score DESC, a.created_at DESC"
+      : "a.created_at DESC";
+
   return getDb()
     .prepare(
-      `SELECT a.*, j.title AS job_title, j.slug AS job_slug
+      // Explicit columns: never load the resume BLOB or full extracted text into
+      // memory for list views — only the small fields the table renders.
+      `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
+              a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
+              a.status, a.resume_skills, a.match_score, a.created_at,
+              j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE a.organization_id = ?
-       ORDER BY a.created_at DESC`,
+       ORDER BY ${ordering}`,
     )
     .all(organizationId)
     .map((row) => {

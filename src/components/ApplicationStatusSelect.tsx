@@ -1,16 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/db";
-
-const LABELS: Record<ApplicationStatus, string> = {
-  new: "New",
-  screening: "Screening",
-  interview: "Interview",
-  offer: "Offer",
-  hired: "Hired",
-  rejected: "Rejected",
-};
+import {
+  APPLICATION_STATUSES,
+  APPLICATION_STATUS_LABELS,
+  type ApplicationStatus,
+} from "@/lib/application-status";
 
 const STYLES: Record<ApplicationStatus, string> = {
   new: "bg-blue-50 text-blue-700 border-blue-200",
@@ -67,7 +62,7 @@ export function ApplicationStatusSelect({
       >
         {APPLICATION_STATUSES.map((value) => (
           <option key={value} value={value}>
-            {LABELS[value]}
+            {APPLICATION_STATUS_LABELS[value]}
           </option>
         ))}
       </select>

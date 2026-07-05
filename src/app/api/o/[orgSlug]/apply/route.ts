@@ -5,6 +5,8 @@ import { detectResumeKind } from "@/lib/file-validation";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
+import { extractResumeText } from "@/lib/resume-parsing";
+import { scoreResume } from "@/lib/scoring";
 
 export const runtime = "nodejs";
 
@@ -75,11 +77,32 @@ export async function POST(request: Request, context: RouteContext) {
 
     // The MIME type above is client-supplied; confirm the actual file bytes match
     // an allowed resume format so a renamed script can't be stored.
-    if (!detectResumeKind(buffer)) {
+    const resumeKind = detectResumeKind(buffer);
+    if (!resumeKind) {
       return NextResponse.json(
         { error: "Resume file does not appear to be a valid PDF, DOC, or DOCX" },
         { status: 400 },
       );
+    }
+
+    // Parse the resume and score it against the job. Never fail the application
+    // over parsing/scoring problems — store nulls and move on.
+    let resumeText = "";
+    let resumeSkills: string[] = [];
+    let matchScore: number | null = null;
+    try {
+      resumeText = await extractResumeText(buffer, resumeKind);
+      if (resumeText) {
+        const result = await scoreResume({
+          resumeText,
+          jobTitle: job.title,
+          jobDescription: job.description,
+        });
+        resumeSkills = result.resumeSkills;
+        matchScore = result.score;
+      }
+    } catch (parseError) {
+      console.error("Resume parsing/scoring failed (application still saved):", parseError);
     }
 
     createApplication({
@@ -92,26 +115,29 @@ export async function POST(request: Request, context: RouteContext) {
       resume_filename: resume.name,
       resume_content_type: contentType,
       resume_data: buffer,
+      resume_text: resumeText,
+      resume_skills: resumeSkills,
+      match_score: matchScore,
     });
 
-    // Send email notification in the background — don't fail the application if SMTP is down
-    try {
-      await sendApplicationEmail({
-        organization,
-        job,
-        applicantName: name,
-        applicantEmail: email,
-        applicantPhone: phone,
-        coverLetter,
-        resume: {
-          filename: resume.name,
-          content: buffer,
-          contentType,
-        },
-      });
-    } catch (emailError) {
+    // Fire-and-forget the notification email: the application is already saved,
+    // so the applicant shouldn't wait on (or be failed by) a slow/unreachable
+    // SMTP server. Safe because this runs as a long-lived Node process.
+    void sendApplicationEmail({
+      organization,
+      job,
+      applicantName: name,
+      applicantEmail: email,
+      applicantPhone: phone,
+      coverLetter,
+      resume: {
+        filename: resume.name,
+        content: buffer,
+        contentType,
+      },
+    }).catch((emailError) => {
       console.error("SMTP delivery failed (application still saved):", emailError);
-    }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

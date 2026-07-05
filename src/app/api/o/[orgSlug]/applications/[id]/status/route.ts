@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateApplicationStatus } from "@/lib/applications";
 import { requireOrgSessionApi } from "@/lib/auth";
-import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/db";
+import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/application-status";
 
 export const runtime = "nodejs";
 

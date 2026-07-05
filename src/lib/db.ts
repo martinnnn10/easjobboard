@@ -2,24 +2,12 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 
+import { type ApplicationStatus } from "./application-status";
+
+export type { ApplicationStatus } from "./application-status";
+export { APPLICATION_STATUSES } from "./application-status";
+
 export type JobStatus = "draft" | "published" | "closed";
-
-export type ApplicationStatus =
-  | "new"
-  | "screening"
-  | "interview"
-  | "offer"
-  | "hired"
-  | "rejected";
-
-export const APPLICATION_STATUSES: ApplicationStatus[] = [
-  "new",
-  "screening",
-  "interview",
-  "offer",
-  "hired",
-  "rejected",
-];
 
 export type Organization = {
   id: string;
@@ -76,6 +64,8 @@ export type Application = {
   resume_filename: string;
   resume_content_type: string;
   status: ApplicationStatus;
+  resume_skills: string[];
+  match_score: number | null;
   created_at: string;
 };
 
@@ -253,6 +243,9 @@ function initDb(database: Database.Database): void {
       resume_content_type TEXT NOT NULL,
       resume_data BLOB NOT NULL,
       status TEXT NOT NULL DEFAULT 'new',
+      resume_text TEXT NOT NULL DEFAULT '',
+      resume_skills TEXT NOT NULL DEFAULT '[]',
+      match_score INTEGER,
       created_at TEXT NOT NULL,
       FOREIGN KEY (organization_id) REFERENCES organizations(id),
       FOREIGN KEY (job_id) REFERENCES jobs(id)
@@ -262,9 +255,18 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
   `);
 
-  // Migration: add the pipeline status column to databases created before it existed.
+  // Migrations: add columns to databases created before these features existed.
   if (!columnExists(database, "applications", "status")) {
     database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
+  }
+  if (!columnExists(database, "applications", "resume_text")) {
+    database.exec("ALTER TABLE applications ADD COLUMN resume_text TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "applications", "resume_skills")) {
+    database.exec("ALTER TABLE applications ADD COLUMN resume_skills TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!columnExists(database, "applications", "match_score")) {
+    database.exec("ALTER TABLE applications ADD COLUMN match_score INTEGER");
   }
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)");
 }
@@ -340,6 +342,18 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     resume_filename: row.resume_filename as string,
     resume_content_type: row.resume_content_type as string,
     status: (row.status as ApplicationStatus | undefined) ?? "new",
+    resume_skills: parseSkills(row.resume_skills),
+    match_score: row.match_score == null ? null : Number(row.match_score),
     created_at: row.created_at as string,
   };
+}
+
+function parseSkills(value: unknown): string[] {
+  if (typeof value !== "string" || value.length === 0) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }
