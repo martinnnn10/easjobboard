@@ -70,7 +70,12 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
               {applicants.map((application) => (
                 <tr key={application.id} className="border-b border-zinc-100 last:border-0">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-zinc-900">{application.applicant_name}</div>
+                    <Link
+                      href={`/o/${orgSlug}/admin/applications/${application.id}`}
+                      className="font-medium text-zinc-900 hover:text-blue-700"
+                    >
+                      {application.applicant_name}
+                    </Link>
                     <div className="text-zinc-500">{application.applicant_email}</div>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>

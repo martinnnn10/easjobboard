@@ -15,8 +15,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   let organization;
+  let user;
   try {
-    ({ organization } = await requireOrgSessionApi(orgSlug));
+    ({ organization, user } = await requireOrgSessionApi(orgSlug));
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -32,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const updated = updateApplicationStatus(id, organization.id, body.status);
+  const updated = updateApplicationStatus(id, organization.id, body.status, user.name);
   if (!updated) {
     return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }

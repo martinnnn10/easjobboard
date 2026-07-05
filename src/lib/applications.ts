@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { recordCandidateEvent } from "./candidate-events";
 import { getDb, rowToApplication, type Application, type ApplicationStatus } from "./db";
 
 function nowIso(): string {
@@ -56,12 +57,48 @@ export function createApplication(input: {
       created_at: nowIso(),
     });
 
+  const jobTitle = (
+    database.prepare("SELECT title FROM jobs WHERE id = ?").get(input.job_id) as { title?: string } | undefined
+  )?.title;
+  recordCandidateEvent({
+    organization_id: input.organization_id,
+    application_id: id,
+    type: "applied",
+    detail: jobTitle ? `Applied to ${jobTitle}` : "Application received",
+    actor: input.applicant_name,
+  });
+
   return getApplicationById(id)!;
 }
 
 export function getApplicationById(id: string): Application | null {
   const row = getDb().prepare("SELECT * FROM applications WHERE id = ?").get(id);
   return row ? rowToApplication(row as Record<string, unknown>) : null;
+}
+
+/**
+ * Single application with its job, org-scoped and without loading the resume
+ * BLOB — the shape the candidate detail page needs.
+ */
+export function getApplicationDetail(id: string, organizationId: string): ApplicationWithJob | null {
+  const row = getDb()
+    .prepare(
+      `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
+              a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
+              a.status, a.resume_skills, a.match_score, a.created_at,
+              j.title AS job_title, j.slug AS job_slug
+       FROM applications a
+       JOIN jobs j ON j.id = a.job_id
+       WHERE a.id = ? AND a.organization_id = ?`,
+    )
+    .get(id, organizationId) as Record<string, unknown> | undefined;
+
+  if (!row) return null;
+  return {
+    ...rowToApplication(row),
+    job_title: row.job_title as string,
+    job_slug: row.job_slug as string,
+  };
 }
 
 export function getApplicationResume(id: string, organizationId: string): {
@@ -183,11 +220,29 @@ export function updateApplicationStatus(
   id: string,
   organizationId: string,
   status: ApplicationStatus,
+  actor?: string,
 ): Application | null {
-  const result = getDb()
+  const database = getDb();
+  const previous = database
+    .prepare("SELECT status FROM applications WHERE id = ? AND organization_id = ?")
+    .get(id, organizationId) as { status: ApplicationStatus } | undefined;
+  if (!previous) return null;
+
+  const result = database
     .prepare("UPDATE applications SET status = ? WHERE id = ? AND organization_id = ?")
     .run(status, id, organizationId);
 
   if (result.changes === 0) return null;
+
+  if (previous.status !== status) {
+    recordCandidateEvent({
+      organization_id: organizationId,
+      application_id: id,
+      type: "stage_change",
+      detail: `Moved from ${previous.status} to ${status}`,
+      actor: actor ?? "",
+    });
+  }
+
   return getApplicationById(id);
 }

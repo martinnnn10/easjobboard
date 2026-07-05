@@ -63,6 +63,9 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
             New job
           </Link>
+          <Link href={`/o/${orgSlug}/admin/pipeline`} className="btn-secondary">
+            Pipeline
+          </Link>
           <Link href={`/o/${orgSlug}/admin/candidates`} className="btn-secondary">
             Candidate pool
           </Link>
@@ -91,8 +94,8 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
         <section className="card space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-zinc-900">Pipeline</h2>
-            <Link href={`/o/${orgSlug}/admin/applicants`} className="text-sm text-blue-600 hover:underline">
-              Manage candidates →
+            <Link href={`/o/${orgSlug}/admin/pipeline`} className="text-sm text-blue-600 hover:underline">
+              Open the board →
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">

@@ -121,7 +121,14 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                   <tbody>
                     {candidate.applications.map((app) => (
                       <tr key={app.applicationId} className="border-b border-zinc-100 last:border-0">
-                        <td className="px-3 py-2 text-zinc-900">{app.jobTitle}</td>
+                        <td className="px-3 py-2">
+                          <Link
+                            href={`/o/${orgSlug}/admin/applications/${app.applicationId}`}
+                            className="text-zinc-900 hover:text-blue-700 hover:underline"
+                          >
+                            {app.jobTitle}
+                          </Link>
+                        </td>
                         <td className="px-3 py-2 text-zinc-600">{APPLICATION_STATUS_LABELS[app.status]}</td>
                         <td className="px-3 py-2 text-zinc-600">{app.matchScore === null ? "—" : `${app.matchScore}%`}</td>
                         <td className="px-3 py-2 text-zinc-600">{new Date(app.createdAt).toLocaleDateString()}</td>

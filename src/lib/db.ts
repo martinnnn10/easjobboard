@@ -262,6 +262,22 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
   `);
 
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS candidate_events (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      application_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      actor TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (application_id) REFERENCES applications(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_candidate_events_app ON candidate_events(application_id);
+  `);
+
   // Migrations: add columns to databases created before these features existed.
   if (!columnExists(database, "applications", "status")) {
     database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
