@@ -4,6 +4,23 @@ import path from "path";
 
 export type JobStatus = "draft" | "published" | "closed";
 
+export type ApplicationStatus =
+  | "new"
+  | "screening"
+  | "interview"
+  | "offer"
+  | "hired"
+  | "rejected";
+
+export const APPLICATION_STATUSES: ApplicationStatus[] = [
+  "new",
+  "screening",
+  "interview",
+  "offer",
+  "hired",
+  "rejected",
+];
+
 export type Organization = {
   id: string;
   slug: string;
@@ -58,6 +75,7 @@ export type Application = {
   cover_letter: string;
   resume_filename: string;
   resume_content_type: string;
+  status: ApplicationStatus;
   created_at: string;
 };
 
@@ -234,6 +252,7 @@ function initDb(database: Database.Database): void {
       resume_filename TEXT NOT NULL,
       resume_content_type TEXT NOT NULL,
       resume_data BLOB NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
       created_at TEXT NOT NULL,
       FOREIGN KEY (organization_id) REFERENCES organizations(id),
       FOREIGN KEY (job_id) REFERENCES jobs(id)
@@ -242,6 +261,12 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_applications_org ON applications(organization_id);
     CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
   `);
+
+  // Migration: add the pipeline status column to databases created before it existed.
+  if (!columnExists(database, "applications", "status")) {
+    database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)");
 }
 
 export function getDb(): Database.Database {
@@ -314,6 +339,7 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     cover_letter: row.cover_letter as string,
     resume_filename: row.resume_filename as string,
     resume_content_type: row.resume_content_type as string,
+    status: (row.status as ApplicationStatus | undefined) ?? "new",
     created_at: row.created_at as string,
   };
 }

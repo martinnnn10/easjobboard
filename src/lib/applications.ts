@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { getDb, rowToApplication, type Application } from "./db";
+import { getDb, rowToApplication, type Application, type ApplicationStatus } from "./db";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -104,4 +104,50 @@ export function countApplicationsByOrganization(organizationId: string): number 
     .prepare("SELECT COUNT(*) AS count FROM applications WHERE organization_id = ?")
     .get(organizationId) as { count: number };
   return row.count;
+}
+
+/**
+ * Returns a count of applications in each pipeline stage for an organization.
+ * Stages with no applications are included with a count of 0.
+ */
+export function getApplicationStatusCounts(
+  organizationId: string,
+): Record<ApplicationStatus, number> {
+  const counts: Record<ApplicationStatus, number> = {
+    new: 0,
+    screening: 0,
+    interview: 0,
+    offer: 0,
+    hired: 0,
+    rejected: 0,
+  };
+
+  const rows = getDb()
+    .prepare(
+      "SELECT status, COUNT(*) AS count FROM applications WHERE organization_id = ? GROUP BY status",
+    )
+    .all(organizationId) as Array<{ status: ApplicationStatus; count: number }>;
+
+  for (const row of rows) {
+    if (row.status in counts) counts[row.status] = row.count;
+  }
+  return counts;
+}
+
+/**
+ * Moves an application to a new pipeline stage. Scoped by organization so one
+ * org can never mutate another's records. Returns the updated row, or null if
+ * no matching application exists for that organization.
+ */
+export function updateApplicationStatus(
+  id: string,
+  organizationId: string,
+  status: ApplicationStatus,
+): Application | null {
+  const result = getDb()
+    .prepare("UPDATE applications SET status = ? WHERE id = ? AND organization_id = ?")
+    .run(status, id, organizationId);
+
+  if (result.changes === 0) return null;
+  return getApplicationById(id);
 }

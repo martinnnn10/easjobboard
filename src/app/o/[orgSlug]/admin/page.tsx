@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LogoutButton } from "@/components/LogoutButton";
 import { StatusBadge } from "@/components/StatusBadge";
-import { countApplicationsByOrganization, listApplicationsByOrganization } from "@/lib/applications";
+import {
+  countApplicationsByOrganization,
+  getApplicationStatusCounts,
+  listApplicationsByOrganization,
+} from "@/lib/applications";
+import { APPLICATION_STATUSES } from "@/lib/db";
 import { requireOrgSession } from "@/lib/auth";
 import { getOrgIndeedFeedUrl, getOrgJobUrl, getOrgUrl } from "@/lib/env";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
@@ -20,6 +25,16 @@ export default async function OrgAdminPage({ params }: PageProps) {
   const jobs = listJobsByOrganization(organization.id);
   const applicants = listApplicationsByOrganization(organization.id).slice(0, 5);
   const applicantCount = countApplicationsByOrganization(organization.id);
+  const statusCounts = getApplicationStatusCounts(organization.id);
+
+  const STAGE_LABELS: Record<(typeof APPLICATION_STATUSES)[number], string> = {
+    new: "New",
+    screening: "Screening",
+    interview: "Interview",
+    offer: "Offer",
+    hired: "Hired",
+    rejected: "Rejected",
+  };
 
   return (
     <div className="page-shell space-y-8">
@@ -53,6 +68,25 @@ export default async function OrgAdminPage({ params }: PageProps) {
           </a>
         </div>
       </section>
+
+      {applicantCount > 0 ? (
+        <section className="card space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-zinc-900">Pipeline</h2>
+            <Link href={`/o/${orgSlug}/admin/applicants`} className="text-sm text-blue-600 hover:underline">
+              Manage candidates →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
+            {APPLICATION_STATUSES.map((stage) => (
+              <div key={stage} className="rounded-lg border border-zinc-200 px-3 py-2">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">{STAGE_LABELS[stage]}</p>
+                <p className="mt-1 text-xl font-semibold text-zinc-900">{statusCounts[stage]}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="card space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Syndication feeds</h2>

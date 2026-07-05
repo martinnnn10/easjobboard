@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
 import { listApplicationsByOrganization } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -36,6 +37,7 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
               <tr>
                 <th className="px-4 py-3 font-medium">Applicant</th>
                 <th className="px-4 py-3 font-medium">Job</th>
+                <th className="px-4 py-3 font-medium">Stage</th>
                 <th className="px-4 py-3 font-medium">Phone</th>
                 <th className="px-4 py-3 font-medium">Applied</th>
                 <th className="px-4 py-3 font-medium">Resume</th>
@@ -49,6 +51,13 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
                     <div className="text-zinc-500">{application.applicant_email}</div>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
+                  <td className="px-4 py-3">
+                    <ApplicationStatusSelect
+                      orgSlug={orgSlug}
+                      applicationId={application.id}
+                      initialStatus={application.status}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-zinc-600">{application.applicant_phone || "—"}</td>
                   <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3">
