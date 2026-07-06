@@ -32,6 +32,32 @@ function createTransport() {
   };
 }
 
+/**
+ * Team invite: emails a teammate a link to join the organization. Best-effort —
+ * the admin also gets a copyable link in the UI in case email is slow/unreachable.
+ */
+export async function sendInviteEmail(input: {
+  organization: Organization;
+  toEmail: string;
+  inviterName: string;
+  inviteUrl: string;
+}): Promise<void> {
+  const { smtp, transporter } = createTransport();
+  await transporter.sendMail({
+    from: `"${smtp.fromName}" <${smtp.fromEmail}>`,
+    to: input.toEmail,
+    subject: `${input.inviterName || input.organization.name} invited you to ${input.organization.name} on ${getPlatformName()}`,
+    text: [
+      `${input.inviterName || "A teammate"} invited you to join ${input.organization.name} on ${getPlatformName()}.`,
+      "",
+      "Accept your invitation and set up your account here:",
+      input.inviteUrl,
+      "",
+      "This link expires in 7 days.",
+    ].join("\n"),
+  });
+}
+
 export async function sendApplicationEmail(input: ApplicationEmailInput): Promise<void> {
   const { smtp, transporter } = createTransport();
 

@@ -366,6 +366,25 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_job_syndications_job ON job_syndications(job_id);
   `);
 
+  // Team invitations: a signed token lets a teammate join an existing org.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS invites (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      invited_by TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      accepted_at TEXT,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_invites_org ON invites(organization_id);
+    CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(token);
+  `);
+
   // Migrations: add columns to databases created before these features existed.
   if (!columnExists(database, "applications", "status")) {
     database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");

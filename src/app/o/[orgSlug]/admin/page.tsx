@@ -91,6 +91,9 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <a href={getOrgUrl(orgSlug)} target="_blank" rel="noreferrer" className="btn-secondary">
             View careers page
           </a>
+          <Link href={`/o/${orgSlug}/admin/team`} className="btn-secondary">
+            Team
+          </Link>
           <LogoutButton orgSlug={orgSlug} />
         </div>
       </div>
