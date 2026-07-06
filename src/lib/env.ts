@@ -81,3 +81,22 @@ export function getOrgEmbedScriptUrl(orgSlug: string): string {
 export function getJobQrUrl(orgSlug: string, jobSlug: string): string {
   return `${getBaseUrl()}/o/${orgSlug}/jobs/${jobSlug}/qr.svg`;
 }
+
+/**
+ * 100Hires distribution config. The API key is read only from the environment
+ * (never committed). Base URL and jobs path are overridable so the endpoint can
+ * be corrected without a code change if the API shape differs.
+ */
+export function getHundredHiresConfig() {
+  const apiKey = process.env.HUNDREDHIRES_API_KEY ?? "";
+  return {
+    apiKey,
+    enabled: Boolean(apiKey),
+    baseUrl: (process.env.HUNDREDHIRES_BASE_URL ?? "https://api.100hires.com/v2").replace(/\/$/, ""),
+    jobsPath: process.env.HUNDREDHIRES_JOBS_PATH ?? "/jobs",
+  };
+}
+
+export function isHundredHiresConfigured(): boolean {
+  return Boolean(process.env.HUNDREDHIRES_API_KEY);
+}

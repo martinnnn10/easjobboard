@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { isHundredHiresConfigured } from "@/lib/env";
+import { syncJobToHundredHires } from "@/lib/integrations/hundredhires";
 import { createJob, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
-import type { JobStatus } from "@/lib/db";
+import type { Job, JobStatus, Organization } from "@/lib/db";
+
+/**
+ * Push a newly published job to external push-API boards (100Hires) without
+ * blocking the response — the job is already saved, and a slow/failing board
+ * must never fail publishing. The result is recorded in job_syndications.
+ */
+function distributeInBackground(job: Job, organization: Organization): void {
+  // Only when the platform key is set AND this org has explicitly opted in — so
+  // it never touches orgs that just want resumes at their own email.
+  if (job.status !== "published" || !isHundredHiresConfigured() || !organization.syndicate_100hires) return;
+  void syncJobToHundredHires(job, organization).catch((error) => {
+    console.error("100Hires sync failed (job still published):", error);
+  });
+}
 
 export const runtime = "nodejs";
 
@@ -44,6 +60,8 @@ export async function POST(request: Request, context: RouteContext) {
       status: (body.status as JobStatus) ?? "draft",
       screen_key: body.screen_key,
     });
+
+    distributeInBackground(job, organization);
 
     return NextResponse.json({ job }, { status: 201 });
   } catch (error) {

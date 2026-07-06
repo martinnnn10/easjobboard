@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { HundredHiresControls, HundredHiresToggle } from "@/components/HundredHiresControls";
 import { requireOrgSession } from "@/lib/auth";
 import {
   getOrgEmbedScriptUrl,
@@ -8,9 +9,13 @@ import {
   getOrgJsonFeedUrl,
   getOrgSitemapUrl,
   getOrgXmlFeedUrl,
+  isHundredHiresConfigured,
 } from "@/lib/env";
+import { HUNDREDHIRES_CHANNEL } from "@/lib/integrations/hundredhires";
+import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { SYNDICATION_BOARDS, TIER_LABELS, type SyndicationTier } from "@/lib/syndication";
+import { getSyndicationsForOrg } from "@/lib/syndications";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
 
@@ -45,6 +50,23 @@ export default async function SyndicationPage({ params }: PageProps) {
 
   await requireOrgSession(orgSlug);
 
+  // 100Hires direct integration state (opt-in per org; key set platform-wide).
+  const hundredHiresConfigured = isHundredHiresConfigured();
+  const hundredHiresEnabled = organization.syndicate_100hires;
+  const publishedJobs = listJobsByOrganization(organization.id, "published");
+  const syndications = getSyndicationsForOrg(organization.id, HUNDREDHIRES_CHANNEL);
+  const hundredHiresJobRows = publishedJobs.map((job) => {
+    const syn = syndications[job.id];
+    return {
+      id: job.id,
+      title: job.title,
+      status: syn?.status ?? "",
+      url: syn?.url ?? "",
+      error: syn?.error ?? "",
+      syncedAt: syn?.syncedAt ?? null,
+    };
+  });
+
   const automaticCount = SYNDICATION_BOARDS.filter((b) => b.tier === "automatic").length;
   const registerCount = SYNDICATION_BOARDS.filter((b) => b.tier === "register").length;
 
@@ -62,6 +84,56 @@ export default async function SyndicationPage({ params }: PageProps) {
           and the same feeds can be registered with <span className="font-medium">{registerCount}</span> more aggregators.
         </p>
       </div>
+
+      {/* 100Hires direct integration */}
+      <section className="card space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-zinc-900">100Hires</h2>
+              {hundredHiresConfigured ? (
+                <span
+                  className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    hundredHiresEnabled ? "bg-green-100 text-green-800" : "bg-zinc-100 text-zinc-600"
+                  }`}
+                >
+                  {hundredHiresEnabled ? "On for this org" : "Off"}
+                </span>
+              ) : (
+                <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                  Not connected
+                </span>
+              )}
+            </div>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+              Push this organization&apos;s published jobs to 100Hires. Applicants who click through still apply on your
+              careers page, so they flow through your skills screen. This is separate from resume delivery —{" "}
+              <span className="font-medium">resumes always go to {organization.application_email}</span> regardless.
+            </p>
+          </div>
+          {hundredHiresConfigured ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-zinc-600">{hundredHiresEnabled ? "Enabled" : "Enable"}</span>
+              <HundredHiresToggle orgSlug={orgSlug} enabled={hundredHiresEnabled} />
+            </div>
+          ) : null}
+        </div>
+
+        {!hundredHiresConfigured ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            To connect 100Hires, add <code className="rounded bg-white px-1">HUNDREDHIRES_API_KEY</code> to your
+            server environment (from 100Hires → Settings → Integrations), then restart. The key is read only from the
+            environment and is never stored in the app.
+          </div>
+        ) : hundredHiresEnabled ? (
+          <HundredHiresControls orgSlug={orgSlug} jobs={hundredHiresJobRows} />
+        ) : (
+          <p className="text-sm text-zinc-500">
+            Turn this on to start posting {organization.name}&apos;s jobs to 100Hires. It stays off for every other
+            organization unless they enable it themselves.
+          </p>
+        )}
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Your feeds</h2>

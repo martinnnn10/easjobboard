@@ -16,6 +16,8 @@ export type Organization = {
   website: string;
   application_email: string;
   brand_color: string;
+  /** Opt-in: push this org's published jobs to 100Hires. Default false. */
+  syndicate_100hires: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -232,6 +234,11 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "organizations", "brand_color")) {
     database.exec("ALTER TABLE organizations ADD COLUMN brand_color TEXT NOT NULL DEFAULT ''");
   }
+  // Migration: per-org 100Hires opt-in (default off, so existing orgs never
+  // start pushing to 100Hires without explicitly enabling it).
+  if (!columnExists(database, "organizations", "syndicate_100hires")) {
+    database.exec("ALTER TABLE organizations ADD COLUMN syndicate_100hires INTEGER NOT NULL DEFAULT 0");
+  }
 
   migrateLegacyJobs(database);
 
@@ -336,6 +343,29 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_screen_submissions_job ON screen_submissions(job_id);
   `);
 
+  // Per-job distribution to external boards (e.g. 100Hires) that accept a push
+  // API rather than a pulled feed. One row per (job, channel).
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS job_syndications (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      external_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
+      url TEXT NOT NULL DEFAULT '',
+      error TEXT NOT NULL DEFAULT '',
+      synced_at TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE(job_id, channel),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (job_id) REFERENCES jobs(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_job_syndications_org ON job_syndications(organization_id);
+    CREATE INDEX IF NOT EXISTS idx_job_syndications_job ON job_syndications(job_id);
+  `);
+
   // Migrations: add columns to databases created before these features existed.
   if (!columnExists(database, "applications", "status")) {
     database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
@@ -395,6 +425,7 @@ export function rowToOrganization(row: Record<string, unknown>): Organization {
     website: row.website as string,
     application_email: row.application_email as string,
     brand_color: (row.brand_color as string | undefined) ?? "",
+    syndicate_100hires: Boolean(row.syndicate_100hires),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };

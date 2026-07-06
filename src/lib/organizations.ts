@@ -78,6 +78,16 @@ export function createOrganization(input: {
   return getOrganizationById(id)!;
 }
 
+/** Enable or disable pushing this org's published jobs to 100Hires. */
+export function setOrgSyndicate100hires(id: string, enabled: boolean): Organization | null {
+  const existing = getOrganizationById(id);
+  if (!existing) return null;
+  getDb()
+    .prepare("UPDATE organizations SET syndicate_100hires = ?, updated_at = ? WHERE id = ?")
+    .run(enabled ? 1 : 0, nowIso(), id);
+  return getOrganizationById(id);
+}
+
 export function updateOrganization(
   id: string,
   input: Partial<Pick<Organization, "name" | "website" | "application_email">>,

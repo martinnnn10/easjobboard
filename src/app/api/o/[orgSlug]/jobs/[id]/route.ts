@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { isHundredHiresConfigured } from "@/lib/env";
+import { syncJobToHundredHires } from "@/lib/integrations/hundredhires";
 import { deleteJob, getJobById, updateJob } from "@/lib/jobs";
 import type { JobStatus } from "@/lib/db";
 
@@ -50,6 +52,14 @@ export async function PUT(request: Request, context: RouteContext) {
 
     if (!job) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Keep 100Hires in sync when a published job is edited — only if the platform
+    // key is set and this org opted in. Non-blocking; never affects saving/resumes.
+    if (job.status === "published" && isHundredHiresConfigured() && organization.syndicate_100hires) {
+      void syncJobToHundredHires(job, organization).catch((error) => {
+        console.error("100Hires sync failed (job still saved):", error);
+      });
     }
 
     return NextResponse.json({ job });
