@@ -12,6 +12,16 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Brand blue → premium electric steel. Remapping the blue-600/700/800 tokens
+ * recolors every primary button, link, and accent app-wide from one place, so
+ * the whole UI stays cohesive with the graphite hero. Lighter blues (50–400)
+ * stay as gentle info tints for badges and rings. */
+@theme {
+  --color-blue-600: #2f6e8c;
+  --color-blue-700: #2a6180;
+  --color-blue-800: #22546c;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

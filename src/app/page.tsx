@@ -27,7 +27,7 @@ export default function HomePage() {
         <div className="mx-auto w-full max-w-6xl px-4 py-24">
           <div className="max-w-3xl">
             <p className="section-label text-[#9FB6D4]">{getPlatformName()} · Manufacturing hiring intelligence</p>
-            <h1 className="mt-4 text-4xl font-bold leading-[1.05] tracking-tight text-white md:text-6xl">
+            <h1 className="mt-5 text-[2.6rem] font-extrabold leading-[0.98] tracking-[-0.035em] text-white md:text-[4.25rem]">
               Know who can actually
               <br />
               <span className="text-[#7FB0E6]">troubleshoot before you interview.</span>
