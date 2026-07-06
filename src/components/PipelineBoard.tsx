@@ -36,13 +36,22 @@ const COLUMN_ACCENTS: Record<ApplicationStatus, string> = {
  * Drag-and-drop pipeline: drag a candidate card between stage columns; the
  * stage change is saved optimistically and reverted if the API call fails.
  */
-export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; initialCards: PipelineCard[] }) {
+export function PipelineBoard({
+  orgSlug,
+  initialCards,
+  canEdit = true,
+}: {
+  orgSlug: string;
+  initialCards: PipelineCard[];
+  canEdit?: boolean;
+}) {
   const [cards, setCards] = useState(initialCards);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<ApplicationStatus | null>(null);
   const [error, setError] = useState("");
 
   async function moveCard(id: string, status: ApplicationStatus) {
+    if (!canEdit) return;
     const card = cards.find((c) => c.id === id);
     if (!card || card.status === status) return;
 
@@ -98,16 +107,17 @@ export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; init
                 {columnCards.map((card) => (
                   <div
                     key={card.id}
-                    draggable
+                    draggable={canEdit}
                     onDragStart={(event) => {
+                      if (!canEdit) return;
                       event.dataTransfer.setData("text/plain", card.id);
                       event.dataTransfer.effectAllowed = "move";
                       setDragId(card.id);
                     }}
                     onDragEnd={() => setDragId(null)}
-                    className={`cursor-grab rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition active:cursor-grabbing ${
-                      dragId === card.id ? "opacity-50" : ""
-                    }`}
+                    className={`rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition ${
+                      canEdit ? "cursor-grab active:cursor-grabbing" : ""
+                    } ${dragId === card.id ? "opacity-50" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <Link
@@ -135,7 +145,9 @@ export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; init
         })}
       </div>
       <p className="text-xs text-zinc-500">
-        Drag a card to move a candidate between stages. Click a name to open their full profile and activity.
+        {canEdit
+          ? "Drag a card to move a candidate between stages. Click a name to open their full profile and activity."
+          : "Click a name to open a candidate's full profile. You have read-only access."}
       </p>
     </div>
   );

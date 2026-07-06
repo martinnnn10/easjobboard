@@ -3,6 +3,7 @@ import { requireOrgSessionApi } from "@/lib/auth";
 import { searchManatalCandidates } from "@/lib/integrations/manatal";
 import { searchResumesPdl } from "@/lib/integrations/peopledatalabs";
 import { getJobById } from "@/lib/jobs";
+import { canWrite } from "@/lib/permissions";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { sourceCandidates } from "@/lib/sourcing";
 
@@ -18,10 +19,14 @@ export async function POST(request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   let organization;
+  let user;
   try {
-    ({ organization } = await requireOrgSessionApi(orgSlug));
+    ({ organization, user } = await requireOrgSessionApi(orgSlug));
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canWrite(user.role)) {
+    return NextResponse.json({ error: "You have read-only access." }, { status: 403 });
   }
 
   const limit = rateLimit(`source:${orgSlug}:${getClientIp(request)}`, SOURCE_RATE_LIMIT, SOURCE_RATE_WINDOW_MS);

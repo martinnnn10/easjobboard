@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { canWrite } from "@/lib/permissions";
 import { recordCandidateEvent } from "@/lib/candidate-events";
 
 export const runtime = "nodejs";
@@ -16,6 +17,9 @@ export async function POST(request: Request, context: RouteContext) {
     ({ organization, user } = await requireOrgSessionApi(orgSlug));
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!canWrite(user.role)) {
+    return NextResponse.json({ error: "You have read-only access." }, { status: 403 });
   }
 
   const application = getApplicationDetail(id, organization.id);

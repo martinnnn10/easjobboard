@@ -28,6 +28,8 @@ export type User = {
   email: string;
   password_hash: string;
   name: string;
+  /** "admin" | "recruiter" | "viewer" — see lib/permissions. */
+  role: string;
   created_at: string;
 };
 
@@ -374,6 +376,7 @@ function initDb(database: Database.Database): void {
       email TEXT NOT NULL,
       token TEXT NOT NULL UNIQUE,
       invited_by TEXT NOT NULL DEFAULT '',
+      role TEXT NOT NULL DEFAULT 'recruiter',
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL,
       expires_at TEXT NOT NULL,
@@ -384,6 +387,15 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_invites_org ON invites(organization_id);
     CREATE INDEX IF NOT EXISTS idx_invites_token ON invites(token);
   `);
+
+  // Roles. Existing users default to 'admin' so no one loses access on upgrade;
+  // new invited users get the role their admin assigns (default 'recruiter').
+  if (!columnExists(database, "users", "role")) {
+    database.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+  }
+  if (!columnExists(database, "invites", "role")) {
+    database.exec("ALTER TABLE invites ADD COLUMN role TEXT NOT NULL DEFAULT 'recruiter'");
+  }
 
   // Migrations: add columns to databases created before these features existed.
   if (!columnExists(database, "applications", "status")) {
@@ -457,6 +469,7 @@ export function rowToUser(row: Record<string, unknown>): User {
     email: row.email as string,
     password_hash: row.password_hash as string,
     name: row.name as string,
+    role: (row.role as string | undefined) ?? "admin",
     created_at: row.created_at as string,
   };
 }

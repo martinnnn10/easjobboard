@@ -5,6 +5,7 @@ import { requireOrgSession } from "@/lib/auth";
 import { getBaseUrl } from "@/lib/env";
 import { listInvitesByOrg } from "@/lib/invites";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { canManageTeam } from "@/lib/permissions";
 import { listUsersByOrganization } from "@/lib/users";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
@@ -14,12 +15,16 @@ export default async function TeamPage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+  const canManage = canManageTeam(user.role);
 
   const members = listUsersByOrganization(organization.id).map((u) => ({
+    id: u.id,
     name: u.name,
     email: u.email,
+    role: u.role,
     joinedAt: u.created_at,
+    isSelf: u.id === user.id,
   }));
 
   const invites = listInvitesByOrg(organization.id)
@@ -27,6 +32,7 @@ export default async function TeamPage({ params }: PageProps) {
     .map((inv) => ({
       id: inv.id,
       email: inv.email,
+      role: inv.role,
       invitedBy: inv.invitedBy,
       inviteUrl: `${getBaseUrl()}/join/${inv.token}`,
     }));
@@ -44,7 +50,7 @@ export default async function TeamPage({ params }: PageProps) {
         </p>
       </div>
 
-      <TeamManager orgSlug={orgSlug} members={members} invites={invites} />
+      <TeamManager orgSlug={orgSlug} members={members} invites={invites} canManage={canManage} />
     </div>
   );
 }

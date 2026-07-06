@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { canWrite } from "@/lib/permissions";
 import { seedDemoData } from "@/lib/seed-demo";
 
 export const runtime = "nodejs";
@@ -14,7 +15,10 @@ export async function POST(_request: Request, context: RouteContext) {
   const { orgSlug } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization, user } = await requireOrgSessionApi(orgSlug);
+    if (!canWrite(user.role)) {
+      return NextResponse.json({ error: "You have read-only access." }, { status: 403 });
+    }
     const result = seedDemoData(organization.id, organization.name);
     return NextResponse.json(result);
   } catch (error) {

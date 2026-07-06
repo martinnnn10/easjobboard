@@ -19,6 +19,7 @@ import { badgesForApplication, normalizeRiskLevel } from "@/lib/candidate-intel"
 import { listCandidateEvents, type CandidateEvent } from "@/lib/candidate-events";
 import { candidateGap, GAP_VERDICT_COPY } from "@/lib/gap-analysis";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
+import { canWrite } from "@/lib/permissions";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { evaluateIdealPoints } from "@/lib/screen-scoring";
 import { getScreenSubmission } from "@/lib/screen-submissions";
@@ -51,6 +52,7 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   if (!organization) notFound();
 
   const sessionContext = await requireOrgSession(orgSlug);
+  const canEdit = canWrite(sessionContext.user.role);
 
   const application = getApplicationDetail(id, organization.id);
   if (!application) notFound();
@@ -122,11 +124,17 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <ApplicationStatusSelect
-              orgSlug={orgSlug}
-              applicationId={application.id}
-              initialStatus={application.status}
-            />
+            {canEdit ? (
+              <ApplicationStatusSelect
+                orgSlug={orgSlug}
+                applicationId={application.id}
+                initialStatus={application.status}
+              />
+            ) : (
+              <span className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5 text-sm capitalize text-zinc-600">
+                {application.status}
+              </span>
+            )}
             {submission ? (
               <Link href={`/o/${orgSlug}/admin/applications/${application.id}/kit`} className="btn-primary text-sm">
                 📋 Interview kit
@@ -346,23 +354,27 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
                 </a>
               ) : null}
             </div>
-            <EmailPanel
-              orgSlug={orgSlug}
-              applicationId={application.id}
-              currentStatus={application.status}
-              tokens={{
-                candidateName: application.applicant_name,
-                jobTitle: application.job_title,
-                orgName: organization.name,
-                recruiterName: sessionContext.user.name,
-              }}
-            />
+            {canEdit ? (
+              <EmailPanel
+                orgSlug={orgSlug}
+                applicationId={application.id}
+                currentStatus={application.status}
+                tokens={{
+                  candidateName: application.applicant_name,
+                  jobTitle: application.job_title,
+                  orgName: organization.name,
+                  recruiterName: sessionContext.user.name,
+                }}
+              />
+            ) : null}
           </section>
 
-          <section className="card space-y-3">
-            <h2 className="text-lg font-semibold text-zinc-900">Notes</h2>
-            <NoteForm orgSlug={orgSlug} applicationId={application.id} />
-          </section>
+          {canEdit ? (
+            <section className="card space-y-3">
+              <h2 className="text-lg font-semibold text-zinc-900">Notes</h2>
+              <NoteForm orgSlug={orgSlug} applicationId={application.id} />
+            </section>
+          ) : null}
 
           <section className="card space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900">Activity</h2>

@@ -3,6 +3,7 @@ import { requireOrgSessionApi } from "@/lib/auth";
 import { sendInviteEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/env";
 import { createInvite } from "@/lib/invites";
+import { canManageTeam, normalizeRole } from "@/lib/permissions";
 import { getUserByEmail } from "@/lib/users";
 
 export const runtime = "nodejs";
@@ -14,8 +15,12 @@ export async function POST(request: Request, context: RouteContext) {
   const { orgSlug } = await context.params;
   try {
     const { organization, user } = await requireOrgSessionApi(orgSlug);
-    const body = (await request.json().catch(() => ({}))) as { email?: string };
+    if (!canManageTeam(user.role)) {
+      return NextResponse.json({ error: "Only admins can invite teammates." }, { status: 403 });
+    }
+    const body = (await request.json().catch(() => ({}))) as { email?: string; role?: string };
     const email = String(body.email ?? "").trim().toLowerCase();
+    const role = normalizeRole(body.role);
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
@@ -24,7 +29,7 @@ export async function POST(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "That person already has an account." }, { status: 409 });
     }
 
-    const invite = createInvite({ organizationId: organization.id, email, invitedBy: user.name });
+    const invite = createInvite({ organizationId: organization.id, email, invitedBy: user.name, role });
     const inviteUrl = `${getBaseUrl()}/join/${invite.token}`;
 
     // Best-effort email; the admin still gets a copyable link back either way.

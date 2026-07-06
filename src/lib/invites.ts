@@ -18,6 +18,7 @@ export type Invite = {
   email: string;
   token: string;
   invitedBy: string;
+  role: string;
   status: "pending" | "accepted" | "revoked";
   createdAt: string;
   expiresAt: string;
@@ -31,6 +32,7 @@ function rowToInvite(row: Record<string, unknown>): Invite {
     email: row.email as string,
     token: row.token as string,
     invitedBy: (row.invited_by as string) ?? "",
+    role: (row.role as string | undefined) ?? "recruiter",
     status: row.status as Invite["status"],
     createdAt: row.created_at as string,
     expiresAt: row.expires_at as string,
@@ -42,6 +44,7 @@ export function createInvite(input: {
   organizationId: string;
   email: string;
   invitedBy: string;
+  role: string;
 }): Invite {
   const db = getDb();
   const email = input.email.trim().toLowerCase();
@@ -57,21 +60,17 @@ export function createInvite(input: {
   const expiresAt = new Date(now.getTime() + INVITE_TTL_MS).toISOString();
 
   if (existing) {
-    db.prepare("UPDATE invites SET token = ?, invited_by = ?, created_at = ?, expires_at = ? WHERE id = ?").run(
-      token,
-      input.invitedBy,
-      now.toISOString(),
-      expiresAt,
-      existing.id as string,
-    );
+    db.prepare(
+      "UPDATE invites SET token = ?, invited_by = ?, role = ?, created_at = ?, expires_at = ? WHERE id = ?",
+    ).run(token, input.invitedBy, input.role, now.toISOString(), expiresAt, existing.id as string);
     return getInviteById(existing.id as string)!;
   }
 
   const id = randomUUID();
   db.prepare(
-    `INSERT INTO invites (id, organization_id, email, token, invited_by, status, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)`,
-  ).run(id, input.organizationId, email, token, input.invitedBy, now.toISOString(), expiresAt);
+    `INSERT INTO invites (id, organization_id, email, token, invited_by, role, status, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+  ).run(id, input.organizationId, email, token, input.invitedBy, input.role, now.toISOString(), expiresAt);
   return getInviteById(id)!;
 }
 
@@ -124,6 +123,7 @@ export function acceptInvite(input: { token: string; name: string; password: str
     email: invite.email,
     password: input.password,
     name: input.name,
+    role: invite.role,
   });
 
   getDb()

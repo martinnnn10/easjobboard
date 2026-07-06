@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { canWrite } from "@/lib/permissions";
 import { isHundredHiresConfigured } from "@/lib/env";
 import { syncJobToHundredHires } from "@/lib/integrations/hundredhires";
 import { createJob, listJobsByOrganization } from "@/lib/jobs";
@@ -39,7 +40,10 @@ export async function POST(request: Request, context: RouteContext) {
   const { orgSlug } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization, user } = await requireOrgSessionApi(orgSlug);
+    if (!canWrite(user.role)) {
+      return NextResponse.json({ error: "You have read-only access." }, { status: 403 });
+    }
     const body = await request.json();
 
     const job = createJob(organization.id, organization.name, {

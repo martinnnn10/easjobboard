@@ -3,6 +3,7 @@ import { requireOrgSessionApi } from "@/lib/auth";
 import { isHundredHiresConfigured } from "@/lib/env";
 import { syncJobToHundredHires } from "@/lib/integrations/hundredhires";
 import { getJobById } from "@/lib/jobs";
+import { canWrite } from "@/lib/permissions";
 
 export const runtime = "nodejs";
 
@@ -13,7 +14,10 @@ export async function POST(_request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization, user } = await requireOrgSessionApi(orgSlug);
+    if (!canWrite(user.role)) {
+      return NextResponse.json({ ok: false, error: "You have read-only access." }, { status: 403 });
+    }
     if (!isHundredHiresConfigured()) {
       return NextResponse.json(
         { ok: false, error: "100Hires isn't connected. Set HUNDREDHIRES_API_KEY to enable it." },

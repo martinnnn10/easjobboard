@@ -62,6 +62,7 @@ export async function POST(request: Request) {
       email: adminEmail,
       password,
       name: adminName,
+      role: "admin", // the person who creates the org is its admin
     });
 
     const token = await createSessionToken({

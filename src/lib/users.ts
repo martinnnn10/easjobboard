@@ -21,6 +21,7 @@ export function createUser(input: {
   email: string;
   password: string;
   name: string;
+  role?: string;
 }): User {
   const database = getDb();
   const id = randomUUID();
@@ -28,8 +29,8 @@ export function createUser(input: {
 
   database
     .prepare(
-      `INSERT INTO users (id, organization_id, email, password_hash, name, created_at)
-       VALUES (@id, @organization_id, @email, @password_hash, @name, @created_at)`,
+      `INSERT INTO users (id, organization_id, email, password_hash, name, role, created_at)
+       VALUES (@id, @organization_id, @email, @password_hash, @name, @role, @created_at)`,
     )
     .run({
       id,
@@ -37,10 +38,27 @@ export function createUser(input: {
       email: input.email.trim().toLowerCase(),
       password_hash: passwordHash,
       name: input.name.trim(),
+      role: input.role ?? "recruiter",
       created_at: nowIso(),
     });
 
   return getUserById(id)!;
+}
+
+/** Change a user's role, scoped to an organization. */
+export function updateUserRole(userId: string, organizationId: string, role: string): boolean {
+  const result = getDb()
+    .prepare("UPDATE users SET role = ? WHERE id = ? AND organization_id = ?")
+    .run(role, userId, organizationId);
+  return result.changes > 0;
+}
+
+/** How many admins an org has — used to prevent removing the last one. */
+export function countAdmins(organizationId: string): number {
+  const row = getDb()
+    .prepare("SELECT COUNT(*) AS count FROM users WHERE organization_id = ? AND role = 'admin'")
+    .get(organizationId) as { count: number };
+  return row.count;
 }
 
 export async function verifyUserPassword(user: User, password: string): Promise<boolean> {
