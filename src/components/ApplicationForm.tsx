@@ -33,20 +33,48 @@ export function ApplicationForm({
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [report, setReport] = useState<ApplyReport | null>(null);
+  // The skills check is opt-in: hidden behind a CTA so it never blocks applying.
+  const [screenOpen, setScreenOpen] = useState(false);
+  const [answers, setAnswers] = useState<Record<string, ScreenAnswerValue>>({});
 
-  // Ranking questions start pre-populated with the presented order so an
-  // untouched ranking still submits a (scoreable) answer.
-  const initialAnswers = useMemo(() => {
-    const seed: Record<string, ScreenAnswerValue> = {};
-    for (const q of screen?.questions ?? []) {
-      if (q.type === "ranking" && q.items) seed[q.id] = q.items.map((it) => it.id);
-    }
-    return seed;
+  const typeById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const q of screen?.questions ?? []) map[q.id] = q.type;
+    return map;
   }, [screen]);
-  const [answers, setAnswers] = useState<Record<string, ScreenAnswerValue>>(initialAnswers);
+
+  // Rough time estimate so applicants know the ask up front (~40s/question).
+  const estMinutes = Math.max(2, Math.round(((screen?.questions.length ?? 0) * 40) / 60));
 
   function setAnswer(id: string, value: ScreenAnswerValue) {
     setAnswers((current) => ({ ...current, [id]: value }));
+  }
+
+  // "Really answered" = picked an option or wrote text on a non-ranking question.
+  // Ranking alone doesn't count, so peeking at the screen and bailing leaves the
+  // application un-scored (pending) rather than scored as a fail.
+  function hasRealAnswer(): boolean {
+    return Object.entries(answers).some(([id, value]) => {
+      const type = typeById[id];
+      if (type === "multiple_choice" || type === "experience") return typeof value === "number" && value >= 0;
+      if (type === "short_answer" || type === "scenario") return typeof value === "string" && value.trim().length > 0;
+      return false;
+    });
+  }
+
+  function startScreen() {
+    // Seed ranking questions to the presented order so an opened screen submits
+    // a scoreable ordering the applicant can then rearrange.
+    setAnswers((current) => {
+      const next = { ...current };
+      for (const q of screen?.questions ?? []) {
+        if (q.type === "ranking" && q.items && next[q.id] === undefined) {
+          next[q.id] = q.items.map((it) => it.id);
+        }
+      }
+      return next;
+    });
+    setScreenOpen(true);
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -69,7 +97,9 @@ export function ApplicationForm({
     formData.append("desiredPay", desiredPay);
     formData.append("coverLetter", coverLetter);
     formData.append("resume", resume);
-    if (screen) {
+    // Only submit the skills check if the applicant actually engaged with it —
+    // otherwise it stays optional (application saved, screen left un-scored).
+    if (screen && hasRealAnswer()) {
       formData.append("screenKey", screen.key);
       formData.append("screenAnswers", JSON.stringify(answers));
     }
@@ -89,7 +119,11 @@ export function ApplicationForm({
 
     setReport(data.report ?? null);
     setStatus("success");
-    setMessage("Application sent. The hiring team will review your resume and your skills check.");
+    setMessage(
+      screen && hasRealAnswer()
+        ? "Application sent — and because you completed the skills check, you go to the front of the review line."
+        : "Application sent. The hiring team will review your resume.",
+    );
   }
 
   if (status === "success") {
@@ -141,8 +175,8 @@ export function ApplicationForm({
       <div>
         <h2 className="text-xl font-semibold text-zinc-900">Apply for {jobTitle}</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Your resume goes to the hiring team.
-          {screen ? " A short skills check below helps them see you can actually do the work." : ""}
+          Your resume goes straight to the hiring team.
+          {screen ? " Want to jump the line? There’s an optional skills check below." : ""}
         </p>
       </div>
 
@@ -197,21 +231,51 @@ export function ApplicationForm({
       </label>
 
       {screen ? (
-        <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
-          <div>
-            <p className="section-label text-blue-700">Skills check</p>
-            <p className="mt-1 text-sm text-zinc-700">
-              {screen.blurb} There are no trick questions — answer the way you actually would on the floor.
-            </p>
-          </div>
-          <ScreenQuestions questions={screen.questions} answers={answers} onChange={setAnswer} />
+        <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+          {!screenOpen ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-2">
+                <span className="text-lg leading-6">⚡</span>
+                <div>
+                  <p className="text-sm font-semibold text-zinc-900">
+                    Optional: take the skills check and get seen first
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-700">
+                    It’s optional — you can submit right now. But hiring managers review candidates who complete the
+                    skills check <span className="font-medium">before the resume pile</span>. It’s about {estMinutes}{" "}
+                    minutes of real plant-floor questions and it’s the fastest way in front of a person.
+                  </p>
+                </div>
+              </div>
+              <div>
+                <button type="button" onClick={startScreen} className="btn-primary text-sm">
+                  Start the skills check →
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <p className="section-label text-blue-700">Skills check · optional</p>
+                <p className="mt-1 text-sm text-zinc-700">
+                  {screen.blurb} No trick questions — answer the way you actually would on the floor. You can still
+                  submit without finishing.
+                </p>
+              </div>
+              <ScreenQuestions questions={screen.questions} answers={answers} onChange={setAnswer} />
+            </div>
+          )}
         </div>
       ) : null}
 
       {status === "error" ? <p className="text-sm text-red-600">{message}</p> : null}
 
       <button type="submit" disabled={status === "loading"} className="btn-primary w-full">
-        {status === "loading" ? "Submitting…" : "Submit application"}
+        {status === "loading"
+          ? "Submitting…"
+          : screen && screenOpen && hasRealAnswer()
+            ? "Submit application + skills check"
+            : "Submit application"}
       </button>
     </form>
   );

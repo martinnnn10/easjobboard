@@ -22,6 +22,15 @@ export function getPlatformEmail(): string {
   return process.env.PLATFORM_EMAIL ?? "eas@eautomatedstaffing.com";
 }
 
+/**
+ * Optional path to a brand logo image (e.g. "/logo.svg" or "/logo.png") placed
+ * in /public. When set, the header/footer show it in place of the built-in
+ * emblem. Empty by default so the bundled emblem is used.
+ */
+export function getPlatformLogo(): string {
+  return process.env.PLATFORM_LOGO_SRC ?? "";
+}
+
 export function getAuthSecret(): string {
   return required("AUTH_SECRET");
 }
