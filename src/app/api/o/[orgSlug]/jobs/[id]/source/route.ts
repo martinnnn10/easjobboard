@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { searchResumesPdl } from "@/lib/integrations/peopledatalabs";
 import { getJobById } from "@/lib/jobs";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { sourceCandidates } from "@/lib/sourcing";
@@ -35,6 +36,10 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  const result = await sourceCandidates(job);
+  // Choose the read-only search provider: Apollo passive search (default) or the
+  // People Data Labs resume database.
+  const body = (await request.json().catch(() => ({}))) as { provider?: string };
+  const result =
+    body.provider === "pdl" ? await searchResumesPdl(job) : await sourceCandidates(job);
   return NextResponse.json(result);
 }

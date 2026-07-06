@@ -100,3 +100,21 @@ export function getHundredHiresConfig() {
 export function isHundredHiresConfigured(): boolean {
   return Boolean(process.env.HUNDREDHIRES_API_KEY);
 }
+
+/**
+ * People Data Labs (resume/candidate database) config. Read-only candidate
+ * search, dormant until PDL_API_KEY is set. Key is read only from the
+ * environment; base URL is overridable for testing.
+ */
+export function getPdlConfig() {
+  const apiKey = process.env.PDL_API_KEY ?? "";
+  return {
+    apiKey,
+    enabled: Boolean(apiKey),
+    baseUrl: (process.env.PDL_BASE_URL ?? "https://api.peopledatalabs.com/v5").replace(/\/$/, ""),
+  };
+}
+
+export function isPdlConfigured(): boolean {
+  return Boolean(process.env.PDL_API_KEY);
+}

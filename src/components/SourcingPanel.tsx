@@ -52,13 +52,20 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
   const [state, setState] = useState<"idle" | "loading">("idle");
   const [result, setResult] = useState<SourcingResult | null>(null);
   const [enrich, setEnrich] = useState<Record<number, EnrichState>>({});
+  const [provider, setProvider] = useState<"apollo" | "pdl">("apollo");
+  const [resultProvider, setResultProvider] = useState<"apollo" | "pdl">("apollo");
 
   async function handleSearch() {
     setState("loading");
     setResult(null);
     setEnrich({});
+    setResultProvider(provider);
     try {
-      const response = await fetch(`/api/o/${orgSlug}/jobs/${jobId}/source`, { method: "POST" });
+      const response = await fetch(`/api/o/${orgSlug}/jobs/${jobId}/source`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
       const data = (await response.json()) as SourcingResult;
       setResult(data);
     } catch {
@@ -112,14 +119,48 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-zinc-700">Search source:</span>
+        {(
+          [
+            { key: "apollo", label: "Passive search (Apollo)" },
+            { key: "pdl", label: "Resume database (People Data Labs)" },
+          ] as const
+        ).map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setProvider(opt.key)}
+            className={`rounded-lg border px-3 py-1.5 text-sm transition ${
+              provider === opt.key
+                ? "border-blue-600 bg-blue-50 font-medium text-blue-700"
+                : "border-zinc-300 text-zinc-700 hover:border-zinc-400"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       <button onClick={handleSearch} disabled={state === "loading"} className="btn-primary">
         {state === "loading" ? "Searching…" : "Find candidates"}
       </button>
 
       {result?.status === "not_configured" ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Outbound sourcing isn&apos;t configured yet. Set an <code className="rounded bg-amber-100 px-1">APOLLO_API_KEY</code>{" "}
-          environment variable to search the passive candidate market from this job.
+          {resultProvider === "pdl" ? (
+            <>
+              The People Data Labs resume database isn&apos;t connected. Set a{" "}
+              <code className="rounded bg-amber-100 px-1">PDL_API_KEY</code> environment variable to search it.
+              Heads-up: general resume databases skew office/tech, so coverage of skilled trades is limited.
+            </>
+          ) : (
+            <>
+              Outbound sourcing isn&apos;t configured yet. Set an{" "}
+              <code className="rounded bg-amber-100 px-1">APOLLO_API_KEY</code> environment variable to search the
+              passive candidate market from this job.
+            </>
+          )}
         </div>
       ) : null}
 
@@ -159,21 +200,43 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => handleEnrich(index, candidate)}
-                      disabled={e?.loading}
-                      className="btn-secondary text-sm"
-                    >
-                      {e?.loading ? "Enriching…" : "Reveal contact & draft outreach"}
-                    </button>
-                    {e && !e.loading && e.email ? (
-                      <span className="text-sm text-zinc-700">
-                        {e.email}
-                        {e.phone ? ` · ${e.phone}` : ""}
-                      </span>
-                    ) : null}
-                  </div>
+                  {candidate.matchedSkills.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {candidate.matchedSkills.slice(0, 8).map((skill) => (
+                        <span key={skill} className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {resultProvider === "pdl" ? (
+                    <div className="flex items-center gap-3 text-sm">
+                      {candidate.emailStatus && candidate.emailStatus.includes("@") ? (
+                        <a href={`mailto:${candidate.emailStatus}`} className="text-blue-600 hover:underline">
+                          ✉ {candidate.emailStatus}
+                        </a>
+                      ) : (
+                        <span className="text-zinc-500">No public email — reach out on LinkedIn.</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleEnrich(index, candidate)}
+                        disabled={e?.loading}
+                        className="btn-secondary text-sm"
+                      >
+                        {e?.loading ? "Enriching…" : "Reveal contact & draft outreach"}
+                      </button>
+                      {e && !e.loading && e.email ? (
+                        <span className="text-sm text-zinc-700">
+                          {e.email}
+                          {e.phone ? ` · ${e.phone}` : ""}
+                        </span>
+                      ) : null}
+                    </div>
+                  )}
 
                   {e?.message ? <p className="text-xs text-amber-700">{e.message}</p> : null}
 
