@@ -1,19 +1,42 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { listApplicationsByOrganization } from "@/lib/applications";
+import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
+import { BadgeRow, ScreenScoreBadge } from "@/components/ScreenSignals";
+import {
+  countApplicationsByOrganization,
+  listApplicationsByOrganization,
+} from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
-type PageProps = { params: Promise<{ orgSlug: string }> };
+const PAGE_SIZE = 25;
 
-export default async function OrgApplicantsPage({ params }: PageProps) {
+type PageProps = {
+  params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ page?: string }>;
+};
+
+export default async function OrgApplicantsPage({ params, searchParams }: PageProps) {
   const { orgSlug } = await params;
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
   await requireOrgSession(orgSlug);
 
-  const applicants = listApplicationsByOrganization(organization.id);
+  const total = countApplicationsByOrganization(organization.id);
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const requestedPage = Number.parseInt((await searchParams).page ?? "1", 10);
+  const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, requestedPage), pageCount) : 1;
+
+  const applicants = listApplicationsByOrganization(organization.id, {
+    orderBy: "score",
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  });
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = (page - 1) * PAGE_SIZE + applicants.length;
 
   return (
     <div className="page-shell space-y-6">
@@ -23,7 +46,8 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-zinc-900">Applicants</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Resumes are also emailed to {organization.application_email} when candidates apply.
+          Ranked by practical skills-screen score — who can actually do the work — not resume keywords. Resumes are
+          also emailed to {organization.application_email} when candidates apply.
         </p>
       </div>
 
@@ -36,7 +60,9 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
               <tr>
                 <th className="px-4 py-3 font-medium">Applicant</th>
                 <th className="px-4 py-3 font-medium">Job</th>
-                <th className="px-4 py-3 font-medium">Phone</th>
+                <th className="px-4 py-3 font-medium">Skills screen</th>
+                <th className="px-4 py-3 font-medium">Signals</th>
+                <th className="px-4 py-3 font-medium">Stage</th>
                 <th className="px-4 py-3 font-medium">Applied</th>
                 <th className="px-4 py-3 font-medium">Resume</th>
               </tr>
@@ -45,11 +71,31 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
               {applicants.map((application) => (
                 <tr key={application.id} className="border-b border-zinc-100 last:border-0">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-zinc-900">{application.applicant_name}</div>
+                    <Link
+                      href={`/o/${orgSlug}/admin/applications/${application.id}`}
+                      className="font-medium text-zinc-900 hover:text-blue-700"
+                    >
+                      {application.applicant_name}
+                    </Link>
                     <div className="text-zinc-500">{application.applicant_email}</div>
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
-                  <td className="px-4 py-3 text-zinc-600">{application.applicant_phone || "—"}</td>
+                  <td className="px-4 py-3">
+                    <ScreenScoreBadge score={application.screen_score} status={application.screen_status} />
+                    <div className="mt-1 text-[11px] text-zinc-400">
+                      {application.match_score === null ? "" : `Resume kw: ${application.match_score}%`}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <BadgeRow badges={badgesForApplication(application)} max={3} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <ApplicationStatusSelect
+                      orgSlug={orgSlug}
+                      applicationId={application.id}
+                      initialStatus={application.status}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <a href={`/api/o/${orgSlug}/applications/${application.id}/resume`} className="text-blue-600 hover:underline">
@@ -62,6 +108,36 @@ export default async function OrgApplicantsPage({ params }: PageProps) {
           </table>
         </div>
       )}
+
+      {total > PAGE_SIZE ? (
+        <div className="flex items-center justify-between text-sm text-zinc-600">
+          <span>
+            Showing {rangeStart}–{rangeEnd} of {total}
+          </span>
+          <div className="flex gap-2">
+            {page > 1 ? (
+              <Link
+                href={`/o/${orgSlug}/admin/applicants?page=${page - 1}`}
+                className="btn-secondary px-3 py-1.5"
+              >
+                ← Previous
+              </Link>
+            ) : (
+              <span className="btn-secondary pointer-events-none px-3 py-1.5 opacity-50">← Previous</span>
+            )}
+            {page < pageCount ? (
+              <Link
+                href={`/o/${orgSlug}/admin/applicants?page=${page + 1}`}
+                className="btn-secondary px-3 py-1.5"
+              >
+                Next →
+              </Link>
+            ) : (
+              <span className="btn-secondary pointer-events-none px-3 py-1.5 opacity-50">Next →</span>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

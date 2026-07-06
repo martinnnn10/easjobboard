@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { Job, JobStatus } from "@/lib/db";
+import { JD_TEMPLATES, getTemplateById, matchTemplateByTitle, type JdTemplate } from "@/lib/jd-templates";
+import { getScreen, SCREEN_OPTIONS, suggestScreenForTitle } from "@/lib/screens";
 
 type JobFormValues = {
   title: string;
@@ -20,6 +22,15 @@ type JobFormValues = {
   company_name: string;
   reference_number: string;
   status: JobStatus;
+  screen_key: string;
+};
+
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  multiple_choice: "Multiple choice",
+  short_answer: "Short answer",
+  scenario: "Troubleshooting scenario",
+  ranking: "Order the steps",
+  experience: "Experience",
 };
 
 const EMPLOYMENT_TYPES = ["FULL_TIME", "PART_TIME", "CONTRACT", "TEMPORARY", "INTERN"];
@@ -150,147 +161,187 @@ const US_CITIES: CityEntry[] = [
   { city: "Albuquerque", state: "New Mexico", stateCode: "NM", zip: "87101" },
   // Connecticut
   { city: "Hartford", state: "Connecticut", stateCode: "CT", zip: "06101" },
+  // Additional major cities across all states (quick-pick suggestions)
+  { city: "Seattle", state: "Washington", stateCode: "WA", zip: "98101" },
+  { city: "Tacoma", state: "Washington", stateCode: "WA", zip: "98402" },
+  { city: "Spokane", state: "Washington", stateCode: "WA", zip: "99201" },
+  { city: "Portland", state: "Oregon", stateCode: "OR", zip: "97201" },
+  { city: "Salem", state: "Oregon", stateCode: "OR", zip: "97301" },
+  { city: "Eugene", state: "Oregon", stateCode: "OR", zip: "97401" },
+  { city: "Denver", state: "Colorado", stateCode: "CO", zip: "80202" },
+  { city: "Colorado Springs", state: "Colorado", stateCode: "CO", zip: "80903" },
+  { city: "Aurora", state: "Colorado", stateCode: "CO", zip: "80010" },
+  { city: "Phoenix", state: "Arizona", stateCode: "AZ", zip: "85004" },
+  { city: "Tucson", state: "Arizona", stateCode: "AZ", zip: "85701" },
+  { city: "Mesa", state: "Arizona", stateCode: "AZ", zip: "85201" },
+  { city: "Las Vegas", state: "Nevada", stateCode: "NV", zip: "89101" },
+  { city: "Reno", state: "Nevada", stateCode: "NV", zip: "89501" },
+  { city: "Henderson", state: "Nevada", stateCode: "NV", zip: "89002" },
+  { city: "Salt Lake City", state: "Utah", stateCode: "UT", zip: "84101" },
+  { city: "Boise", state: "Idaho", stateCode: "ID", zip: "83702" },
+  { city: "Houston", state: "Texas", stateCode: "TX", zip: "77002" },
+  { city: "Dallas", state: "Texas", stateCode: "TX", zip: "75201" },
+  { city: "Austin", state: "Texas", stateCode: "TX", zip: "78701" },
+  { city: "San Antonio", state: "Texas", stateCode: "TX", zip: "78205" },
+  { city: "Fort Worth", state: "Texas", stateCode: "TX", zip: "76102" },
+  { city: "El Paso", state: "Texas", stateCode: "TX", zip: "79901" },
+  { city: "Arlington", state: "Texas", stateCode: "TX", zip: "76010" },
+  { city: "Chicago", state: "Illinois", stateCode: "IL", zip: "60601" },
+  { city: "Aurora", state: "Illinois", stateCode: "IL", zip: "60505" },
+  { city: "Detroit", state: "Michigan", stateCode: "MI", zip: "48226" },
+  { city: "Grand Rapids", state: "Michigan", stateCode: "MI", zip: "49503" },
+  { city: "Warren", state: "Michigan", stateCode: "MI", zip: "48088" },
+  { city: "Minneapolis", state: "Minnesota", stateCode: "MN", zip: "55401" },
+  { city: "St. Paul", state: "Minnesota", stateCode: "MN", zip: "55102" },
+  { city: "Milwaukee", state: "Wisconsin", stateCode: "WI", zip: "53202" },
+  { city: "Madison", state: "Wisconsin", stateCode: "WI", zip: "53703" },
+  { city: "Indianapolis", state: "Indiana", stateCode: "IN", zip: "46204" },
+  { city: "Fort Wayne", state: "Indiana", stateCode: "IN", zip: "46802" },
+  { city: "Columbus", state: "Ohio", stateCode: "OH", zip: "43215" },
+  { city: "Cleveland", state: "Ohio", stateCode: "OH", zip: "44113" },
+  { city: "Cincinnati", state: "Ohio", stateCode: "OH", zip: "45202" },
+  { city: "Toledo", state: "Ohio", stateCode: "OH", zip: "43604" },
+  { city: "Kansas City", state: "Missouri", stateCode: "MO", zip: "64106" },
+  { city: "St. Louis", state: "Missouri", stateCode: "MO", zip: "63101" },
+  { city: "Wichita", state: "Kansas", stateCode: "KS", zip: "67202" },
+  { city: "Omaha", state: "Nebraska", stateCode: "NE", zip: "68102" },
+  { city: "Des Moines", state: "Iowa", stateCode: "IA", zip: "50309" },
+  { city: "Nashville", state: "Tennessee", stateCode: "TN", zip: "37203" },
+  { city: "Memphis", state: "Tennessee", stateCode: "TN", zip: "38103" },
+  { city: "Knoxville", state: "Tennessee", stateCode: "TN", zip: "37902" },
+  { city: "Louisville", state: "Kentucky", stateCode: "KY", zip: "40202" },
+  { city: "Atlanta", state: "Georgia", stateCode: "GA", zip: "30303" },
+  { city: "Savannah", state: "Georgia", stateCode: "GA", zip: "31401" },
+  { city: "Charlotte", state: "North Carolina", stateCode: "NC", zip: "28202" },
+  { city: "Raleigh", state: "North Carolina", stateCode: "NC", zip: "27601" },
+  { city: "Greensboro", state: "North Carolina", stateCode: "NC", zip: "27401" },
+  { city: "Columbia", state: "South Carolina", stateCode: "SC", zip: "29201" },
+  { city: "Charleston", state: "South Carolina", stateCode: "SC", zip: "29401" },
+  { city: "Birmingham", state: "Alabama", stateCode: "AL", zip: "35203" },
+  { city: "Montgomery", state: "Alabama", stateCode: "AL", zip: "36104" },
+  { city: "Jackson", state: "Mississippi", stateCode: "MS", zip: "39201" },
+  { city: "New Orleans", state: "Louisiana", stateCode: "LA", zip: "70112" },
+  { city: "Baton Rouge", state: "Louisiana", stateCode: "LA", zip: "70802" },
+  { city: "Little Rock", state: "Arkansas", stateCode: "AR", zip: "72201" },
+  { city: "Oklahoma City", state: "Oklahoma", stateCode: "OK", zip: "73102" },
+  { city: "Tulsa", state: "Oklahoma", stateCode: "OK", zip: "74103" },
+  { city: "Miami", state: "Florida", stateCode: "FL", zip: "33128" },
+  { city: "Orlando", state: "Florida", stateCode: "FL", zip: "32801" },
+  { city: "Tampa", state: "Florida", stateCode: "FL", zip: "33602" },
+  { city: "Jacksonville", state: "Florida", stateCode: "FL", zip: "32202" },
+  { city: "Fort Lauderdale", state: "Florida", stateCode: "FL", zip: "33301" },
+  { city: "New York", state: "New York", stateCode: "NY", zip: "10007" },
+  { city: "Brooklyn", state: "New York", stateCode: "NY", zip: "11201" },
+  { city: "Buffalo", state: "New York", stateCode: "NY", zip: "14202" },
+  { city: "Rochester", state: "New York", stateCode: "NY", zip: "14604" },
+  { city: "Newark", state: "New Jersey", stateCode: "NJ", zip: "07102" },
+  { city: "Jersey City", state: "New Jersey", stateCode: "NJ", zip: "07302" },
+  { city: "Boston", state: "Massachusetts", stateCode: "MA", zip: "02108" },
+  { city: "Worcester", state: "Massachusetts", stateCode: "MA", zip: "01608" },
+  { city: "Providence", state: "Rhode Island", stateCode: "RI", zip: "02903" },
+  { city: "Philadelphia", state: "Pennsylvania", stateCode: "PA", zip: "19107" },
+  { city: "Pittsburgh", state: "Pennsylvania", stateCode: "PA", zip: "15222" },
+  { city: "Baltimore", state: "Maryland", stateCode: "MD", zip: "21201" },
+  { city: "Washington", state: "District of Columbia", stateCode: "DC", zip: "20001" },
+  { city: "Richmond", state: "Virginia", stateCode: "VA", zip: "23219" },
+  { city: "Virginia Beach", state: "Virginia", stateCode: "VA", zip: "23451" },
+  { city: "Norfolk", state: "Virginia", stateCode: "VA", zip: "23510" },
+  { city: "Charleston", state: "West Virginia", stateCode: "WV", zip: "25301" },
+  { city: "Portland", state: "Maine", stateCode: "ME", zip: "04101" },
+  { city: "Manchester", state: "New Hampshire", stateCode: "NH", zip: "03101" },
+  { city: "Burlington", state: "Vermont", stateCode: "VT", zip: "05401" },
+  { city: "Wilmington", state: "Delaware", stateCode: "DE", zip: "19801" },
+  { city: "Billings", state: "Montana", stateCode: "MT", zip: "59101" },
+  { city: "Cheyenne", state: "Wyoming", stateCode: "WY", zip: "82001" },
+  { city: "Fargo", state: "North Dakota", stateCode: "ND", zip: "58102" },
+  { city: "Sioux Falls", state: "South Dakota", stateCode: "SD", zip: "57104" },
+  { city: "Honolulu", state: "Hawaii", stateCode: "HI", zip: "96813" },
+  { city: "Anchorage", state: "Alaska", stateCode: "AK", zip: "99501" },
 ];
 
-// ─── Job Title Intelligence ────────────────────────────────────────────────
-type JobTitleSuggestion = {
-  employment_type: string;
-  salary_min: string;
-  salary_max: string;
-  salary_period: string;
-  descriptionHint: string;
-};
-
-const JOB_TITLE_PATTERNS: { pattern: RegExp; suggestion: JobTitleSuggestion }[] = [
-  {
-    pattern: /maintenance\s*(supervisor|manager)/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "85000",
-      salary_max: "110000",
-      salary_period: "YEAR",
-      descriptionHint: "Supervise and coordinate maintenance activities including preventive maintenance programs, equipment repairs, and facility upkeep. Manage maintenance staff scheduling, training, and performance. Ensure compliance with safety regulations and maintain documentation of all maintenance activities.\n\nRequirements:\n- 5+ years maintenance experience in industrial/manufacturing environment\n- Knowledge of PLCs, electrical systems, and mechanical systems\n- Experience with CMMS software\n- Strong leadership and communication skills\n- OSHA safety knowledge\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /maintenance\s*technician/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "55000",
-      salary_max: "75000",
-      salary_period: "YEAR",
-      descriptionHint: "Perform preventive and corrective maintenance on production equipment, HVAC systems, and facility infrastructure. Troubleshoot electrical, mechanical, pneumatic, and hydraulic systems. Complete work orders and maintain accurate maintenance records.\n\nRequirements:\n- 3+ years industrial maintenance experience\n- Knowledge of PLCs and electrical troubleshooting\n- Ability to read schematics, blueprints, and technical manuals\n- Experience with welding, fabrication, or machining preferred\n- Must be available for on-call rotation\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /electrician|electrical\s*technician/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "65000",
-      salary_max: "90000",
-      salary_period: "YEAR",
-      descriptionHint: "Install, maintain, and repair electrical systems including wiring, conduit, panels, motors, VFDs, and control systems. Perform troubleshooting using multimeters, meggars, and thermal imaging. Ensure all work meets NEC code requirements.\n\nRequirements:\n- Journeyman or Master Electrician license\n- Experience with 480V 3-phase systems\n- PLC programming knowledge (Allen-Bradley, Siemens)\n- Ability to read electrical drawings and schematics\n- NFPA 70E arc flash training\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /plc\s*programmer|controls\s*engineer|automation\s*engineer/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "90000",
-      salary_max: "130000",
-      salary_period: "YEAR",
-      descriptionHint: "Design, program, and commission PLC-based control systems for manufacturing automation. Develop HMI interfaces, configure industrial networks, and integrate SCADA systems. Support production with troubleshooting and continuous improvement projects.\n\nRequirements:\n- BS in Electrical Engineering or related field\n- 3+ years PLC programming (Allen-Bradley, Siemens, or Mitsubishi)\n- Experience with HMI development (FactoryTalk, WinCC)\n- Knowledge of industrial communication protocols (EtherNet/IP, Profinet, Modbus)\n- AutoCAD Electrical proficiency\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /machine\s*operator|production\s*operator/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "38000",
-      salary_max: "52000",
-      salary_period: "YEAR",
-      descriptionHint: "Operate and monitor production machinery to meet quality and output targets. Perform basic machine setup, changeovers, and minor adjustments. Conduct quality checks and maintain production logs.\n\nRequirements:\n- High school diploma or GED\n- 1+ years manufacturing experience preferred\n- Ability to read and follow work instructions\n- Basic math and measurement skills\n- Ability to lift 50 lbs and stand for extended periods\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /warehouse|material\s*handler|forklift/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "35000",
-      salary_max: "48000",
-      salary_period: "YEAR",
-      descriptionHint: "Receive, store, and distribute materials, equipment, and products within the warehouse. Operate forklifts and other material handling equipment. Maintain inventory accuracy and ensure proper storage conditions.\n\nRequirements:\n- Valid forklift certification\n- Experience with warehouse management systems (WMS)\n- Ability to lift 50+ lbs regularly\n- Basic computer skills for inventory tracking\n- Attention to detail for accurate order picking\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /welder|welding/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "50000",
-      salary_max: "72000",
-      salary_period: "YEAR",
-      descriptionHint: "Perform MIG, TIG, and stick welding on various metals including carbon steel, stainless steel, and aluminum. Read and interpret blueprints, welding symbols, and fabrication drawings. Ensure all welds meet quality standards and pass inspection.\n\nRequirements:\n- AWS certification preferred\n- 3+ years welding experience in industrial setting\n- Proficiency in multiple welding processes\n- Ability to read blueprints and welding symbols\n- Knowledge of metallurgy and heat treatment basics\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /hvac|refrigeration/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "55000",
-      salary_max: "80000",
-      salary_period: "YEAR",
-      descriptionHint: "Install, maintain, and repair HVAC and refrigeration systems in commercial and industrial facilities. Perform preventive maintenance, diagnose system failures, and ensure optimal performance. Handle refrigerant recovery and charging per EPA regulations.\n\nRequirements:\n- EPA 608 Universal Certification\n- 3+ years commercial/industrial HVAC experience\n- Knowledge of building automation systems (BAS)\n- Ability to read mechanical drawings and wiring diagrams\n- Valid driver's license\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /project\s*manager/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "95000",
-      salary_max: "130000",
-      salary_period: "YEAR",
-      descriptionHint: "Lead and manage capital projects from conception through commissioning. Develop project scopes, budgets, and schedules. Coordinate with engineering, operations, and contractors to ensure on-time, on-budget delivery.\n\nRequirements:\n- PMP certification preferred\n- 5+ years project management experience in industrial/manufacturing\n- Proficiency in MS Project or Primavera\n- Strong budget management and vendor negotiation skills\n- Bachelor's degree in Engineering or related field\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /safety\s*(manager|coordinator|specialist)/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "70000",
-      salary_max: "95000",
-      salary_period: "YEAR",
-      descriptionHint: "Develop and implement safety programs to ensure compliance with OSHA regulations and company policies. Conduct safety audits, incident investigations, and risk assessments. Lead safety training programs and maintain safety documentation.\n\nRequirements:\n- CSP or ASP certification preferred\n- 3+ years safety management in manufacturing/industrial\n- Knowledge of OSHA 29 CFR 1910 (General Industry)\n- Experience with LOTO, confined space, fall protection programs\n- Strong communication and training delivery skills\n\nJob Type: Full-time",
-    },
-  },
-  {
-    pattern: /quality\s*(engineer|inspector|manager)/i,
-    suggestion: {
-      employment_type: "FULL_TIME",
-      salary_min: "70000",
-      salary_max: "100000",
-      salary_period: "YEAR",
-      descriptionHint: "Develop and maintain quality management systems. Perform inspections, audits, and root cause analysis. Drive continuous improvement initiatives using statistical methods and lean principles.\n\nRequirements:\n- CQE or Six Sigma certification preferred\n- Experience with ISO 9001 / IATF 16949\n- Proficiency in SPC, FMEA, and 8D methodology\n- Knowledge of GD&T and CMM operation\n- Strong analytical and problem-solving skills\n\nJob Type: Full-time",
-    },
-  },
+// All US states + DC for the state dropdown, so any typed city resolves to a
+// clean "City, ST" label even when it isn't in the quick-pick list above.
+const US_STATES: { name: string; code: string }[] = [
+  { name: "Alabama", code: "AL" }, { name: "Alaska", code: "AK" }, { name: "Arizona", code: "AZ" },
+  { name: "Arkansas", code: "AR" }, { name: "California", code: "CA" }, { name: "Colorado", code: "CO" },
+  { name: "Connecticut", code: "CT" }, { name: "Delaware", code: "DE" }, { name: "District of Columbia", code: "DC" },
+  { name: "Florida", code: "FL" }, { name: "Georgia", code: "GA" }, { name: "Hawaii", code: "HI" },
+  { name: "Idaho", code: "ID" }, { name: "Illinois", code: "IL" }, { name: "Indiana", code: "IN" },
+  { name: "Iowa", code: "IA" }, { name: "Kansas", code: "KS" }, { name: "Kentucky", code: "KY" },
+  { name: "Louisiana", code: "LA" }, { name: "Maine", code: "ME" }, { name: "Maryland", code: "MD" },
+  { name: "Massachusetts", code: "MA" }, { name: "Michigan", code: "MI" }, { name: "Minnesota", code: "MN" },
+  { name: "Mississippi", code: "MS" }, { name: "Missouri", code: "MO" }, { name: "Montana", code: "MT" },
+  { name: "Nebraska", code: "NE" }, { name: "Nevada", code: "NV" }, { name: "New Hampshire", code: "NH" },
+  { name: "New Jersey", code: "NJ" }, { name: "New Mexico", code: "NM" }, { name: "New York", code: "NY" },
+  { name: "North Carolina", code: "NC" }, { name: "North Dakota", code: "ND" }, { name: "Ohio", code: "OH" },
+  { name: "Oklahoma", code: "OK" }, { name: "Oregon", code: "OR" }, { name: "Pennsylvania", code: "PA" },
+  { name: "Rhode Island", code: "RI" }, { name: "South Carolina", code: "SC" }, { name: "South Dakota", code: "SD" },
+  { name: "Tennessee", code: "TN" }, { name: "Texas", code: "TX" }, { name: "Utah", code: "UT" },
+  { name: "Vermont", code: "VT" }, { name: "Virginia", code: "VA" }, { name: "Washington", code: "WA" },
+  { name: "West Virginia", code: "WV" }, { name: "Wisconsin", code: "WI" }, { name: "Wyoming", code: "WY" },
 ];
 
-function getJobTitleSuggestion(title: string): JobTitleSuggestion | null {
-  if (!title || title.length < 3) return null;
-  for (const { pattern, suggestion } of JOB_TITLE_PATTERNS) {
-    if (pattern.test(title)) return suggestion;
-  }
-  return null;
+/** Builds the posted location label from city + state, e.g. "Fremont, CA". */
+function deriveLocation(city: string, stateCode: string): string {
+  const c = city.trim();
+  const s = stateCode.trim();
+  if (c && s) return `${c}, ${s}`;
+  return c;
 }
 
+// Job-title → template intelligence now lives in @/lib/jd-templates so the same
+// library powers both the browsable picker and title-match auto-fill.
+
 // ─── Location Search ───────────────────────────────────────────────────────
+// Deduplicated quick-pick list (some cities are listed more than once across the
+// dataset) — keyed by city+state so suggestions never repeat.
+const CITY_SUGGESTIONS: CityEntry[] = (() => {
+  const seen = new Set<string>();
+  const unique: CityEntry[] = [];
+  for (const entry of US_CITIES) {
+    const key = `${entry.city.toLowerCase()}|${entry.stateCode}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(entry);
+  }
+  return unique;
+})();
+
 function searchCities(query: string): CityEntry[] {
   if (!query || query.length < 2) return [];
   const lower = query.toLowerCase();
-  return US_CITIES.filter(
-    (entry) =>
-      entry.city.toLowerCase().startsWith(lower) ||
-      entry.city.toLowerCase().includes(lower)
-  ).slice(0, 8);
+  // Prefer prefix matches, then substring matches.
+  const prefix = CITY_SUGGESTIONS.filter((entry) => entry.city.toLowerCase().startsWith(lower));
+  const contains = CITY_SUGGESTIONS.filter(
+    (entry) => !entry.city.toLowerCase().startsWith(lower) && entry.city.toLowerCase().includes(lower),
+  );
+  return [...prefix, ...contains].slice(0, 8);
+}
+
+// Read-only preview of the questions an applicant will see for a given screen.
+function ScreenPreview({ screenKey }: { screenKey: string }) {
+  const screen = getScreen(screenKey);
+  if (!screen) return null;
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white p-4">
+      <p className="text-sm font-semibold text-zinc-900">{screen.label}</p>
+      <p className="mt-0.5 text-xs text-zinc-500">
+        {screen.questions.length} questions · applicants answer these when they apply
+      </p>
+      <ol className="mt-3 space-y-2.5">
+        {screen.questions.map((question, index) => (
+          <li key={question.id} className="text-sm">
+            <span className="font-medium text-zinc-800">
+              {index + 1}. {question.prompt}
+            </span>
+            <span className="ml-2 inline-flex rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500">
+              {QUESTION_TYPE_LABELS[question.type] ?? question.type}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────
@@ -311,6 +362,9 @@ function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
     company_name: job?.company_name ?? defaultCompanyName ?? "",
     reference_number: job?.reference_number ?? "",
     status: job?.status ?? "draft",
+    // Default the screen ON for new jobs (suggested from the title once typed,
+    // otherwise the maintenance-tech screen); editing preserves the saved choice.
+    screen_key: job ? job.screen_key : "maintenance_tech",
   };
 }
 
@@ -336,8 +390,17 @@ export function JobForm({
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Job title suggestion state
-  const [titleSuggestion, setTitleSuggestion] = useState<JobTitleSuggestion | null>(null);
+  const [titleSuggestion, setTitleSuggestion] = useState<JdTemplate | null>(null);
   const [showTitleHint, setShowTitleHint] = useState(false);
+
+  // Skills-screen picker state. Once the recruiter picks a screen manually we
+  // stop auto-suggesting from the title.
+  const [showScreenPreview, setShowScreenPreview] = useState(false);
+  const screenTouched = useRef(Boolean(job));
+
+  // AI description generation state
+  const [generating, setGenerating] = useState(false);
+  const [generateNote, setGenerateNote] = useState("");
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -394,14 +457,29 @@ export function JobForm({
     []
   );
 
-  // Handle city input with autocomplete
+  // Handle city input with autocomplete. Always keeps the posted location label
+  // in sync with the typed city (+ current state), so any city works — not just
+  // ones in the quick-pick list.
   const handleCityInput = useCallback((value: string) => {
-    updateField("city", value);
+    setValues((current) => ({
+      ...current,
+      city: value,
+      location: deriveLocation(value, current.state),
+    }));
     const results = searchCities(value);
     setCitySuggestions(results);
     setShowCitySuggestions(results.length > 0);
     setActiveSuggestionIndex(-1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // State dropdown — re-derive the location label from the current city.
+  const handleStateSelect = useCallback((stateCode: string) => {
+    setValues((current) => ({
+      ...current,
+      state: stateCode,
+      location: deriveLocation(current.city, stateCode),
+    }));
   }, []);
 
   const selectCity = useCallback((entry: CityEntry) => {
@@ -440,10 +518,16 @@ export function JobForm({
     [showCitySuggestions, citySuggestions, activeSuggestionIndex, selectCity]
   );
 
-  // Handle job title changes — suggest employment type and salary
+  // Handle job title changes — suggest employment type, salary, and screen
   const handleTitleChange = useCallback((value: string) => {
-    updateField("title", value);
-    const suggestion = getJobTitleSuggestion(value);
+    const suggestedScreen = suggestScreenForTitle(value);
+    setValues((current) => ({
+      ...current,
+      title: value,
+      // Auto-track the best-fit screen until the recruiter overrides it.
+      screen_key: screenTouched.current ? current.screen_key : suggestedScreen ?? current.screen_key,
+    }));
+    const suggestion = matchTemplateByTitle(value);
     setTitleSuggestion(suggestion);
     if (suggestion) {
       setShowTitleHint(true);
@@ -459,15 +543,67 @@ export function JobForm({
       salary_min: current.salary_min || titleSuggestion.salary_min,
       salary_max: current.salary_max || titleSuggestion.salary_max,
       salary_period: titleSuggestion.salary_period,
-      description: current.description || titleSuggestion.descriptionHint,
+      description: current.description || titleSuggestion.description,
     }));
     setShowTitleHint(false);
   }, [titleSuggestion]);
+
+  // Explicit template picker — fills title (if empty), salary, type, and body.
+  const applyTemplate = useCallback((templateId: string) => {
+    const template = getTemplateById(templateId);
+    if (!template) return;
+    const suggestedScreen = suggestScreenForTitle(template.sampleTitle);
+    setValues((current) => ({
+      ...current,
+      title: current.title || template.sampleTitle,
+      employment_type: template.employment_type,
+      salary_min: template.salary_min,
+      salary_max: template.salary_max,
+      salary_period: template.salary_period,
+      description: template.description,
+      screen_key: screenTouched.current ? current.screen_key : suggestedScreen ?? current.screen_key,
+    }));
+    setTitleSuggestion(null);
+    setShowTitleHint(false);
+  }, []);
+
+  async function handleGenerateDescription() {
+    if (!values.title.trim()) return;
+    setGenerating(true);
+    setGenerateNote("");
+    try {
+      const response = await fetch(`/api/o/${orgSlug}/jobs/generate-description`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: values.title, location: values.location }),
+      });
+      const data = (await response.json()) as { description?: string; source?: string; error?: string };
+      if (!response.ok || !data.description) {
+        setGenerateNote(data.error ?? "Couldn't generate a description. Add an ANTHROPIC_API_KEY or use a template.");
+        return;
+      }
+      updateField("description", data.description);
+      setGenerateNote(
+        data.source === "llm" ? "Generated with AI — review and edit before publishing." : "Filled from the closest template.",
+      );
+    } catch {
+      setGenerateNote("Generation failed. Please try again.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
+
+    // Ensure the posted location label is populated from city + state even if
+    // the auto-fill was cleared. City is the required field that drives it.
+    const payload = {
+      ...values,
+      location: values.location.trim() || deriveLocation(values.city, values.state),
+    };
 
     const url = job ? `/api/o/${orgSlug}/jobs/${job.id}` : `/api/o/${orgSlug}/jobs`;
     const method = job ? "PUT" : "POST";
@@ -475,7 +611,7 @@ export function JobForm({
     const response = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values),
+      body: JSON.stringify(payload),
     });
 
     setLoading(false);
@@ -485,12 +621,38 @@ export function JobForm({
       return;
     }
 
-    router.push(`/o/${orgSlug}/admin`);
+    // Celebrate a freshly published job on the dashboard (share link, flyer, QR).
+    const data = (await response.json().catch(() => null)) as { job?: { slug?: string } } | null;
+    const publishedSlug = !job && values.status === "published" ? data?.job?.slug : undefined;
+    router.push(publishedSlug ? `/o/${orgSlug}/admin?published=${encodeURIComponent(publishedSlug)}` : `/o/${orgSlug}/admin`);
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Start-from-a-template picker */}
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Start from a template</span>
+        <select
+          defaultValue=""
+          onChange={(event) => {
+            if (event.target.value) applyTemplate(event.target.value);
+            event.target.value = "";
+          }}
+          className="field-input"
+        >
+          <option value="">Choose a role template…</option>
+          {JD_TEMPLATES.map((template) => (
+            <option key={template.id} value={template.id}>
+              {template.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-zinc-500">
+          Fills the title, employment type, salary range, and a starter description you can edit.
+        </span>
+      </label>
+
       {/* Job Title with Intelligence */}
       <div className="space-y-2">
         <label className="block space-y-1">
@@ -536,7 +698,17 @@ export function JobForm({
 
       {/* Description */}
       <label className="block space-y-1">
-        <span className="text-sm font-medium">Description *</span>
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Description *</span>
+          <button
+            type="button"
+            onClick={handleGenerateDescription}
+            disabled={generating || !values.title.trim()}
+            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+          >
+            {generating ? "Generating…" : "✨ Generate with AI"}
+          </button>
+        </div>
         <textarea
           value={values.description}
           onChange={(event) => updateField("description", event.target.value)}
@@ -544,27 +716,65 @@ export function JobForm({
           placeholder="Job responsibilities, requirements, and qualifications..."
           required
         />
+        {generateNote ? <span className="text-xs text-zinc-500">{generateNote}</span> : null}
       </label>
+
+      {/* Attach skills screen — the differentiator */}
+      <fieldset className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+        <legend className="px-2 text-sm font-semibold text-blue-800">Attach skills screen</legend>
+        <p className="text-sm text-zinc-700">
+          Every applicant answers a short, role-specific screen so you can see who can actually troubleshoot — before
+          you interview. This is what sets your postings apart from a plain job board.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Screen for this role</span>
+            <select
+              value={values.screen_key}
+              onChange={(event) => {
+                screenTouched.current = true;
+                updateField("screen_key", event.target.value);
+                setShowScreenPreview(false);
+              }}
+              className="field-input"
+            >
+              {SCREEN_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.shortLabel}
+                </option>
+              ))}
+              <option value="">No screen (not recommended)</option>
+            </select>
+          </label>
+          <div className="flex items-end">
+            {values.screen_key ? (
+              <button
+                type="button"
+                onClick={() => setShowScreenPreview((v) => !v)}
+                className="btn-secondary text-sm"
+              >
+                {showScreenPreview ? "Hide preview" : "Preview the screen"}
+              </button>
+            ) : (
+              <p className="text-xs text-amber-700">
+                Without a screen, this posting behaves like any other job board — applicants aren&apos;t qualified.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {showScreenPreview && values.screen_key ? (
+          <ScreenPreview screenKey={values.screen_key} />
+        ) : null}
+      </fieldset>
 
       {/* Location Section */}
       <fieldset className="space-y-3 rounded-lg border border-zinc-200 p-4">
         <legend className="px-2 text-sm font-semibold text-zinc-700">Location</legend>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Location label *</span>
-            <input
-              value={values.location}
-              onChange={(event) => handleLocationChange(event.target.value)}
-              placeholder="Newark, CA"
-              className="field-input"
-              required
-            />
-            <span className="text-xs text-zinc-500">Displayed on job boards (e.g. &quot;Newark, CA&quot; or &quot;Remote&quot;)</span>
-          </label>
-
           <div className="relative block space-y-1">
-            <span className="text-sm font-medium">City</span>
+            <span className="text-sm font-medium">City *</span>
             <input
               ref={cityInputRef}
               value={values.city}
@@ -573,11 +783,14 @@ export function JobForm({
                 if (citySuggestions.length > 0) setShowCitySuggestions(true);
               }}
               onKeyDown={handleCityKeyDown}
-              placeholder="Start typing a city name..."
+              placeholder="Start typing any city name..."
               className="field-input"
               autoComplete="off"
+              required
             />
-            <span className="text-xs text-zinc-500">Type a city to auto-fill State and ZIP</span>
+            <span className="text-xs text-zinc-500">
+              Pick a suggestion, or just keep typing — any city works.
+            </span>
 
             {showCitySuggestions && citySuggestions.length > 0 && (
               <div
@@ -603,14 +816,35 @@ export function JobForm({
           </div>
 
           <label className="block space-y-1">
-            <span className="text-sm font-medium">State</span>
-            <input
+            <span className="text-sm font-medium">State *</span>
+            <select
               value={values.state}
-              onChange={(event) => updateField("state", event.target.value)}
-              placeholder="Auto-filled from city"
+              onChange={(event) => handleStateSelect(event.target.value)}
+              className="field-input"
+              required
+            >
+              <option value="">Select a state…</option>
+              {US_STATES.map((state) => (
+                <option key={state.code} value={state.code}>
+                  {state.name} ({state.code})
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-zinc-500">Sets the posted location with your city.</span>
+          </label>
+
+          <label className="block space-y-1 md:col-span-2">
+            <span className="text-sm font-medium">Location label</span>
+            <input
+              value={values.location}
+              onChange={(event) => handleLocationChange(event.target.value)}
+              placeholder="Auto-filled from City and State"
               className="field-input bg-zinc-50"
-              readOnly={false}
             />
+            <span className="text-xs text-zinc-500">
+              This is what appears on job boards. Auto-filled from your city and state — edit it for a custom label like
+              &quot;Remote&quot; or &quot;Bay Area&quot;.
+            </span>
           </label>
 
           <label className="block space-y-1">
@@ -618,7 +852,7 @@ export function JobForm({
             <input
               value={values.zip}
               onChange={(event) => updateField("zip", event.target.value)}
-              placeholder="Auto-filled from city"
+              placeholder="Optional"
               className="field-input bg-zinc-50"
             />
           </label>

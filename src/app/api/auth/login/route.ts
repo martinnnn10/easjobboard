@@ -1,13 +1,26 @@
 import { NextResponse } from "next/server";
 import { setSessionCookie } from "@/lib/auth";
 import { getOrganizationById } from "@/lib/organizations";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSessionToken } from "@/lib/session";
 import { getUserByEmail, verifyUserPassword } from "@/lib/users";
 
 export const runtime = "nodejs";
 
+// Throttle password attempts per IP to slow credential brute-forcing.
+const LOGIN_RATE_LIMIT = 10;
+const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
+
 export async function POST(request: Request) {
   try {
+    const limit = rateLimit(`login:${getClientIp(request)}`, LOGIN_RATE_LIMIT, LOGIN_RATE_WINDOW_MS);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+      );
+    }
+
     const body = (await request.json()) as { email?: string; password?: string; orgSlug?: string };
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");

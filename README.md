@@ -54,6 +54,9 @@ Platform contact email: `eas@eautomatedstaffing.com`
 | `AUTH_SECRET` | Session signing secret |
 | `BASE_URL` | Public HTTPS URL when deployed |
 | `SMTP_*` | Platform mail server for delivering applications to org inboxes |
+| `APOLLO_API_KEY` | Optional. Enables outbound candidate sourcing (Apollo People Search) from a job. When unset, the "Source candidates" page shows a configure-me notice. |
+| `ANTHROPIC_API_KEY` | Optional. Enables Claude-backed resume scoring, candidate outreach drafting, and AI job-description generation. Each feature falls back to its offline path when unset. |
+| `ANTHROPIC_MODEL` | Optional. Overrides the Claude model used for the AI features (default: `claude-opus-4-8`). |
 
 Each organization sets its own **resume delivery email** during signup. Applications are sent to that address with the resume attached, and also stored in the admin portal for download.
 

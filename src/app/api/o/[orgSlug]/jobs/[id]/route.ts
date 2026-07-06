@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { isHundredHiresConfigured } from "@/lib/env";
+import { syncJobToHundredHires } from "@/lib/integrations/hundredhires";
 import { deleteJob, getJobById, updateJob } from "@/lib/jobs";
+import { canWrite } from "@/lib/permissions";
 import type { JobStatus } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -26,7 +29,10 @@ export async function PUT(request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization, user } = await requireOrgSessionApi(orgSlug);
+    if (!canWrite(user.role)) {
+      return NextResponse.json({ error: "You have read-only access." }, { status: 403 });
+    }
     const body = await request.json();
 
     const job = updateJob(id, organization.id, {
@@ -45,10 +51,19 @@ export async function PUT(request: Request, context: RouteContext) {
       company_name: body.company_name,
       reference_number: body.reference_number,
       status: body.status as JobStatus,
+      screen_key: body.screen_key,
     });
 
     if (!job) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Keep 100Hires in sync when a published job is edited — only if the platform
+    // key is set and this org opted in. Non-blocking; never affects saving/resumes.
+    if (job.status === "published" && isHundredHiresConfigured() && organization.syndicate_100hires) {
+      void syncJobToHundredHires(job, organization).catch((error) => {
+        console.error("100Hires sync failed (job still saved):", error);
+      });
     }
 
     return NextResponse.json({ job });
@@ -64,7 +79,10 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization, user } = await requireOrgSessionApi(orgSlug);
+    if (!canWrite(user.role)) {
+      return NextResponse.json({ error: "You have read-only access." }, { status: 403 });
+    }
     const deleted = deleteJob(id, organization.id);
     if (!deleted) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -7,8 +7,8 @@ export function SignupForm() {
   const router = useRouter();
   const [values, setValues] = useState({
     orgName: "",
-    orgSlug: "",
     website: "",
+    brandColor: "#39b54a",
     applicationEmail: "",
     adminName: "",
     adminEmail: "",
@@ -62,16 +62,6 @@ export function SignupForm() {
         </label>
 
         <label className="block space-y-1">
-          <span className="text-sm font-medium">Portal URL slug</span>
-          <input
-            value={values.orgSlug}
-            onChange={(event) => setValues((current) => ({ ...current, orgSlug: event.target.value }))}
-            className="field-input"
-            placeholder="electrical-automation-services"
-          />
-        </label>
-
-        <label className="block space-y-1">
           <span className="text-sm font-medium">Website</span>
           <input
             value={values.website}
@@ -79,6 +69,19 @@ export function SignupForm() {
             className="field-input"
             placeholder="https://example.com"
           />
+        </label>
+
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Brand color</span>
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={values.brandColor}
+              onChange={(event) => setValues((current) => ({ ...current, brandColor: event.target.value }))}
+              className="h-10 w-14 cursor-pointer rounded-lg border border-zinc-300 bg-white p-1"
+            />
+            <span className="text-xs text-zinc-500">Used on your careers page and job flyers.</span>
+          </div>
         </label>
 
         <label className="block space-y-1 md:col-span-2">

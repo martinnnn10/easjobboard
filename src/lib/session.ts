@@ -8,6 +8,20 @@ export type SessionData = {
   orgSlug: string;
 };
 
+/**
+ * Constant-time string comparison to avoid leaking signature bytes via timing.
+ * Works in any runtime (no Node-only crypto dependency). Comparing lengths first
+ * is safe here because both operands are fixed-length hex HMAC digests.
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
 async function signPayload(payload: string, secret: string): Promise<string> {
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -51,7 +65,7 @@ export async function parseSessionToken(token: string | undefined): Promise<Sess
 
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
-  if (signature !== (await signPayload(payload, getAuthSecret()))) return null;
+  if (!timingSafeEqual(signature, await signPayload(payload, getAuthSecret()))) return null;
 
   return decodePayload(payload);
 }
