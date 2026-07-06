@@ -1,26 +1,31 @@
 import { getPlatformLogo, getPlatformName } from "@/lib/env";
 
 /**
- * Brand lockup: emblem + "EAS Recruit" wordmark.
+ * Brand lockup: emblem + "EAS Recruit" wordmark, matching the EAS Recruit
+ * identity — metallic frame, EAS-green lightning bolt (electrical + automation).
  *
- * The emblem is a self-contained SVG (a steel lightning bolt inside a hex —
- * electrical + automation) so it needs no external asset and stays crisp at any
- * size. To use your own logo instead, drop the file in /public and set
- * PLATFORM_LOGO_SRC=/your-logo.svg — it renders in place of the built-in mark.
+ * Use the compact lockup (emblem + wordmark) in the navbar. Pass `tagline` for
+ * the full marketing lockup ("The right skills · The right fit · The right hire")
+ * in heroes, the footer, and marketing surfaces only. To swap in an exact brand
+ * asset, drop the file in /public and set PLATFORM_LOGO_SRC=/your-logo.svg.
  */
 export function Logo({
   size = 34,
   wordmark = true,
+  tagline = false,
   variant = "light",
 }: {
   size?: number;
   wordmark?: boolean;
+  /** Show the "The right skills · fit · hire" tagline under the wordmark. */
+  tagline?: boolean;
   /** "light" for light backgrounds (dark wordmark), "dark" for dark backgrounds. */
   variant?: "light" | "dark";
 }) {
   const logoSrc = getPlatformLogo();
   const name = getPlatformName();
   const wordClass = variant === "dark" ? "text-white" : "text-zinc-900";
+  const taglineClass = variant === "dark" ? "text-slate-400" : "text-zinc-500";
 
   return (
     <span className="flex items-center gap-2.5">
@@ -31,47 +36,57 @@ export function Logo({
         <Emblem size={size} />
       )}
       {wordmark ? (
-        <span className={`text-lg font-bold tracking-tight ${wordClass}`}>{name}</span>
+        <span className="flex flex-col leading-none">
+          <span className={`text-lg font-bold tracking-tight ${wordClass}`}>{name}</span>
+          {tagline ? (
+            <span className={`mt-1 text-[0.6rem] font-semibold uppercase tracking-[0.22em] ${taglineClass}`}>
+              The right skills · fit · hire
+            </span>
+          ) : null}
+        </span>
       ) : null}
     </span>
   );
 }
 
 /**
- * The EAS emblem — the green automation coil, on a graphite tile. A crisp SVG
- * rendition of the brand mark (stacked helical loops). Swap in your exact logo
- * file any time via PLATFORM_LOGO_SRC.
+ * The EAS emblem — an EAS-green lightning bolt (the electrical-automation mark)
+ * set on a deep-charcoal tile with a brushed-silver frame. Self-contained SVG so
+ * it needs no external asset and stays crisp at favicon size. Swap in the exact
+ * brand file any time via PLATFORM_LOGO_SRC.
  */
 export function Emblem({ size = 34 }: { size?: number }) {
-  // Loops of the coil, arranged diagonally like a spring viewed at an angle.
-  const loops = [
-    { cx: 23.2, cy: 11, rx: 7.0, ry: 2.5 },
-    { cx: 22.0, cy: 14.6, rx: 7.3, ry: 2.6 },
-    { cx: 20.8, cy: 18.3, rx: 7.5, ry: 2.7 },
-    { cx: 19.6, cy: 22.0, rx: 7.5, ry: 2.7 },
-    { cx: 18.4, cy: 25.7, rx: 7.3, ry: 2.6 },
-    { cx: 17.2, cy: 29.3, rx: 7.0, ry: 2.5 },
-  ];
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" role="img" aria-label="EAS coil emblem" className="flex-none">
+    <svg width={size} height={size} viewBox="0 0 40 40" role="img" aria-label="EAS Recruit emblem" className="flex-none">
       <defs>
-        <linearGradient id="eas-coil-grad" x1="0.15" y1="0" x2="0.85" y2="1">
-          <stop offset="0" stopColor="#6FE06F" />
-          <stop offset="1" stopColor="#248F31" />
+        <linearGradient id="eas-tile" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#1b2434" />
+          <stop offset="1" stopColor="#0a0e16" />
+        </linearGradient>
+        <linearGradient id="eas-frame" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#e6e9ee" />
+          <stop offset="0.5" stopColor="#aeb5bf" />
+          <stop offset="1" stopColor="#7c828c" />
+        </linearGradient>
+        <linearGradient id="eas-bolt" x1="0.2" y1="0" x2="0.8" y2="1">
+          <stop offset="0" stopColor="#5fe070" />
+          <stop offset="0.55" stopColor="#39b54a" />
+          <stop offset="1" stopColor="#248f31" />
         </linearGradient>
       </defs>
-      <rect x="0" y="0" width="40" height="40" rx="9" fill="#131418" />
-      <g fill="none" stroke="url(#eas-coil-grad)" strokeWidth="2.6" strokeLinecap="round">
-        {loops.map((l, i) => (
-          <ellipse key={i} cx={l.cx} cy={l.cy} rx={l.rx} ry={l.ry} />
-        ))}
-      </g>
-      {/* Bright front-edge highlight so the coil reads as 3-D like the logo. */}
-      <g fill="none" stroke="#8FF08F" strokeWidth="1.1" strokeLinecap="round" opacity="0.9">
-        {loops.map((l, i) => (
-          <path key={i} d={`M ${l.cx - l.rx} ${l.cy} A ${l.rx} ${l.ry} 0 0 0 ${l.cx + l.rx} ${l.cy}`} />
-        ))}
-      </g>
+      {/* Brushed-silver frame + charcoal tile */}
+      <rect x="1" y="1" width="38" height="38" rx="9.5" fill="url(#eas-frame)" />
+      <rect x="2.4" y="2.4" width="35.2" height="35.2" rx="8.2" fill="url(#eas-tile)" />
+      {/* EAS-green lightning bolt — electrical + automation */}
+      <path
+        d="M23.8 6 L12.4 22.2 H19.2 L16.3 34 L28.2 16.6 H20.9 Z"
+        fill="url(#eas-bolt)"
+        stroke="#0a0e16"
+        strokeWidth="0.8"
+        strokeLinejoin="round"
+      />
+      {/* Bright front edge so the bolt reads with depth */}
+      <path d="M23.8 6 L12.4 22.2 H16.4 Z" fill="#8ff09a" opacity="0.55" />
     </svg>
   );
 }

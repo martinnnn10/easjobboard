@@ -24,7 +24,7 @@ export type PipelineCard = {
 };
 
 const COLUMN_ACCENTS: Record<ApplicationStatus, string> = {
-  new: "border-t-blue-400",
+  new: "border-t-slate-400",
   screening: "border-t-amber-400",
   interview: "border-t-violet-400",
   offer: "border-t-teal-400",

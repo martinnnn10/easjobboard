@@ -28,7 +28,7 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-const DEFAULT_BRAND_COLOR = "#2563eb";
+const DEFAULT_BRAND_COLOR = "#39b54a";
 
 /** The org's brand color, falling back to the platform default blue. */
 export function getBrandColor(organization: Organization): string {

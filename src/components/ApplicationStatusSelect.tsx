@@ -8,7 +8,7 @@ import {
 } from "@/lib/application-status";
 
 const STYLES: Record<ApplicationStatus, string> = {
-  new: "bg-blue-50 text-blue-700 border-blue-200",
+  new: "bg-slate-100 text-slate-700 border-slate-200",
   screening: "bg-amber-50 text-amber-700 border-amber-200",
   interview: "bg-violet-50 text-violet-700 border-violet-200",
   offer: "bg-teal-50 text-teal-700 border-teal-200",

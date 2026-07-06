@@ -145,7 +145,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
       {/* THE RENEWAL NUMBER + the daily habit. */}
       <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="hero-dark flex flex-col justify-center rounded-2xl px-6 py-6 ring-1 ring-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9FB6D4]">Interview-hours saved</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#4fc862]">Interview-hours saved</p>
           {roi.interviewsAvoided > 0 ? (
             <>
               <p className="mt-2 text-4xl font-bold tracking-tight text-white">

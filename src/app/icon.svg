@@ -1,0 +1,22 @@
+<svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EAS Recruit">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2434"/>
+      <stop offset="1" stop-color="#0a0e16"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e6e9ee"/>
+      <stop offset="0.5" stop-color="#aeb5bf"/>
+      <stop offset="1" stop-color="#7c828c"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#5fe070"/>
+      <stop offset="0.55" stop-color="#39b54a"/>
+      <stop offset="1" stop-color="#248f31"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="38" height="38" rx="9.5" fill="url(#frame)"/>
+  <rect x="2.4" y="2.4" width="35.2" height="35.2" rx="8.2" fill="url(#tile)"/>
+  <path d="M23.8 6 L12.4 22.2 H19.2 L16.3 34 L28.2 16.6 H20.9 Z" fill="url(#bolt)" stroke="#0a0e16" stroke-width="0.8" stroke-linejoin="round"/>
+  <path d="M23.8 6 L12.4 22.2 H16.4 Z" fill="#8ff09a" opacity="0.55"/>
+</svg>

@@ -26,15 +26,17 @@ export default function HomePage() {
       <section className="hero-dark">
         <div className="mx-auto w-full max-w-6xl px-4 py-24">
           <div className="max-w-3xl">
-            <p className="section-label text-[#9FB6D4]">{getPlatformName()} · Manufacturing hiring intelligence</p>
+            <p className="section-label text-[#4fc862]">{getPlatformName()} · Manufacturing hiring intelligence</p>
+            <div className="rule-green mt-4" />
             <h1 className="mt-5 text-[2.6rem] font-extrabold leading-[0.98] tracking-[-0.035em] text-white md:text-[4.25rem]">
               Know who can actually
               <br />
-              <span className="text-[#7FB0E6]">troubleshoot before you interview.</span>
+              <span className="text-[#4fc862]">troubleshoot before you interview.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-slate-300">
-              {getPlatformName()} screens maintenance, controls, and skilled-trades applicants on real plant-floor
-              scenarios so manufacturers can find the people who can repair, troubleshoot, lead, and stay.
+              Screen maintenance and controls applicants for real plant-floor ability. {getPlatformName()} puts every
+              applicant through practical scenarios so you can find the people who can repair, troubleshoot, lead, and
+              stay.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/signup" className="btn-accent px-6 py-3 text-base">
@@ -56,7 +58,7 @@ export default function HomePage() {
         <div className="grid gap-6 md:grid-cols-3">
           {STEPS.map((step) => (
             <div key={step.n} className="card card-hover space-y-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-900 font-mono text-sm font-bold text-[#7FB0E6]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#111827] font-mono text-sm font-bold text-[#4fc862]">
                 {step.n}
               </div>
               <h2 className="text-lg font-semibold text-zinc-900">{step.title}</h2>
@@ -100,7 +102,7 @@ export default function HomePage() {
           </div>
           <p className="mt-6 text-sm text-slate-400">
             Questions? {" "}
-            <a href={`mailto:${getPlatformEmail()}`} className="font-medium text-[#7FB0E6] underline">
+            <a href={`mailto:${getPlatformEmail()}`} className="font-medium text-[#4fc862] underline">
               {getPlatformEmail()}
             </a>
           </p>

@@ -83,9 +83,12 @@ export default function RootLayout({
         </header>
         <main className="flex-1">{children}</main>
         <footer className="hero-dark mt-auto">
-          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-slate-400">
-            <Logo size={30} variant="dark" />
-            <span>Manufacturing hiring intelligence by {getPlatformCompany()}</span>
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-9 text-sm text-slate-400">
+            <Logo size={34} variant="dark" tagline />
+            <span className="max-w-xs text-right">
+              Built for manufacturing hiring: maintenance, electrical, controls, refrigeration, and plant leadership. By{" "}
+              {getPlatformCompany()}.
+            </span>
           </div>
         </footer>
       </body>

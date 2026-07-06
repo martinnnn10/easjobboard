@@ -8,7 +8,7 @@ export function SignupForm() {
   const [values, setValues] = useState({
     orgName: "",
     website: "",
-    brandColor: "#2563eb",
+    brandColor: "#39b54a",
     applicationEmail: "",
     adminName: "",
     adminEmail: "",

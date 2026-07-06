@@ -12,14 +12,31 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Brand blue → premium electric steel. Remapping the blue-600/700/800 tokens
- * recolors every primary button, link, and accent app-wide from one place, so
- * the whole UI stays cohesive with the graphite hero. Lighter blues (50–400)
- * stay as gentle info tints for badges and rings. */
+/* EAS Recruit brand green. The old SaaS blue is remapped to the EAS green ramp
+ * so every primary button, link, focus ring, and accent recolors from one place
+ * and stays cohesive with the charcoal heroes. Anchored on EAS Green #39B54A at
+ * 500; darker shades drive buttons/links, lighter tints drive rings and badges.
+ * Green reads as "capable / strong fit" throughout — amber stays warning, red
+ * stays rejection. */
 @theme {
-  --color-blue-600: #2f6e8c;
-  --color-blue-700: #2a6180;
-  --color-blue-800: #22546c;
+  --color-blue-50: #ecfbef;
+  --color-blue-100: #d2f4d9;
+  --color-blue-200: #a8e8b4;
+  --color-blue-300: #72d584;
+  --color-blue-400: #4cc463;
+  --color-blue-500: #39b54a;
+  --color-blue-600: #2e9e3e;
+  --color-blue-700: #268734;
+  --color-blue-800: #1e6b2a;
+  --color-blue-900: #185423;
+
+  /* EAS brand palette, available as utilities (bg-eas-green, text-charcoal…). */
+  --color-eas-green: #39b54a;
+  --color-eas-green-bright: #4fc862;
+  --color-charcoal: #111827;
+  --color-industrial: #05070a;
+  --color-silver: #c9ced6;
+  --color-steel: #f3f5f7;
 }
 
 body {
@@ -54,9 +71,9 @@ h3 {
   @apply inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:opacity-60;
 }
 
-/* Premium near-white CTA — sits on the graphite hero/CTA grounds. */
+/* EAS green CTA — sits on the charcoal hero/CTA grounds and reads as "go". */
 .btn-accent {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-100 focus:ring-4 focus:ring-white/20 disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[#39b54a] px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-[#2e9e3e] focus:ring-4 focus:ring-[#39b54a]/30 disabled:opacity-60;
 }
 
 /* ── Cards ──────────────────────────────────────────────── */
@@ -83,9 +100,24 @@ h3 {
   @apply text-3xl font-bold tracking-tight text-zinc-900;
 }
 
-/* ── Premium graphite ground with a faint electric-steel glow ─────── */
+/* ── Industrial charcoal-to-black ground: a faint silver plant-floor grid
+ *    with an EAS-green glow. The grid pattern is reserved for hero/CTA/footer
+ *    grounds only — never behind dashboard content. ─────────────────────── */
 .hero-dark {
-  background-color: #131418;
-  background-image: radial-gradient(58% 78% at 18% -8%, rgba(120, 168, 224, 0.16), transparent 66%);
-  color: #f4f4f2;
+  background-color: #05070a;
+  background-image:
+    radial-gradient(72% 90% at 14% -12%, rgba(57, 181, 74, 0.2), transparent 60%),
+    linear-gradient(180deg, #111827 0%, #05070a 78%),
+    linear-gradient(rgba(201, 206, 214, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 206, 214, 0.055) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+  color: #f3f5f7;
+}
+
+/* Slim green accent hairline for hero/section framing. */
+.rule-green {
+  height: 3px;
+  width: 3.5rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #39b54a, #4fc862);
 }

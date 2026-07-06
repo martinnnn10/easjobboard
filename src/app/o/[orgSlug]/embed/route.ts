@@ -56,9 +56,9 @@ export async function GET(_request: Request, context: RouteContext) {
   .eas-widget { display: flex; flex-direction: column; gap: 8px; padding: 4px; }
   .eas-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
   .eas-head h2 { font-size: 15px; margin: 0; }
-  .eas-head a { font-size: 12px; color: #2563eb; text-decoration: none; }
+  .eas-head a { font-size: 12px; color: #2e9e3e; text-decoration: none; }
   .eas-job { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid #e4e4e7; border-radius: 10px; text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; }
-  .eas-job:hover { border-color: #93c5fd; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .eas-job:hover { border-color: #72d584; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
   .eas-title { font-weight: 600; font-size: 14px; }
   .eas-meta { font-size: 12px; color: #71717a; }
   .eas-empty { font-size: 14px; color: #71717a; }
