@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import {
   countApplicationsByOrganization,
   getApplicationStatusCounts,
+  getCallQueueCount,
   getJobScreeningSummaries,
   getScreeningStats,
   listApplicationsByOrganization,
@@ -52,6 +53,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   // The hook + the renewal number.
   const trapCandidates = resumeTrapCandidates(allApplicants).slice(0, 4);
   const roi = getRoiStats(organization.id);
+  const callQueueCount = getCallQueueCount(organization.id);
 
   const publishedSlug = (await searchParams).published;
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
@@ -159,7 +161,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
         >
           <p className="section-label">Call queue</p>
           <p className="stat-value mt-2 text-green-700">
-            {stats.strongFit + stats.needsReview}
+            {callQueueCount}
             <span className="ml-1 text-base font-medium text-zinc-400">to work</span>
           </p>
           <p className="mt-1 text-sm text-zinc-600">Who to call first, ranked by ability — phone one tap away →</p>

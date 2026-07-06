@@ -239,9 +239,10 @@ export function getApplicationStatusCounts(
   return counts;
 }
 
-// Thresholds shared across the intelligence views.
-const STRONG_FIT = 70;
-const REVIEW_FLOOR = 45;
+// Thresholds shared across the intelligence views. Exported so every surface
+// (dashboard, queue, ROI, benchmarks) uses one definition and can't drift.
+export const STRONG_FIT = 70;
+export const REVIEW_FLOOR = 45;
 
 export type ScreeningStats = {
   totalApplicants: number;
@@ -287,6 +288,23 @@ export function getScreeningStats(organizationId: string): ScreeningStats {
     highRisk: row.high_risk ?? 0,
     avgScore: row.avg_score == null ? null : Math.round(row.avg_score),
   };
+}
+
+/**
+ * The single "worth a call" predicate, shared by the Call Queue page and the
+ * dashboard's "N to work" card so the count and the list can never disagree:
+ * a completed screen still in new/screening that cleared the review floor.
+ */
+export function getCallQueueCount(organizationId: string): number {
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS count FROM applications
+       WHERE organization_id = ? AND screen_status = 'completed'
+         AND screen_score IS NOT NULL AND screen_score >= ?
+         AND status IN ('new','screening')`,
+    )
+    .get(organizationId, REVIEW_FLOOR) as { count: number };
+  return row.count;
 }
 
 export type JobScreeningSummary = {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BadgeRow, ConfidencePill, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
-import { listApplicationsByOrganization } from "@/lib/applications";
+import { listApplicationsByOrganization, REVIEW_FLOOR } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { badgesForApplication, deriveRecommendedAction, normalizeRiskLevel } from "@/lib/candidate-intel";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -20,11 +20,16 @@ export default async function CallQueuePage({ params }: PageProps) {
 
   await requireOrgSession(orgSlug);
 
-  // Everyone still to be worked (new/screening) who has a completed screen,
-  // already ranked by practical score.
+  // Everyone worth a call: a completed screen that cleared the review floor,
+  // still in new/screening, ranked by practical score. Clear rejects (below the
+  // floor) are excluded — this matches the dashboard "N to work" count exactly.
   const all = listApplicationsByOrganization(organization.id, { orderBy: "score" });
   const queue = all.filter(
-    (a) => a.screen_status === "completed" && (a.status === "new" || a.status === "screening"),
+    (a) =>
+      a.screen_status === "completed" &&
+      a.screen_score !== null &&
+      a.screen_score >= REVIEW_FLOOR &&
+      (a.status === "new" || a.status === "screening"),
   );
 
   return (

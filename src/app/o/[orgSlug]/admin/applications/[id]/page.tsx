@@ -193,7 +193,7 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
             </p>
             <ClaimVsProof
               resumeMatch={gap.resumeMatch}
-              screenScore={gap.screenScore}
+              screenScore={gap.backingScore}
               proofLabel={`Demonstrated ${gap.backingLabel.toLowerCase()}`}
             />
           </div>

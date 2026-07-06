@@ -210,8 +210,15 @@ export function deriveScoreConfidence(input: {
   if (input.hasOpenQuestions && input.avgOpenWords < 6) {
     return { level: "low", reason: "Written answers were very thin" };
   }
-  if (ratio >= 0.9 && (!input.hasOpenQuestions || input.avgOpenWords >= 12)) {
+  // Prose graded offline (no LLM) is rougher than AI rubric grading, so a
+  // full, substantive screen with written answers tops out at medium unless the
+  // opens were AI-graded — high is reserved for the most trustworthy scores.
+  const graderTrusted = !input.hasOpenQuestions || input.method === "llm";
+  if (ratio >= 0.9 && (!input.hasOpenQuestions || input.avgOpenWords >= 12) && graderTrusted) {
     return { level: "high", reason: "Complete and substantive" };
+  }
+  if (ratio >= 0.9 && input.hasOpenQuestions && input.avgOpenWords >= 12 && !graderTrusted) {
+    return { level: "medium", reason: "Complete, but written answers were graded offline — spot-check by phone" };
   }
   return { level: "medium", reason: "Some answers were brief or partial" };
 }

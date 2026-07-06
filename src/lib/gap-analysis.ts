@@ -63,11 +63,12 @@ export function candidateGap(
   const proof = app.screen_score;
   const paper = app.match_score;
 
+  // "trap" uses the SAME thresholds as isResumeTrap / the dashboard hero, so the
+  // two surfaces can never disagree about who is a resume trap.
   let verdict: CandidateGap["verdict"] = "aligned";
-  if (paper !== null && proof !== null) {
-    if (paper - proof >= 20) verdict = "trap";
-    else if (proof - paper >= 20) verdict = "sleeper";
-  } else if (proof !== null && (paper === null || paper < 40) && proof >= 60) {
+  if (paper !== null && paper >= PAPER_STRONG && proof !== null && proof < PROOF_WEAK) {
+    verdict = "trap";
+  } else if (proof !== null && (paper === null ? proof >= 60 : proof - paper >= 20)) {
     verdict = "sleeper";
   }
 

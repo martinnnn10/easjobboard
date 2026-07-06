@@ -11,7 +11,10 @@ import { getDb } from "./db";
 // Conservative, defensible assumptions: one loaded panel-hour per interview.
 const HOURS_PER_INTERVIEW = 1;
 const DOLLARS_PER_HOUR = 100;
-// A completed screen below this, or flagged high-risk, is a wasted interview avoided.
+// A completed screen below the review floor is a clear reject — an interview the
+// screen let the team skip. High-risk-but-strong candidates are NOT counted:
+// the Call Queue still tells the recruiter to phone them (to clear the flag), so
+// counting them as "avoided" would contradict the product and inflate the number.
 const WASTE_THRESHOLD = 45;
 
 export type RoiStats = {
@@ -29,7 +32,7 @@ export function getRoiStats(organizationId: string): RoiStats {
       `SELECT
          SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN 1 ELSE 0 END) AS completed,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL
-                   AND (screen_score < ? OR risk_level = 'high') THEN 1 ELSE 0 END) AS avoided
+                   AND screen_score < ? THEN 1 ELSE 0 END) AS avoided
        FROM applications WHERE organization_id = ?`,
     )
     .get(WASTE_THRESHOLD, organizationId) as { completed: number | null; avoided: number | null };

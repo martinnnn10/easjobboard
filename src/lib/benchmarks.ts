@@ -38,17 +38,23 @@ export function getScoreBenchmark(
     .prepare(
       `SELECT
          COUNT(*) AS pool,
-         SUM(CASE WHEN overall_score <= ? THEN 1 ELSE 0 END) AS at_or_below
+         SUM(CASE WHEN overall_score < ? THEN 1 ELSE 0 END) AS below,
+         SUM(CASE WHEN overall_score = ? THEN 1 ELSE 0 END) AS tied
        FROM screen_submissions
        WHERE organization_id = ? AND screen_key = ? AND overall_score IS NOT NULL`,
     )
-    .get(score, organizationId, screenKey) as { pool: number; at_or_below: number | null };
+    .get(score, score, organizationId, screenKey) as {
+    pool: number;
+    below: number | null;
+    tied: number | null;
+  };
 
   const pool = row.pool ?? 0;
   if (pool < MIN_POOL) return { pool, topPercent: null, early: true };
 
-  const atOrBelow = row.at_or_below ?? 0;
-  const percentileRank = Math.round((atOrBelow / pool) * 100); // % this score meets or beats
+  // Tie-aware (midpoint) percentile rank: ties split so a modal/average score
+  // isn't misreported as "top of the field".
+  const percentileRank = Math.round((((row.below ?? 0) + (row.tied ?? 0) / 2) / pool) * 100);
   const topPercent = Math.max(1, 100 - percentileRank);
   return { pool, topPercent, early: false };
 }
