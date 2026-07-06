@@ -118,3 +118,21 @@ export function getPdlConfig() {
 export function isPdlConfigured(): boolean {
   return Boolean(process.env.PDL_API_KEY);
 }
+
+/**
+ * Manatal ATS config. Searches the org's own Manatal candidate database
+ * (read-only). Dormant until MANATAL_API_KEY is set; key read only from the
+ * environment; base URL overridable for testing.
+ */
+export function getManatalConfig() {
+  const apiKey = process.env.MANATAL_API_KEY ?? "";
+  return {
+    apiKey,
+    enabled: Boolean(apiKey),
+    baseUrl: (process.env.MANATAL_BASE_URL ?? "https://api.manatal.com/open/v3").replace(/\/$/, ""),
+  };
+}
+
+export function isManatalConfigured(): boolean {
+  return Boolean(process.env.MANATAL_API_KEY);
+}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOrgSessionApi } from "@/lib/auth";
+import { searchManatalCandidates } from "@/lib/integrations/manatal";
 import { searchResumesPdl } from "@/lib/integrations/peopledatalabs";
 import { getJobById } from "@/lib/jobs";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
@@ -40,6 +41,10 @@ export async function POST(request: Request, context: RouteContext) {
   // People Data Labs resume database.
   const body = (await request.json().catch(() => ({}))) as { provider?: string };
   const result =
-    body.provider === "pdl" ? await searchResumesPdl(job) : await sourceCandidates(job);
+    body.provider === "pdl"
+      ? await searchResumesPdl(job)
+      : body.provider === "manatal"
+        ? await searchManatalCandidates(job)
+        : await sourceCandidates(job);
   return NextResponse.json(result);
 }

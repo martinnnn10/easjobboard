@@ -52,8 +52,8 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
   const [state, setState] = useState<"idle" | "loading">("idle");
   const [result, setResult] = useState<SourcingResult | null>(null);
   const [enrich, setEnrich] = useState<Record<number, EnrichState>>({});
-  const [provider, setProvider] = useState<"apollo" | "pdl">("apollo");
-  const [resultProvider, setResultProvider] = useState<"apollo" | "pdl">("apollo");
+  const [provider, setProvider] = useState<"apollo" | "pdl" | "manatal">("apollo");
+  const [resultProvider, setResultProvider] = useState<"apollo" | "pdl" | "manatal">("apollo");
 
   async function handleSearch() {
     setState("loading");
@@ -124,6 +124,7 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
         {(
           [
             { key: "apollo", label: "Passive search (Apollo)" },
+            { key: "manatal", label: "My Manatal database" },
             { key: "pdl", label: "Resume database (People Data Labs)" },
           ] as const
         ).map((opt) => (
@@ -153,6 +154,12 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
               The People Data Labs resume database isn&apos;t connected. Set a{" "}
               <code className="rounded bg-amber-100 px-1">PDL_API_KEY</code> environment variable to search it.
               Heads-up: general resume databases skew office/tech, so coverage of skilled trades is limited.
+            </>
+          ) : resultProvider === "manatal" ? (
+            <>
+              Your Manatal database isn&apos;t connected. Set a{" "}
+              <code className="rounded bg-amber-100 px-1">MANATAL_API_KEY</code> environment variable (Manatal →
+              Settings → API) to search the candidates already in your Manatal ATS.
             </>
           ) : (
             <>
@@ -210,14 +217,16 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
                     </div>
                   ) : null}
 
-                  {resultProvider === "pdl" ? (
+                  {resultProvider !== "apollo" ? (
                     <div className="flex items-center gap-3 text-sm">
                       {candidate.emailStatus && candidate.emailStatus.includes("@") ? (
                         <a href={`mailto:${candidate.emailStatus}`} className="text-blue-600 hover:underline">
                           ✉ {candidate.emailStatus}
                         </a>
                       ) : (
-                        <span className="text-zinc-500">No public email — reach out on LinkedIn.</span>
+                        <span className="text-zinc-500">
+                          {resultProvider === "manatal" ? "No email on file." : "No public email — reach out on LinkedIn."}
+                        </span>
                       )}
                     </div>
                   ) : (
