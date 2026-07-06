@@ -75,7 +75,7 @@ export default function RootLayout({
         <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3.5">
             <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-700 text-sm font-bold text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-[#7FB0E6]">
                 ⚡
               </span>
               <span className="text-lg font-bold tracking-tight text-zinc-900">{getPlatformName()}</span>

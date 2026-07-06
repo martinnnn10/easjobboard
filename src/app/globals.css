@@ -44,8 +44,9 @@ h3 {
   @apply inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:opacity-60;
 }
 
+/* Premium near-white CTA — sits on the graphite hero/CTA grounds. */
 .btn-accent {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 font-semibold text-zinc-950 shadow-sm transition hover:bg-amber-400 disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-100 focus:ring-4 focus:ring-white/20 disabled:opacity-60;
 }
 
 /* ── Cards ──────────────────────────────────────────────── */
@@ -72,11 +73,9 @@ h3 {
   @apply text-3xl font-bold tracking-tight text-zinc-900;
 }
 
-/* ── Industrial dark hero with faint blueprint grid ─────── */
+/* ── Premium graphite ground with a faint electric-steel glow ─────── */
 .hero-dark {
-  background-color: #0b1220;
-  background-image: linear-gradient(rgba(59, 130, 246, 0.09) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(59, 130, 246, 0.09) 1px, transparent 1px);
-  background-size: 30px 30px;
-  color: #f8fafc;
+  background-color: #131418;
+  background-image: radial-gradient(58% 78% at 18% -8%, rgba(120, 168, 224, 0.16), transparent 66%);
+  color: #f4f4f2;
 }

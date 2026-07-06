@@ -26,11 +26,11 @@ export default function HomePage() {
       <section className="hero-dark">
         <div className="mx-auto w-full max-w-6xl px-4 py-24">
           <div className="max-w-3xl">
-            <p className="section-label text-blue-300">{getPlatformName()} · Manufacturing hiring intelligence</p>
+            <p className="section-label text-[#9FB6D4]">{getPlatformName()} · Manufacturing hiring intelligence</p>
             <h1 className="mt-4 text-4xl font-bold leading-[1.05] tracking-tight text-white md:text-6xl">
               Know who can actually
               <br />
-              <span className="text-blue-400">troubleshoot before you interview.</span>
+              <span className="text-[#7FB0E6]">troubleshoot before you interview.</span>
             </h1>
             <p className="mt-6 max-w-xl text-lg text-slate-300">
               {getPlatformName()} screens maintenance, controls, and skilled-trades applicants on real plant-floor
@@ -56,7 +56,7 @@ export default function HomePage() {
         <div className="grid gap-6 md:grid-cols-3">
           {STEPS.map((step) => (
             <div key={step.n} className="card card-hover space-y-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-700 font-mono text-sm font-bold text-white">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-zinc-900 font-mono text-sm font-bold text-[#7FB0E6]">
                 {step.n}
               </div>
               <h2 className="text-lg font-semibold text-zinc-900">{step.title}</h2>
@@ -85,11 +85,11 @@ export default function HomePage() {
 
       {/* CTA */}
       <section className="mx-auto w-full max-w-6xl px-4 py-20">
-        <div className="rounded-3xl bg-blue-700 px-8 py-14 text-center">
+        <div className="hero-dark rounded-3xl px-8 py-14 text-center ring-1 ring-white/10">
           <h2 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
             Stop wasting interviews on candidates who only look good on paper.
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-blue-100">
+          <p className="mx-auto mt-3 max-w-xl text-slate-300">
             Built for manufacturing hiring: maintenance, controls, electrical, refrigeration, and plant leadership.
             Post your first screened role free — no credit card, no setup call.
           </p>
@@ -98,9 +98,9 @@ export default function HomePage() {
               Create your organization →
             </Link>
           </div>
-          <p className="mt-6 text-sm text-blue-200">
+          <p className="mt-6 text-sm text-slate-400">
             Questions? {" "}
-            <a href={`mailto:${getPlatformEmail()}`} className="font-medium text-white underline">
+            <a href={`mailto:${getPlatformEmail()}`} className="font-medium text-[#7FB0E6] underline">
               {getPlatformEmail()}
             </a>
           </p>
