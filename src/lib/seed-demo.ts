@@ -1,5 +1,10 @@
 import { createApplication } from "./applications";
-import { assessRisk, deriveRecommendedAction, type ScreenSummary } from "./candidate-intel";
+import {
+  assessRisk,
+  deriveRecommendedAction,
+  deriveScoreConfidence,
+  type ScreenSummary,
+} from "./candidate-intel";
 import { getDb } from "./db";
 import { createJob } from "./jobs";
 import { scoreResumeHeuristic } from "./scoring";
@@ -301,6 +306,24 @@ export function seedDemoData(organizationId: string, companyName: string): { see
       candidateIsLead,
     });
 
+    const openAnswers = (result?.perAnswer ?? []).filter(
+      (a) => a.type === "short_answer" || a.type === "scenario",
+    );
+    const avgOpenWords =
+      openAnswers.length === 0
+        ? 0
+        : openAnswers.reduce((sum, a) => sum + a.answerText.split(/\s+/).filter(Boolean).length, 0) /
+          openAnswers.length;
+    const confidence = result
+      ? deriveScoreConfidence({
+          answeredCount: result.answeredCount,
+          totalCount: result.totalCount,
+          method: "heuristic",
+          avgOpenWords,
+          hasOpenQuestions: openAnswers.length > 0,
+        }).level
+      : undefined;
+
     const summary: ScreenSummary = {
       strengths: result?.strengths ?? [],
       redFlags: result?.redFlags ?? [],
@@ -308,6 +331,7 @@ export function seedDemoData(organizationId: string, companyName: string): { see
       strongDims: result?.strongDims ?? [],
       weakDims: result?.weakDims ?? [],
       method: "heuristic",
+      confidence,
     };
 
     const application = createApplication({

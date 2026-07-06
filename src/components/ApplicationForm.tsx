@@ -2,8 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { ScreenQuestions } from "@/components/ScreenQuestions";
+import { DimensionBars } from "@/components/ScreenSignals";
 import type { ScreenAnswerValue } from "@/lib/screen-scoring";
 import type { PublicScreen } from "@/lib/screens";
+
+type ApplyReport = {
+  score: number;
+  dimensions: { label: string; score: number }[];
+  strengths: string[];
+};
 
 export function ApplicationForm({
   orgSlug,
@@ -25,6 +32,7 @@ export function ApplicationForm({
   const [resume, setResume] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [report, setReport] = useState<ApplyReport | null>(null);
 
   // Ranking questions start pre-populated with the presented order so an
   // untouched ranking still submits a (scoreable) answer.
@@ -71,7 +79,7 @@ export function ApplicationForm({
       body: formData,
     });
 
-    const data = (await response.json()) as { error?: string };
+    const data = (await response.json()) as { error?: string; report?: ApplyReport | null };
 
     if (!response.ok) {
       setStatus("error");
@@ -79,15 +87,51 @@ export function ApplicationForm({
       return;
     }
 
+    setReport(data.report ?? null);
     setStatus("success");
     setMessage("Application sent. The hiring team will review your resume and your skills check.");
   }
 
   if (status === "success") {
+    const band =
+      report && report.score >= 70
+        ? { label: "Strong result", cls: "bg-green-100 text-green-800" }
+        : report && report.score >= 45
+          ? { label: "Solid result", cls: "bg-amber-100 text-amber-800" }
+          : { label: "Thanks for taking it", cls: "bg-zinc-100 text-zinc-700" };
     return (
-      <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-green-900">
-        <h2 className="text-lg font-semibold">Application submitted</h2>
-        <p className="mt-2 text-sm">{message}</p>
+      <div className="card space-y-4">
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">
+          <h2 className="text-lg font-semibold">Application submitted ✓</h2>
+          <p className="mt-1 text-sm">{message}</p>
+        </div>
+
+        {report ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="section-label">Your skills check</p>
+                <p className="mt-1 text-sm text-zinc-600">Here&apos;s how you did — the hiring team sees this too.</p>
+              </div>
+              <span className={`inline-flex items-baseline gap-1 rounded-full px-3 py-1 text-lg font-bold ${band.cls}`}>
+                {report.score}
+                <span className="text-xs font-semibold opacity-70">/100</span>
+              </span>
+            </div>
+            {report.dimensions.length > 0 ? <DimensionBars dimensions={report.dimensions} /> : null}
+            {report.strengths.length > 0 ? (
+              <div>
+                <p className="text-sm font-semibold text-green-800">What you showed</p>
+                <ul className="mt-1 space-y-0.5 text-sm text-zinc-700">
+                  {report.strengths.map((s) => (
+                    <li key={s}>✓ {s}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            <p className="text-xs text-zinc-500">{band.label}. Good luck — the team will be in touch.</p>
+          </div>
+        ) : null}
       </div>
     );
   }

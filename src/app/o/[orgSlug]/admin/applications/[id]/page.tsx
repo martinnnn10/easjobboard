@@ -3,12 +3,24 @@ import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
 import { EmailPanel } from "@/components/EmailPanel";
 import { NoteForm } from "@/components/NoteForm";
-import { BadgeRow, DimensionBars, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
+import {
+  BadgeRow,
+  ClaimVsProof,
+  ConfidencePill,
+  DimensionBars,
+  PercentileChip,
+  RiskPill,
+  ScreenScoreBadge,
+} from "@/components/ScreenSignals";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { benchmarkLabel, getScoreBenchmark } from "@/lib/benchmarks";
 import { badgesForApplication, normalizeRiskLevel } from "@/lib/candidate-intel";
 import { listCandidateEvents, type CandidateEvent } from "@/lib/candidate-events";
+import { candidateGap, GAP_VERDICT_COPY } from "@/lib/gap-analysis";
+import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { evaluateIdealPoints } from "@/lib/screen-scoring";
 import { getScreenSubmission } from "@/lib/screen-submissions";
 import { DIMENSION_LABELS, type ScreenDimension } from "@/lib/screens";
 
@@ -45,6 +57,8 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
 
   const events = listCandidateEvents(id, organization.id);
   const submission = getScreenSubmission(id, organization.id);
+  const job = getJobByOrgAndSlug(organization.id, application.job_slug);
+  const screenKey = job?.screen_key ?? submission?.screenKey ?? "";
   const badges = badgesForApplication(application);
   const riskLevel = normalizeRiskLevel(application.risk_level);
   const summary = application.screen_summary;
@@ -55,6 +69,16 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
         .map(([dim, score]) => ({ label: DIMENSION_LABELS[dim], score }))
         .sort((a, b) => b.score - a.score)
     : [];
+  const strongestDim = dimensions.length ? dimensions[0] : null;
+  const weakestDim = dimensions.length ? dimensions[dimensions.length - 1] : null;
+
+  // Trust signals: percentile vs the role's pool, and the resume-vs-reality gap.
+  const benchmark =
+    application.screen_status === "completed"
+      ? getScoreBenchmark(organization.id, screenKey, application.screen_score)
+      : null;
+  const gap = candidateGap(application, screenKey, submission);
+  const confidence = summary?.confidence ?? null;
 
   const smsHref = application.applicant_phone
     ? `sms:${application.applicant_phone.replace(/[^0-9+]/g, "")}`
@@ -66,7 +90,24 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
         <Link href={`/o/${orgSlug}/admin/pipeline`} className="text-sm text-blue-600 hover:underline">
           ← Back to pipeline
         </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+
+        {/* Verdict banner — the conclusion before any evidence. */}
+        {application.screen_status === "completed" && recommendedAction ? (
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-zinc-200 bg-zinc-900 px-5 py-3 text-white">
+            <div className="flex items-center gap-3">
+              <ScreenScoreBadge score={application.screen_score} status={application.screen_status} size="lg" />
+              <span className="text-base font-bold tracking-tight">{recommendedAction}</span>
+            </div>
+            <span className="hidden text-zinc-600 sm:inline">|</span>
+            <span className="text-sm text-zinc-300">
+              {strongestDim ? `Strong: ${strongestDim.label.toLowerCase()}` : ""}
+              {weakestDim && weakestDim.score < 60 ? ` · Weak: ${weakestDim.label.toLowerCase()}` : ""}
+              {application.risk_flags[0] ? ` · ${application.risk_flags[0].label}` : " · No risk flags"}
+            </span>
+          </div>
+        ) : null}
+
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-zinc-900">{application.applicant_name}</h1>
             <p className="mt-1 text-sm text-zinc-600">
@@ -86,6 +127,11 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
               applicationId={application.id}
               initialStatus={application.status}
             />
+            {submission ? (
+              <Link href={`/o/${orgSlug}/admin/applications/${application.id}/kit`} className="btn-primary text-sm">
+                📋 Interview kit
+              </Link>
+            ) : null}
             <a
               href={`/api/o/${orgSlug}/applications/${application.id}/resume`}
               className="text-sm text-blue-600 hover:underline"
@@ -101,8 +147,12 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
         <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
           <div>
             <p className="section-label">Skills screen</p>
-            <div className="mt-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <ScreenScoreBadge score={application.screen_score} status={application.screen_status} size="lg" />
+              {benchmark && (benchmark.topPercent !== null || benchmark.pool > 0) ? (
+                <PercentileChip label={benchmarkLabel(benchmark)} strong={(benchmark.topPercent ?? 100) <= 25} />
+              ) : null}
+              {confidence ? <ConfidencePill level={confidence} /> : null}
             </div>
           </div>
           <div>
@@ -126,6 +176,28 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
         </div>
 
         {badges.length > 0 ? <BadgeRow badges={badges} /> : null}
+
+        {/* Resume vs. reality — claim beside proof. */}
+        {application.screen_status === "completed" && application.match_score !== null ? (
+          <div
+            className={`rounded-lg border p-3 ${
+              gap.verdict === "trap"
+                ? "border-red-200 bg-red-50"
+                : gap.verdict === "sleeper"
+                  ? "border-green-200 bg-green-50"
+                  : "border-zinc-200 bg-zinc-50/60"
+            }`}
+          >
+            <p className="mb-2 text-sm font-semibold text-zinc-900">
+              Resume vs. reality — <span className="font-normal">{GAP_VERDICT_COPY[gap.verdict]}</span>
+            </p>
+            <ClaimVsProof
+              resumeMatch={gap.resumeMatch}
+              screenScore={gap.screenScore}
+              proofLabel={`Demonstrated ${gap.backingLabel.toLowerCase()}`}
+            />
+          </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           {summary && summary.strengths.length > 0 ? (
@@ -195,8 +267,31 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
                         <span className="font-semibold">Why:</span> {answer.rationale}
                       </p>
                     ) : null}
+                    {(() => {
+                      const points = evaluateIdealPoints(screenKey, answer.questionId, answer.answerText);
+                      if (points.length === 0) return null;
+                      return (
+                        <div className="mt-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                            A strong answer covers
+                          </p>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {points.map((p) => (
+                              <span
+                                key={p.label}
+                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] ${
+                                  p.hit ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {p.hit ? "✓" : "✗"} {p.label}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     {answer.followUp ? (
-                      <p className="mt-1 text-xs text-blue-700">
+                      <p className="mt-2 text-xs text-blue-700">
                         <span className="font-semibold">Ask in interview:</span> {answer.followUp}
                       </p>
                     ) : null}

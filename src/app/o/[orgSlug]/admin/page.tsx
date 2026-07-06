@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoSeedButton } from "@/components/DemoSeedButton";
 import { LogoutButton } from "@/components/LogoutButton";
-import { BadgeRow, ScreenScoreBadge } from "@/components/ScreenSignals";
+import { BadgeRow, ClaimVsProof, ScreenScoreBadge } from "@/components/ScreenSignals";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   countApplicationsByOrganization,
@@ -15,8 +15,10 @@ import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS } from "@/lib/applicati
 import { requireOrgSession } from "@/lib/auth";
 import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrgUrl } from "@/lib/env";
+import { resumeTrapCandidates } from "@/lib/gap-analysis";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { getRoiStats } from "@/lib/roi";
 import { getScreenLabel } from "@/lib/screens";
 
 type PageProps = {
@@ -32,7 +34,8 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const sessionContext = await requireOrgSession(orgSlug);
 
   const jobs = listJobsByOrganization(organization.id);
-  const applicants = listApplicationsByOrganization(organization.id, { orderBy: "score", limit: 5 });
+  const allApplicants = listApplicationsByOrganization(organization.id, { orderBy: "score" });
+  const applicants = allApplicants.slice(0, 5);
   const applicantCount = countApplicationsByOrganization(organization.id);
   const statusCounts = getApplicationStatusCounts(organization.id);
   const activeInPipeline =
@@ -45,6 +48,10 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const openRolesNoStrong = publishedJobs.filter(
     (job) => (jobSummaries[job.id]?.strongFit ?? 0) === 0,
   ).length;
+
+  // The hook + the renewal number.
+  const trapCandidates = resumeTrapCandidates(allApplicants).slice(0, 4);
+  const roi = getRoiStats(organization.id);
 
   const publishedSlug = (await searchParams).published;
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
@@ -85,6 +92,79 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <LogoutButton orgSlug={orgSlug} />
         </div>
       </div>
+
+      {/* THE HOOK — the resume trap: people a keyword ATS would have shortlisted. */}
+      {trapCandidates.length > 0 ? (
+        <section className="rounded-2xl border border-red-200 bg-red-50 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-700">The resume trap</p>
+              <h2 className="mt-1 text-xl font-bold text-red-900">
+                You were about to interview {trapCandidates.length}{" "}
+                {trapCandidates.length === 1 ? "person who can't" : "people who can't"} do the job.
+              </h2>
+              <p className="mt-1 text-sm text-red-800">
+                Strong on paper, weak on the floor — exactly who a keyword job board would have put at the top of your
+                list.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            {trapCandidates.map((c) => (
+              <Link
+                key={c.id}
+                href={`/o/${orgSlug}/admin/applications/${c.id}`}
+                className="block rounded-xl border border-red-200 bg-white p-4 transition hover:border-red-300"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-zinc-900">{c.applicant_name}</span>
+                  <span className="text-xs text-zinc-500">{c.job_title}</span>
+                </div>
+                <div className="mt-3">
+                  <ClaimVsProof resumeMatch={c.match_score} screenScore={c.screen_score} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* THE RENEWAL NUMBER + the daily habit. */}
+      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="hero-dark flex flex-col justify-center rounded-2xl px-6 py-6 ring-1 ring-white/10">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9FB6D4]">Interview-hours saved</p>
+          {roi.interviewsAvoided > 0 ? (
+            <>
+              <p className="mt-2 text-4xl font-bold tracking-tight text-white">
+                ${roi.dollarsSaved.toLocaleString()}
+                <span className="ml-2 text-lg font-semibold text-slate-300">
+                  · {roi.hoursSaved} interview-hours avoided
+                </span>
+              </p>
+              <p className="mt-2 text-sm text-slate-300">
+                Your screens filtered out {roi.interviewsAvoided} weak or high-risk applicants ({roi.filterRatePercent}%
+                of everyone screened) before anyone wasted an interview on them.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-slate-300">
+              Once applicants complete screens, this shows the interview-hours and dollars the screen saved you by
+              filtering weak candidates before you meet them.
+            </p>
+          )}
+        </div>
+        <Link
+          href={`/o/${orgSlug}/admin/queue`}
+          className="card card-hover flex flex-col justify-center border-l-4 border-l-green-500"
+        >
+          <p className="section-label">Call queue</p>
+          <p className="stat-value mt-2 text-green-700">
+            {stats.strongFit + stats.needsReview}
+            <span className="ml-1 text-base font-medium text-zinc-400">to work</span>
+          </p>
+          <p className="mt-1 text-sm text-zinc-600">Who to call first, ranked by ability — phone one tap away →</p>
+        </Link>
+      </section>
 
       {/* Hiring-intelligence stats — who can actually do the job */}
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

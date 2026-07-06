@@ -1,5 +1,5 @@
-import type { Badge, BadgeTone, RiskLevel } from "@/lib/candidate-intel";
-import { RISK_LEVEL_LABELS } from "@/lib/candidate-intel";
+import type { Badge, BadgeTone, ConfidenceLevel, RiskLevel } from "@/lib/candidate-intel";
+import { CONFIDENCE_LABELS, RISK_LEVEL_LABELS } from "@/lib/candidate-intel";
 import type { ScreenStatus } from "@/lib/db";
 
 /** Colour band for a 0–100 practical skills score. */
@@ -84,10 +84,82 @@ export function RiskPill({ level }: { level: RiskLevel }) {
   );
 }
 
+const CONFIDENCE_CLASS: Record<ConfidenceLevel, string> = {
+  high: "bg-green-50 text-green-700 ring-green-200",
+  medium: "bg-amber-50 text-amber-800 ring-amber-200",
+  low: "bg-red-50 text-red-700 ring-red-200",
+};
+
+/** How much to trust a given score — high/medium/low. */
+export function ConfidencePill({ level, reason }: { level: ConfidenceLevel; reason?: string }) {
+  return (
+    <span
+      title={reason}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${CONFIDENCE_CLASS[level]}`}
+    >
+      <span aria-hidden>◑</span>
+      {CONFIDENCE_LABELS[level]}
+    </span>
+  );
+}
+
+/** "Top X% of N" role percentile chip. */
+export function PercentileChip({ label, strong }: { label: string; strong?: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${
+        strong ? "bg-green-50 text-green-700 ring-green-200" : "bg-zinc-100 text-zinc-600 ring-zinc-200"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function barColor(score: number): string {
   if (score >= 70) return "bg-green-500";
   if (score >= 45) return "bg-amber-500";
   return "bg-red-500";
+}
+
+/**
+ * The claim-vs-proof strip: what the resume says (keyword match) beside what the
+ * candidate demonstrated on the screen. When paper >> proof, the gap is the
+ * whole pitch — the person a keyword ATS would have shortlisted.
+ */
+export function ClaimVsProof({
+  resumeMatch,
+  screenScore,
+  proofLabel = "Demonstrated ability",
+}: {
+  resumeMatch: number | null;
+  screenScore: number | null;
+  proofLabel?: string;
+}) {
+  const rows: { label: string; value: number | null; kind: "paper" | "proof" }[] = [
+    { label: "Resume says (keyword match)", value: resumeMatch, kind: "paper" },
+    { label: proofLabel, value: screenScore, kind: "proof" },
+  ];
+  return (
+    <div className="space-y-2.5">
+      {rows.map((row) => (
+        <div key={row.label} className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium text-zinc-700">{row.label}</span>
+            <span className="font-semibold text-zinc-900">{row.value === null ? "—" : row.value}</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-zinc-100">
+            <div
+              className={`h-full rounded-full ${
+                row.kind === "paper" ? "bg-zinc-400" : barColor(row.value ?? 0)
+              }`}
+              style={{ width: `${row.value ?? 0}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** Horizontal bar breakdown of the six competency dimensions. */

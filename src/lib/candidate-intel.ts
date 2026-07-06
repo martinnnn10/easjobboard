@@ -168,10 +168,52 @@ export type ScreenSummary = {
   strongDims: string[];
   weakDims: string[];
   method: "llm" | "heuristic";
+  /** How much to trust this score (see deriveScoreConfidence). Optional for older rows. */
+  confidence?: ConfidenceLevel;
 };
 
 export function emptyScreenSummary(): ScreenSummary {
   return { strengths: [], redFlags: [], recommendedAction: "", strongDims: [], weakDims: [], method: "heuristic" };
+}
+
+// ─── Score confidence ───────────────────────────────────────────────────────
+export type ConfidenceLevel = "high" | "medium" | "low";
+export type ScoreConfidence = { level: ConfidenceLevel; reason: string };
+
+export const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
+  high: "High confidence",
+  medium: "Medium confidence",
+  low: "Low confidence",
+};
+
+/**
+ * Not every score is an equally safe bet. A 74 from a fully-answered, substantive
+ * screen and a 74 from three one-word answers are different — this surfaces which
+ * to act on and which to verify by phone. Signals: how much was answered, how
+ * substantive the written answers were, and whether opens were AI- or
+ * offline-graded. Deterministic.
+ */
+export function deriveScoreConfidence(input: {
+  answeredCount: number;
+  totalCount: number;
+  method: "llm" | "heuristic";
+  /** Average word count across the open (short-answer/scenario) answers. */
+  avgOpenWords: number;
+  /** Whether the screen had any open questions at all. */
+  hasOpenQuestions: boolean;
+}): ScoreConfidence {
+  const ratio = input.totalCount === 0 ? 0 : input.answeredCount / input.totalCount;
+
+  if (ratio < 0.6) {
+    return { level: "low", reason: `Only ${input.answeredCount} of ${input.totalCount} answered` };
+  }
+  if (input.hasOpenQuestions && input.avgOpenWords < 6) {
+    return { level: "low", reason: "Written answers were very thin" };
+  }
+  if (ratio >= 0.9 && (!input.hasOpenQuestions || input.avgOpenWords >= 12)) {
+    return { level: "high", reason: "Complete and substantive" };
+  }
+  return { level: "medium", reason: "Some answers were brief or partial" };
 }
 
 export type BadgeInput = {

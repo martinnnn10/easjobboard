@@ -100,6 +100,7 @@ export type ScreenSummaryRecord = {
   strongDims: string[];
   weakDims: string[];
   method: "llm" | "heuristic";
+  confidence?: "high" | "medium" | "low";
 };
 
 export type JobInput = Omit<

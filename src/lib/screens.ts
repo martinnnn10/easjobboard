@@ -579,6 +579,24 @@ export function getScreenLabel(key: string | null | undefined): string {
 }
 
 /**
+ * The single competency a role most stands on — used to contrast a candidate's
+ * demonstrated ability against their claimed/resume signal.
+ */
+export function backingDimension(key: string | null | undefined): ScreenDimension {
+  switch (key) {
+    case "industrial_electrician":
+      return "electrical";
+    case "controls_tech":
+      return "troubleshooting";
+    case "maintenance_leader":
+      return "roleAlignment";
+    case "maintenance_tech":
+    default:
+      return "troubleshooting";
+  }
+}
+
+/**
  * Suggests the best-fit screen for a job title. Used to default the screen
  * picker when a recruiter types a title or applies a template.
  */

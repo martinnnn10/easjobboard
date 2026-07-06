@@ -3,6 +3,7 @@ import { createApplication } from "@/lib/applications";
 import {
   assessRisk,
   deriveRecommendedAction,
+  deriveScoreConfidence,
   type ScreenSummary,
 } from "@/lib/candidate-intel";
 import { recordCandidateEvent } from "@/lib/candidate-events";
@@ -15,7 +16,7 @@ import { extractResumeText } from "@/lib/resume-parsing";
 import { scoreResume } from "@/lib/scoring";
 import { scoreScreen, type ScreenAnswers } from "@/lib/screen-scoring";
 import { saveScreenSubmission } from "@/lib/screen-submissions";
-import { getScreen } from "@/lib/screens";
+import { DIMENSION_LABELS, getScreen, type ScreenDimension } from "@/lib/screens";
 
 export const runtime = "nodejs";
 
@@ -184,6 +185,21 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     if (screenResult) {
+      const openAnswers = screenResult.perAnswer.filter(
+        (a) => a.type === "short_answer" || a.type === "scenario",
+      );
+      const avgOpenWords =
+        openAnswers.length === 0
+          ? 0
+          : openAnswers.reduce((sum, a) => sum + a.answerText.split(/\s+/).filter(Boolean).length, 0) /
+            openAnswers.length;
+      const confidence = deriveScoreConfidence({
+        answeredCount: screenResult.answeredCount,
+        totalCount: screenResult.totalCount,
+        method: screenResult.method,
+        avgOpenWords,
+        hasOpenQuestions: openAnswers.length > 0,
+      });
       screenSummary = {
         strengths: screenResult.strengths,
         redFlags: screenResult.redFlags,
@@ -191,6 +207,7 @@ export async function POST(request: Request, context: RouteContext) {
         strongDims: screenResult.strongDims,
         weakDims: screenResult.weakDims,
         method: screenResult.method,
+        confidence: confidence.level,
       };
     } else {
       screenSummary = {
@@ -276,7 +293,21 @@ export async function POST(request: Request, context: RouteContext) {
       console.error("Applicant confirmation email failed:", emailError);
     });
 
-    return NextResponse.json({ ok: true });
+    // Applicant-safe report card — the tradesperson sees their own result the
+    // moment they submit (ends the application black hole and rewards the real
+    // effort). Never exposes red flags, risk, rationale, or answer keys.
+    const report =
+      screenResult && screenStatus === "completed"
+        ? {
+            score: screenResult.overallScore,
+            dimensions: (Object.entries(screenResult.dimensionScores) as [ScreenDimension, number][])
+              .map(([dim, value]) => ({ label: DIMENSION_LABELS[dim], score: value }))
+              .sort((a, b) => b.score - a.score),
+            strengths: screenResult.strengths.filter((s) => /^Strong/i.test(s)),
+          }
+        : null;
+
+    return NextResponse.json({ ok: true, report });
   } catch (error) {
     console.error("Application failed:", error);
     return NextResponse.json(

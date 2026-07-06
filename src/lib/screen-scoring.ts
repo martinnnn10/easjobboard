@@ -370,6 +370,27 @@ function uniq(items: string[]): string[] {
 }
 
 /**
+ * For the "show the work" evidence panel: which of a question's ideal answer
+ * points the candidate's answer actually hit vs missed. Uses the same
+ * keyword-any matching as the offline grader, so the audit view matches how the
+ * score was reasoned. Returns [] for questions with no rubric points.
+ */
+export function evaluateIdealPoints(
+  screenKey: string,
+  questionId: string,
+  answerText: string,
+): { label: string; hit: boolean }[] {
+  const template = getScreen(screenKey);
+  const question = template?.questions.find((q) => q.id === questionId);
+  if (!question?.idealPoints) return [];
+  const lower = (answerText ?? "").toLowerCase();
+  return question.idealPoints.map((point) => ({
+    label: point.label,
+    hit: point.any.some((kw) => lower.includes(kw)),
+  }));
+}
+
+/**
  * Fully offline, deterministic scoring (no LLM). Used by demo seeding so the
  * sample data ranks identically on every machine, and as the guaranteed
  * fallback path.
