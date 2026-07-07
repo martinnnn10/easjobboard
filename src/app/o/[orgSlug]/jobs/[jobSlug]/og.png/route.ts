@@ -1,3 +1,4 @@
+import sharp from "sharp";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import type { Job } from "@/lib/db";
@@ -5,6 +6,15 @@ import type { Job } from "@/lib/db";
 export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ orgSlug: string; jobSlug: string }> };
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
 function employmentLabel(type: string): string {
   return type
@@ -21,15 +31,6 @@ function salaryLabel(job: Job): string {
   if (job.salary_min && job.salary_max) return `${fmt(job.salary_min)}–${fmt(job.salary_max)}/${period}`;
   const single = (job.salary_min ?? job.salary_max) as number;
   return `${fmt(single)}/${period}`;
-}
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }
 
 /** Greedily wrap a title into up to `maxLines` lines of ~`perLine` chars. */
@@ -53,8 +54,9 @@ function wrapTitle(title: string, perLine = 22, maxLines = 3): string[] {
 }
 
 /**
- * 1200×630 branded social/OG card for a job. SVG keeps it dependency-free and
- * DB-driven; referenced from the job page's Open Graph / Twitter tags.
+ * 1200×630 branded social/OG card for a job, rendered to PNG (via sharp) for
+ * maximum crawler compatibility — Twitter/Facebook/LinkedIn prefer raster
+ * images over SVG. DB-driven; referenced from the job page's OG/Twitter tags.
  */
 export async function GET(_request: Request, context: RouteContext) {
   const { orgSlug, jobSlug } = await context.params;
@@ -96,10 +98,19 @@ export async function GET(_request: Request, context: RouteContext) {
   <text x="80" y="540" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#eaf3d6">${escapeXml(meta)}</text>
 </svg>`;
 
-  return new Response(svg, {
-    headers: {
-      "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control": "public, max-age=3600",
-    },
-  });
+  try {
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+    return new Response(new Uint8Array(png), {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch {
+    // If rasterization fails for any reason, fall back to serving the SVG so the
+    // card still resolves rather than 404-ing.
+    return new Response(svg, {
+      headers: { "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "public, max-age=3600" },
+    });
+  }
 }

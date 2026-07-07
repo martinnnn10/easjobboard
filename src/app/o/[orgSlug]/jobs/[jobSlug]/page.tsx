@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: PageProps) {
   const title = `${job.title} — ${organization.name}`;
   const description = job.description.slice(0, 200).replace(/\s+/g, " ").trim();
   const url = getOrgJobUrl(orgSlug, job.slug);
-  const image = { url: `${url}/og.svg`, width: 1200, height: 630, alt: `${job.title} at ${organization.name}` };
+  const image = { url: `${url}/og.png`, width: 1200, height: 630, alt: `${job.title} at ${organization.name}` };
 
   // Rich cards so links shared to LinkedIn/Slack/Twitter/Facebook render a
   // branded preview instead of a bare URL — a low-cost visibility multiplier.
