@@ -2,6 +2,11 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 
+import { type ApplicationStatus } from "./application-status";
+
+export type { ApplicationStatus } from "./application-status";
+export { APPLICATION_STATUSES } from "./application-status";
+
 export type JobStatus = "draft" | "published" | "closed";
 
 export type Organization = {
@@ -10,6 +15,7 @@ export type Organization = {
   name: string;
   website: string;
   application_email: string;
+  brand_color: string;
   created_at: string;
   updated_at: string;
 };
@@ -42,6 +48,8 @@ export type Job = {
   company_name: string;
   reference_number: string;
   status: JobStatus;
+  /** Skills-screen template key attached to this job ("" = no screen). */
+  screen_key: string;
   created_at: string;
   updated_at: string;
   published_at: string | null;
@@ -58,7 +66,41 @@ export type Application = {
   cover_letter: string;
   resume_filename: string;
   resume_content_type: string;
+  status: ApplicationStatus;
+  resume_skills: string[];
+  match_score: number | null;
+  /** Applicant-supplied context that powers risk flags. */
+  applicant_location: string;
+  desired_pay: string;
+  /** Screening state: "none" (no screen), "pending" (attached, not done), "completed". */
+  screen_status: ScreenStatus;
+  /** 0–100 practical skills score — the PRIMARY ranking signal. */
+  screen_score: number | null;
+  risk_level: RiskLevelValue;
+  risk_flags: RiskFlagRecord[];
+  /** Denormalized snapshot for fast card/list rendering (see ScreenSummary). */
+  screen_summary: ScreenSummaryRecord | null;
   created_at: string;
+};
+
+export type ScreenStatus = "none" | "pending" | "completed";
+export type RiskLevelValue = "low" | "medium" | "high" | "";
+
+export type RiskFlagRecord = {
+  key: string;
+  label: string;
+  detail: string;
+  severity: "medium" | "high";
+};
+
+export type ScreenSummaryRecord = {
+  strengths: string[];
+  redFlags: string[];
+  recommendedAction: string;
+  strongDims: string[];
+  weakDims: string[];
+  method: "llm" | "heuristic";
+  confidence?: "high" | "medium" | "low";
 };
 
 export type JobInput = Omit<
@@ -168,6 +210,7 @@ function initDb(database: Database.Database): void {
       name TEXT NOT NULL,
       website TEXT NOT NULL DEFAULT '',
       application_email TEXT NOT NULL,
+      brand_color TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -184,6 +227,11 @@ function initDb(database: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_users_org ON users(organization_id);
   `);
+
+  // Migration: add branding to databases created before it existed.
+  if (!columnExists(database, "organizations", "brand_color")) {
+    database.exec("ALTER TABLE organizations ADD COLUMN brand_color TEXT NOT NULL DEFAULT ''");
+  }
 
   migrateLegacyJobs(database);
 
@@ -208,6 +256,7 @@ function initDb(database: Database.Database): void {
         company_name TEXT NOT NULL,
         reference_number TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'draft',
+        screen_key TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         published_at TEXT,
@@ -234,6 +283,10 @@ function initDb(database: Database.Database): void {
       resume_filename TEXT NOT NULL,
       resume_content_type TEXT NOT NULL,
       resume_data BLOB NOT NULL,
+      status TEXT NOT NULL DEFAULT 'new',
+      resume_text TEXT NOT NULL DEFAULT '',
+      resume_skills TEXT NOT NULL DEFAULT '[]',
+      match_score INTEGER,
       created_at TEXT NOT NULL,
       FOREIGN KEY (organization_id) REFERENCES organizations(id),
       FOREIGN KEY (job_id) REFERENCES jobs(id)
@@ -242,6 +295,87 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_applications_org ON applications(organization_id);
     CREATE INDEX IF NOT EXISTS idx_applications_job ON applications(job_id);
   `);
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS candidate_events (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      application_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      actor TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (application_id) REFERENCES applications(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_candidate_events_app ON candidate_events(application_id);
+  `);
+
+  // Per-application skills-screen submissions (candidate answers + AI scoring).
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS screen_submissions (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      application_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      screen_key TEXT NOT NULL,
+      answers TEXT NOT NULL DEFAULT '{}',
+      overall_score INTEGER,
+      dimension_scores TEXT NOT NULL DEFAULT '{}',
+      per_answer TEXT NOT NULL DEFAULT '[]',
+      follow_up_questions TEXT NOT NULL DEFAULT '[]',
+      method TEXT NOT NULL DEFAULT 'heuristic',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (application_id) REFERENCES applications(id),
+      FOREIGN KEY (job_id) REFERENCES jobs(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_screen_submissions_app ON screen_submissions(application_id);
+    CREATE INDEX IF NOT EXISTS idx_screen_submissions_job ON screen_submissions(job_id);
+  `);
+
+  // Migrations: add columns to databases created before these features existed.
+  if (!columnExists(database, "applications", "status")) {
+    database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");
+  }
+  if (!columnExists(database, "applications", "resume_text")) {
+    database.exec("ALTER TABLE applications ADD COLUMN resume_text TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "applications", "resume_skills")) {
+    database.exec("ALTER TABLE applications ADD COLUMN resume_skills TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!columnExists(database, "applications", "match_score")) {
+    database.exec("ALTER TABLE applications ADD COLUMN match_score INTEGER");
+  }
+  // Skills-screen + candidate-intelligence columns.
+  if (!columnExists(database, "applications", "applicant_location")) {
+    database.exec("ALTER TABLE applications ADD COLUMN applicant_location TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "applications", "desired_pay")) {
+    database.exec("ALTER TABLE applications ADD COLUMN desired_pay TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "applications", "screen_status")) {
+    database.exec("ALTER TABLE applications ADD COLUMN screen_status TEXT NOT NULL DEFAULT 'none'");
+  }
+  if (!columnExists(database, "applications", "screen_score")) {
+    database.exec("ALTER TABLE applications ADD COLUMN screen_score INTEGER");
+  }
+  if (!columnExists(database, "applications", "risk_level")) {
+    database.exec("ALTER TABLE applications ADD COLUMN risk_level TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "applications", "risk_flags")) {
+    database.exec("ALTER TABLE applications ADD COLUMN risk_flags TEXT NOT NULL DEFAULT '[]'");
+  }
+  if (!columnExists(database, "applications", "screen_summary")) {
+    database.exec("ALTER TABLE applications ADD COLUMN screen_summary TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "jobs", "screen_key")) {
+    database.exec("ALTER TABLE jobs ADD COLUMN screen_key TEXT NOT NULL DEFAULT ''");
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_applications_screen_score ON applications(screen_score)");
 }
 
 export function getDb(): Database.Database {
@@ -260,6 +394,7 @@ export function rowToOrganization(row: Record<string, unknown>): Organization {
     name: row.name as string,
     website: row.website as string,
     application_email: row.application_email as string,
+    brand_color: (row.brand_color as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
@@ -296,6 +431,7 @@ export function rowToJob(row: Record<string, unknown>): Job {
     company_name: row.company_name as string,
     reference_number: row.reference_number as string,
     status: row.status as JobStatus,
+    screen_key: (row.screen_key as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
     published_at: row.published_at as string | null,
@@ -314,6 +450,35 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     cover_letter: row.cover_letter as string,
     resume_filename: row.resume_filename as string,
     resume_content_type: row.resume_content_type as string,
+    status: (row.status as ApplicationStatus | undefined) ?? "new",
+    resume_skills: parseSkills(row.resume_skills),
+    match_score: row.match_score == null ? null : Number(row.match_score),
+    applicant_location: (row.applicant_location as string | undefined) ?? "",
+    desired_pay: (row.desired_pay as string | undefined) ?? "",
+    screen_status: (row.screen_status as ScreenStatus | undefined) ?? "none",
+    screen_score: row.screen_score == null ? null : Number(row.screen_score),
+    risk_level: (row.risk_level as RiskLevelValue | undefined) ?? "",
+    risk_flags: parseJson<RiskFlagRecord[]>(row.risk_flags, []),
+    screen_summary: parseJson<ScreenSummaryRecord | null>(row.screen_summary, null),
     created_at: row.created_at as string,
   };
+}
+
+function parseSkills(value: unknown): string[] {
+  if (typeof value !== "string" || value.length === 0) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseJson<T>(value: unknown, fallback: T): T {
+  if (typeof value !== "string" || value.length === 0) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
 }

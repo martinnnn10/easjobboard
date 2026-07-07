@@ -82,11 +82,11 @@ export function createJob(
       `INSERT INTO jobs (
         id, organization_id, slug, title, description, location, city, state, country, zip,
         employment_type, salary_min, salary_max, salary_currency, salary_period,
-        company_name, reference_number, status, created_at, updated_at, published_at, closed_at
+        company_name, reference_number, status, screen_key, created_at, updated_at, published_at, closed_at
       ) VALUES (
         @id, @organization_id, @slug, @title, @description, @location, @city, @state, @country, @zip,
         @employment_type, @salary_min, @salary_max, @salary_currency, @salary_period,
-        @company_name, @reference_number, @status, @created_at, @updated_at, @published_at, @closed_at
+        @company_name, @reference_number, @status, @screen_key, @created_at, @updated_at, @published_at, @closed_at
       )`,
     )
     .run({
@@ -108,6 +108,7 @@ export function createJob(
       company_name: (input.company_name?.trim() || companyName).trim(),
       reference_number: referenceNumber,
       status: input.status ?? "draft",
+      screen_key: input.screen_key?.trim() ?? "",
       created_at: timestamp,
       updated_at: timestamp,
       published_at: input.status === "published" ? timestamp : null,
@@ -155,6 +156,7 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
         company_name = @company_name,
         reference_number = @reference_number,
         status = @status,
+        screen_key = @screen_key,
         updated_at = @updated_at,
         published_at = @published_at,
         closed_at = @closed_at
@@ -178,6 +180,7 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
       company_name: (input.company_name ?? existing.company_name).trim(),
       reference_number: (input.reference_number ?? existing.reference_number).trim(),
       status: nextStatus,
+      screen_key: input.screen_key !== undefined ? input.screen_key.trim() : existing.screen_key,
       updated_at: timestamp,
       published_at: publishedAt,
       closed_at: closedAt,

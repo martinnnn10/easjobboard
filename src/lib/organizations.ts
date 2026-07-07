@@ -28,6 +28,15 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+const DEFAULT_BRAND_COLOR = "#2563eb";
+
+/** The org's brand color, falling back to the platform default blue. */
+export function getBrandColor(organization: Organization): string {
+  return /^#[0-9a-fA-F]{6}$/.test(organization.brand_color)
+    ? organization.brand_color
+    : DEFAULT_BRAND_COLOR;
+}
+
 export function getOrganizationById(id: string): Organization | null {
   const row = getDb().prepare("SELECT * FROM organizations WHERE id = ?").get(id);
   return row ? rowToOrganization(row as Record<string, unknown>) : null;
@@ -43,6 +52,7 @@ export function createOrganization(input: {
   slug?: string;
   website?: string;
   application_email: string;
+  brand_color?: string;
 }): Organization {
   const database = getDb();
   const id = randomUUID();
@@ -51,8 +61,8 @@ export function createOrganization(input: {
 
   database
     .prepare(
-      `INSERT INTO organizations (id, slug, name, website, application_email, created_at, updated_at)
-       VALUES (@id, @slug, @name, @website, @application_email, @created_at, @updated_at)`,
+      `INSERT INTO organizations (id, slug, name, website, application_email, brand_color, created_at, updated_at)
+       VALUES (@id, @slug, @name, @website, @application_email, @brand_color, @created_at, @updated_at)`,
     )
     .run({
       id,
@@ -60,6 +70,7 @@ export function createOrganization(input: {
       name: input.name.trim(),
       website: input.website?.trim() ?? "",
       application_email: input.application_email.trim(),
+      brand_color: input.brand_color?.trim() ?? "",
       created_at: timestamp,
       updated_at: timestamp,
     });

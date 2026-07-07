@@ -1,17 +1,33 @@
 import { NextResponse } from "next/server";
 import { createOrganization } from "@/lib/organizations";
 import { createUser, getUserByEmail } from "@/lib/users";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { createSessionToken } from "@/lib/session";
 import { setSessionCookie } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
+// Limit org/account creation per IP to curb automated signup abuse.
+const SIGNUP_RATE_LIMIT = 5;
+const SIGNUP_RATE_WINDOW_MS = 60 * 60 * 1000;
+
 export async function POST(request: Request) {
   try {
+    const limit = rateLimit(`signup:${getClientIp(request)}`, SIGNUP_RATE_LIMIT, SIGNUP_RATE_WINDOW_MS);
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Too many signups from this network. Please try again later." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+      );
+    }
+
     const body = await request.json();
     const orgName = String(body.orgName ?? "").trim();
     const orgSlug = String(body.orgSlug ?? "").trim();
     const website = String(body.website ?? "").trim();
+    const rawBrandColor = String(body.brandColor ?? "").trim();
+    // Only accept a well-formed hex color; anything else falls back to default.
+    const brandColor = /^#[0-9a-fA-F]{6}$/.test(rawBrandColor) ? rawBrandColor : "";
     const applicationEmail = String(body.applicationEmail ?? "").trim();
     const adminName = String(body.adminName ?? "").trim();
     const adminEmail = String(body.adminEmail ?? "").trim();
@@ -38,6 +54,7 @@ export async function POST(request: Request) {
       slug: orgSlug || undefined,
       website,
       application_email: applicationEmail,
+      brand_color: brandColor,
     });
 
     const user = createUser({
