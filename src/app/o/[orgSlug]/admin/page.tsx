@@ -9,9 +9,8 @@ import {
   listApplicationsByOrganization,
 } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
-import { getOrgUrl } from "@/lib/env";
 import { resumeTrapCandidates } from "@/lib/gap-analysis";
-import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
+import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getRoiStats } from "@/lib/roi";
 import { canWrite } from "@/lib/roles";
@@ -55,7 +54,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
             Google for Jobs.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-            <a href={getJobPublicUrl(orgSlug, publishedJob.slug)} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline">
+            <a href={`/o/${orgSlug}/jobs/${publishedJob.slug}`} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline">
               View posting
             </a>
             <a href={`/o/${orgSlug}/jobs/${publishedJob.slug}/flyer`} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline">
@@ -81,7 +80,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
               + New job
             </Link>
           ) : null}
-          <a href={getOrgUrl(orgSlug)} target="_blank" rel="noreferrer" className="btn-secondary">
+          <a href={`/o/${orgSlug}`} target="_blank" rel="noreferrer" className="btn-secondary">
             View careers page
           </a>
         </div>

@@ -5,7 +5,7 @@ import { DuplicateJobButton } from "@/components/DuplicateJobButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getJobScreeningSummaries } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
-import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
+import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 import { getScreenLabel } from "@/lib/screens";
@@ -126,7 +126,7 @@ export default async function JobsPage({ params }: PageProps) {
                         ) : null}
                         {job.status === "published" ? (
                           <>
-                            <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-brand-700 hover:underline" target="_blank" rel="noreferrer">
+                            <a href={`/o/${orgSlug}/jobs/${job.slug}`} className="text-brand-700 hover:underline" target="_blank" rel="noreferrer">
                               View
                             </a>
                             <a href={`/o/${orgSlug}/jobs/${job.slug}/flyer`} className="text-brand-700 hover:underline" target="_blank" rel="noreferrer">
