@@ -22,21 +22,32 @@ export type CandidateEvent = {
 
 export function recordCandidateEvent(input: {
   organization_id: string;
-  application_id: string;
+  /** Empty for person-level events logged directly on a candidate. */
+  application_id?: string;
   candidate_id?: string;
   type: CandidateEventType;
   detail: string;
   actor?: string;
 }): void {
   const database = getDb();
+  let applicationId = input.application_id ?? "";
   // Resolve the owning candidate from the application when the caller doesn't
   // supply it, so every event lands on the person's unified timeline.
   let candidateId = input.candidate_id ?? "";
-  if (!candidateId) {
+  if (!candidateId && applicationId) {
     const row = database
       .prepare("SELECT candidate_id FROM applications WHERE id = ?")
-      .get(input.application_id) as { candidate_id?: string } | undefined;
+      .get(applicationId) as { candidate_id?: string } | undefined;
     candidateId = row?.candidate_id ?? "";
+  }
+  // Person-level events (no application) anchor to the candidate's most recent
+  // application so the application_id foreign key stays valid; the timeline is
+  // queried by candidate_id, so the note still shows on the unified profile.
+  if (!applicationId && candidateId) {
+    const row = database
+      .prepare("SELECT id FROM applications WHERE candidate_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
+      .get(candidateId) as { id?: string } | undefined;
+    applicationId = row?.id ?? "";
   }
 
   database
@@ -47,7 +58,7 @@ export function recordCandidateEvent(input: {
     .run(
       randomUUID(),
       input.organization_id,
-      input.application_id,
+      applicationId,
       candidateId,
       input.type,
       input.detail,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CandidateCrmPanel } from "@/components/CandidateCrmPanel";
+import { CandidateNoteForm } from "@/components/CandidateNoteForm";
 import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
@@ -110,6 +111,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
 
           <section className="card space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Timeline</h2>
+            {writable ? <CandidateNoteForm orgSlug={orgSlug} candidateId={candidate.id} /> : null}
             {events.length === 0 ? (
               <p className="text-sm text-zinc-500">No activity yet.</p>
             ) : (
