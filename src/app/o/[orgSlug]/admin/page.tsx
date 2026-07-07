@@ -157,23 +157,23 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
 
       {/* THE RENEWAL NUMBER + the daily habit. */}
       <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className="hero-dark flex flex-col justify-center rounded-2xl px-6 py-6 ring-1 ring-white/10">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9FB6D4]">Interview-hours saved</p>
+        <div className="flex flex-col justify-center rounded-2xl border border-brand-200 bg-brand-50 px-6 py-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">Interview-hours saved</p>
           {roi.interviewsAvoided > 0 ? (
             <>
-              <p className="mt-2 text-4xl font-bold tracking-tight text-white">
+              <p className="mt-2 text-4xl font-bold tracking-tight text-zinc-900">
                 ${roi.dollarsSaved.toLocaleString()}
-                <span className="ml-2 text-lg font-semibold text-slate-300">
+                <span className="ml-2 text-lg font-semibold text-zinc-600">
                   · {roi.hoursSaved} interview-hours avoided
                 </span>
               </p>
-              <p className="mt-2 text-sm text-slate-300">
+              <p className="mt-2 text-sm text-zinc-600">
                 Your screens filtered out {roi.interviewsAvoided} weak or high-risk applicants ({roi.filterRatePercent}%
                 of everyone screened) before anyone wasted an interview on them.
               </p>
             </>
           ) : (
-            <p className="mt-2 text-sm text-slate-300">
+            <p className="mt-2 text-sm text-zinc-600">
               Once applicants complete screens, this shows the interview-hours and dollars the screen saved you by
               filtering weak candidates before you meet them.
             </p>

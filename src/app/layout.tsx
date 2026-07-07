@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+import { Brandmark } from "@/components/Brandmark";
 import { LogoutButton } from "@/components/LogoutButton";
 import { getSession } from "@/lib/auth";
 import { getPlatformCompany, getPlatformName } from "@/lib/env";
@@ -74,19 +75,16 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3.5">
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-[#7FB0E6]">
-                ⚡
-              </span>
-              <span className="text-lg font-bold tracking-tight text-zinc-900">{getPlatformName()}</span>
+            <Link href="/" className="flex items-center">
+              <Brandmark />
             </Link>
             <HeaderNav />
           </div>
         </header>
         <main className="flex-1">{children}</main>
-        <footer className="hero-dark mt-auto">
-          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-slate-400">
-            <span className="font-semibold text-white">{getPlatformName()}</span>
+        <footer className="mt-auto border-t border-zinc-200 bg-white">
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-zinc-500">
+            <Brandmark textClassName="text-base" markSize={26} />
             <span>Manufacturing hiring intelligence by {getPlatformCompany()}</span>
           </div>
         </footer>

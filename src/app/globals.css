@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f5f7;
-  --foreground: #0f172a;
+  --background: #f6f7f5;
+  --foreground: #18181b;
 }
 
 @theme inline {
@@ -12,14 +12,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Brand blue → premium electric steel. Remapping the blue-600/700/800 tokens
- * recolors every primary button, link, and accent app-wide from one place, so
- * the whole UI stays cohesive with the graphite hero. Lighter blues (50–400)
- * stay as gentle info tints for badges and rings. */
+/* EAS Recruit brand green. Remapping the blue-600/700/800 tokens recolors every
+ * primary button, link, and accent app-wide from one place, so the whole UI
+ * stays cohesive with the logo (silver-on-green mark, green "Recruit"
+ * wordmark). Values are dark enough that green links read on white and white
+ * button text meets WCAG AA. Lighter blues (50–400) stay as gentle info tints
+ * for badges and rings. The `brand` scale powers the logo lockup, focus rings,
+ * and the bright lime accents on the dark hero. */
 @theme {
-  --color-blue-600: #2f6e8c;
-  --color-blue-700: #2a6180;
-  --color-blue-800: #22546c;
+  --color-blue-600: #4a7d1e; /* links, focus borders (AA on white) */
+  --color-blue-700: #3f6b19; /* primary button ground (white text, AA) */
+  --color-blue-800: #345812; /* button hover */
+
+  --color-brand-50: #f1f7e6;
+  --color-brand-100: #e2efcb;
+  --color-brand-200: #cbe3a4;
+  --color-brand-300: #b0d579;
+  --color-brand-400: #8ec63f; /* bright lime — logo bolt + dark-hero accents */
+  --color-brand-500: #6fae2a;
+  --color-brand-600: #5c9022; /* "Recruit" wordmark green */
+  --color-brand-700: #4a761b;
+  --color-brand-800: #3d5917;
 }
 
 body {
@@ -42,12 +55,12 @@ h3 {
 
 /* ── Inputs ─────────────────────────────────────────────── */
 .field-input {
-  @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100;
+  @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-blue-600 focus:ring-4 focus:ring-brand-100;
 }
 
 /* ── Buttons ────────────────────────────────────────────── */
 .btn-primary {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:ring-4 focus:ring-blue-200 disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:ring-4 focus:ring-brand-200 disabled:opacity-60;
 }
 
 .btn-secondary {
@@ -86,6 +99,6 @@ h3 {
 /* ── Premium graphite ground with a faint electric-steel glow ─────── */
 .hero-dark {
   background-color: #131418;
-  background-image: radial-gradient(58% 78% at 18% -8%, rgba(120, 168, 224, 0.16), transparent 66%);
+  background-image: radial-gradient(58% 78% at 18% -8%, rgba(142, 198, 63, 0.16), transparent 66%);
   color: #f4f4f2;
 }
