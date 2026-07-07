@@ -38,6 +38,7 @@ export function createApplication(input: {
   desired_pay?: string;
   screen_status?: ScreenStatus;
   screen_score?: number | null;
+  screen_outcome?: string;
   risk_level?: RiskLevelValue;
   risk_flags?: RiskFlagRecord[];
   screen_summary?: ScreenSummaryRecord | null;
@@ -52,12 +53,12 @@ export function createApplication(input: {
         id, organization_id, job_id, applicant_name, applicant_email, applicant_phone,
         cover_letter, resume_filename, resume_content_type, resume_data,
         resume_text, resume_skills, match_score, match_method, applicant_location, desired_pay,
-        screen_status, screen_score, risk_level, risk_flags, screen_summary, created_at
+        screen_status, screen_score, screen_outcome, risk_level, risk_flags, screen_summary, created_at
       ) VALUES (
         @id, @organization_id, @job_id, @applicant_name, @applicant_email, @applicant_phone,
         @cover_letter, @resume_filename, @resume_content_type, @resume_data,
         @resume_text, @resume_skills, @match_score, @match_method, @applicant_location, @desired_pay,
-        @screen_status, @screen_score, @risk_level, @risk_flags, @screen_summary, @created_at
+        @screen_status, @screen_score, @screen_outcome, @risk_level, @risk_flags, @screen_summary, @created_at
       )`,
     )
     .run({
@@ -79,6 +80,7 @@ export function createApplication(input: {
       desired_pay: input.desired_pay ?? "",
       screen_status: input.screen_status ?? "none",
       screen_score: input.screen_score ?? null,
+      screen_outcome: input.screen_outcome ?? "",
       risk_level: input.risk_level ?? "",
       risk_flags: JSON.stringify(input.risk_flags ?? []),
       screen_summary: input.screen_summary ? JSON.stringify(input.screen_summary) : "",
@@ -159,13 +161,15 @@ export type ListApplicationsOptions = {
   limit?: number;
   /** Rows to skip (for pagination). Ignored unless `limit` is set. */
   offset?: number;
+  /** Filter by knockout verdict: "qualified" | "knockout". Omit for all. */
+  screenOutcome?: string;
 };
 
 export function listApplicationsByOrganization(
   organizationId: string,
   options: ListApplicationsOptions = {},
 ): ApplicationWithJob[] {
-  const { orderBy = "recent", limit, offset = 0 } = options;
+  const { orderBy = "recent", limit, offset = 0, screenOutcome } = options;
 
   // "score" ranks by practical skills-screen score first (nulls last), then
   // resume keyword match, then recency; "recent" is reverse-chronological.
@@ -175,6 +179,11 @@ export function listApplicationsByOrganization(
       : "a.created_at DESC";
 
   const params: Array<string | number> = [organizationId];
+  let whereClause = "";
+  if (screenOutcome) {
+    whereClause = " AND a.screen_outcome = ?";
+    params.push(screenOutcome);
+  }
   let limitClause = "";
   if (limit != null) {
     limitClause = " LIMIT ? OFFSET ?";
@@ -188,11 +197,11 @@ export function listApplicationsByOrganization(
       `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
               a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
               a.status, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
-              a.screen_status, a.screen_score, a.risk_level, a.risk_flags, a.screen_summary,
+              a.screen_status, a.screen_score, a.screen_outcome, a.risk_level, a.risk_flags, a.screen_summary,
               a.created_at, j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
-       WHERE a.organization_id = ?
+       WHERE a.organization_id = ?${whereClause}
        ORDER BY ${ordering}${limitClause}`,
     )
     .all(...params)
@@ -206,7 +215,13 @@ export function listApplicationsByOrganization(
     });
 }
 
-export function countApplicationsByOrganization(organizationId: string): number {
+export function countApplicationsByOrganization(organizationId: string, screenOutcome?: string): number {
+  if (screenOutcome) {
+    const row = getDb()
+      .prepare("SELECT COUNT(*) AS count FROM applications WHERE organization_id = ? AND screen_outcome = ?")
+      .get(organizationId, screenOutcome) as { count: number };
+    return row.count;
+  }
   const row = getDb()
     .prepare("SELECT COUNT(*) AS count FROM applications WHERE organization_id = ?")
     .get(organizationId) as { count: number };

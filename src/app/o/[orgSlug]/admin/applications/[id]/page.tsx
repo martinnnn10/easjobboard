@@ -149,11 +149,26 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
             <p className="section-label">Skills screen</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <ScreenScoreBadge score={application.screen_score} status={application.screen_status} size="lg" />
+              {application.screen_outcome === "knockout" ? (
+                <span className="inline-flex rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                  Auto-screened out
+                </span>
+              ) : application.screen_outcome === "qualified" ? (
+                <span className="inline-flex rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                  Qualified
+                </span>
+              ) : null}
               {benchmark && (benchmark.topPercent !== null || benchmark.pool > 0) ? (
                 <PercentileChip label={benchmarkLabel(benchmark)} strong={(benchmark.topPercent ?? 100) <= 25} />
               ) : null}
               {confidence ? <ConfidencePill level={confidence} /> : null}
             </div>
+            {application.screen_outcome === "knockout" ? (
+              <p className="mt-1.5 max-w-md text-xs text-red-700">
+                Did not clear the screen&apos;s passing bar or missed a safety-critical (must-pass) question. Advisory —
+                not auto-rejected.
+              </p>
+            ) : null}
           </div>
           <div>
             <p className="section-label">Resume match</p>

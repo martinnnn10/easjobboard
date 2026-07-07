@@ -52,6 +52,12 @@ export type ScreenQuestion = {
   /** Relative weight in the overall score. Troubleshooting/scenario weigh more. */
   weight: number;
   help?: string;
+  /**
+   * Safety-critical / knockout question: if answered and scored below the
+   * must-pass threshold, the applicant is auto-disqualified regardless of
+   * overall score. Used for lockout/tagout and zero-energy verification.
+   */
+  mustPass?: boolean;
 
   // multiple_choice / experience
   options?: string[];
@@ -83,6 +89,11 @@ export type ScreenTemplate = {
   label: string;
   shortLabel: string;
   blurb: string;
+  /**
+   * Minimum overall screen score (0–100) to be considered qualified. Applicants
+   * below this are auto-flagged as a knockout. Defaults to 0 (no threshold).
+   */
+  passingScore?: number;
   questions: ScreenQuestion[];
 };
 
@@ -92,6 +103,7 @@ const MAINTENANCE_TECH: ScreenTemplate = {
   label: "Maintenance Technician screen",
   shortLabel: "Maintenance Tech",
   blurb: "Tests hands-on electro-mechanical troubleshooting, PMs, and shop-floor safety.",
+  passingScore: 45,
   questions: [
     {
       id: "mt_starter_trip",
@@ -174,6 +186,7 @@ const MAINTENANCE_TECH: ScreenTemplate = {
       type: "multiple_choice",
       dimension: "safety",
       weight: 1.5,
+      mustPass: true,
       prompt: "Before reaching into a machine to clear a jam, you should first:",
       options: [
         "Be quick so the line keeps running",
@@ -216,6 +229,7 @@ const INDUSTRIAL_ELECTRICIAN: ScreenTemplate = {
   label: "Industrial Electrician screen",
   shortLabel: "Industrial Electrician",
   blurb: "Tests motor controls, VFDs, control-circuit troubleshooting, and electrical safety.",
+  passingScore: 50,
   questions: [
     {
       id: "ie_vfd_oc",
@@ -300,6 +314,7 @@ const INDUSTRIAL_ELECTRICIAN: ScreenTemplate = {
       type: "ranking",
       dimension: "safety",
       weight: 1.5,
+      mustPass: true,
       prompt: "Put the lockout/tagout steps in the correct order.",
       items: [
         { id: "notify", text: "Notify affected personnel" },
@@ -328,6 +343,7 @@ const CONTROLS_TECH: ScreenTemplate = {
   label: "Controls Technician screen",
   shortLabel: "Controls Technician",
   blurb: "Tests PLC/HMI/VFD troubleshooting, I/O reasoning, and working with logic online.",
+  passingScore: 50,
   questions: [
     {
       id: "ct_photoeye_stuck",
@@ -441,6 +457,7 @@ const MAINTENANCE_LEADER: ScreenTemplate = {
   label: "Maintenance Leader screen",
   shortLabel: "Maintenance Leader",
   blurb: "Tests reliability leadership, PM strategy, KPIs, and handling floor conflict.",
+  passingScore: 45,
   questions: [
     {
       id: "ml_repeat_downtime",

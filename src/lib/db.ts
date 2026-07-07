@@ -82,6 +82,8 @@ export type Application = {
   screen_status: ScreenStatus;
   /** 0–100 practical skills score — the PRIMARY ranking signal. */
   screen_score: number | null;
+  /** Knockout verdict from the screen's must-pass rules: "qualified" | "knockout" | "". */
+  screen_outcome: string;
   risk_level: RiskLevelValue;
   risk_flags: RiskFlagRecord[];
   /** Denormalized snapshot for fast card/list rendering (see ScreenSummary). */
@@ -371,6 +373,9 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "applications", "screen_score")) {
     database.exec("ALTER TABLE applications ADD COLUMN screen_score INTEGER");
   }
+  if (!columnExists(database, "applications", "screen_outcome")) {
+    database.exec("ALTER TABLE applications ADD COLUMN screen_outcome TEXT NOT NULL DEFAULT ''");
+  }
   if (!columnExists(database, "applications", "risk_level")) {
     database.exec("ALTER TABLE applications ADD COLUMN risk_level TEXT NOT NULL DEFAULT ''");
   }
@@ -486,6 +491,7 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     desired_pay: (row.desired_pay as string | undefined) ?? "",
     screen_status: (row.screen_status as ScreenStatus | undefined) ?? "none",
     screen_score: row.screen_score == null ? null : Number(row.screen_score),
+    screen_outcome: (row.screen_outcome as string | undefined) ?? "",
     risk_level: (row.risk_level as RiskLevelValue | undefined) ?? "",
     risk_flags: parseJson<RiskFlagRecord[]>(row.risk_flags, []),
     screen_summary: parseJson<ScreenSummaryRecord | null>(row.screen_summary, null),

@@ -54,6 +54,41 @@ export type ScreenResult = {
 const STRONG = 70;
 const WEAK = 45;
 
+/** Score below which a must-pass (safety-critical) question triggers a knockout. */
+const MUST_PASS_MIN = 50;
+
+export type KnockoutVerdict = {
+  /** true when the applicant clears the passing bar and every must-pass question. */
+  qualified: boolean;
+  /** Human-readable reasons for a knockout (empty when qualified). */
+  reasons: string[];
+};
+
+/**
+ * Evaluate a completed screen against its knockout rules: the template's overall
+ * passing score plus any must-pass (safety-critical) questions. Advisory — it
+ * flags and enables filtering; it never auto-rejects the applicant.
+ */
+export function evaluateKnockout(screenKey: string, result: ScreenResult): KnockoutVerdict {
+  const template = getScreen(screenKey);
+  if (!template) return { qualified: true, reasons: [] };
+
+  const reasons: string[] = [];
+  const passing = template.passingScore ?? 0;
+  if (passing > 0 && result.overallScore < passing) {
+    reasons.push(`Overall skills score ${result.overallScore} is below the passing bar of ${passing}.`);
+  }
+
+  for (const answer of result.perAnswer) {
+    const question = template.questions.find((q) => q.id === answer.questionId);
+    if (question?.mustPass && answer.answered && answer.score < MUST_PASS_MIN) {
+      reasons.push(`Missed safety-critical question: "${question.prompt}"`);
+    }
+  }
+
+  return { qualified: reasons.length === 0, reasons };
+}
+
 function clampScore(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }

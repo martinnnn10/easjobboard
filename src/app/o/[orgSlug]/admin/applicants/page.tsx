@@ -14,7 +14,7 @@ const PAGE_SIZE = 25;
 
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; screen?: string }>;
 };
 
 export default async function OrgApplicantsPage({ params, searchParams }: PageProps) {
@@ -24,16 +24,32 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
 
   await requireOrgSession(orgSlug);
 
-  const total = countApplicationsByOrganization(organization.id);
+  const sp = await searchParams;
+  const filter = sp.screen === "qualified" || sp.screen === "knockout" ? sp.screen : undefined;
+
+  const allCount = countApplicationsByOrganization(organization.id);
+  const qualifiedCount = countApplicationsByOrganization(organization.id, "qualified");
+  const knockoutCount = countApplicationsByOrganization(organization.id, "knockout");
+
+  const total = filter ? countApplicationsByOrganization(organization.id, filter) : allCount;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const requestedPage = Number.parseInt((await searchParams).page ?? "1", 10);
+  const requestedPage = Number.parseInt(sp.page ?? "1", 10);
   const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, requestedPage), pageCount) : 1;
 
   const applicants = listApplicationsByOrganization(organization.id, {
     orderBy: "score",
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
+    screenOutcome: filter,
   });
+
+  const tabs = [
+    { key: undefined as string | undefined, label: "All", count: allCount },
+    { key: "qualified", label: "Qualified", count: qualifiedCount },
+    { key: "knockout", label: "Auto-screened out", count: knockoutCount },
+  ];
+  const tabHref = (key: string | undefined) =>
+    `/o/${orgSlug}/admin/applicants${key ? `?screen=${key}` : ""}`;
 
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = (page - 1) * PAGE_SIZE + applicants.length;
@@ -51,8 +67,33 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((tab) => {
+          const active = filter === tab.key;
+          return (
+            <Link
+              key={tab.label}
+              href={tabHref(tab.key)}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? "border-zinc-900 bg-zinc-900 text-white"
+                  : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+              }`}
+            >
+              {tab.label} <span className={active ? "text-zinc-300" : "text-zinc-400"}>{tab.count}</span>
+            </Link>
+          );
+        })}
+      </div>
+
       {applicants.length === 0 ? (
-        <div className="card text-zinc-600">No applications yet.</div>
+        <div className="card text-zinc-600">
+          {filter === "knockout"
+            ? "No auto-screened-out applicants."
+            : filter === "qualified"
+              ? "No qualified applicants yet."
+              : "No applications yet."}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
           <table className="min-w-full text-left text-sm">
@@ -81,7 +122,18 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
                   <td className="px-4 py-3">
-                    <ScreenScoreBadge score={application.screen_score} status={application.screen_status} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <ScreenScoreBadge score={application.screen_score} status={application.screen_status} />
+                      {application.screen_outcome === "knockout" ? (
+                        <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                          Knockout
+                        </span>
+                      ) : application.screen_outcome === "qualified" ? (
+                        <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800">
+                          Qualified
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="mt-1 text-[11px] text-zinc-400">
                       {application.match_score === null ? "" : `Resume kw: ${application.match_score}%`}
                     </div>
@@ -117,7 +169,7 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
           <div className="flex gap-2">
             {page > 1 ? (
               <Link
-                href={`/o/${orgSlug}/admin/applicants?page=${page - 1}`}
+                href={`/o/${orgSlug}/admin/applicants?${filter ? `screen=${filter}&` : ""}page=${page - 1}`}
                 className="btn-secondary px-3 py-1.5"
               >
                 ← Previous
@@ -127,7 +179,7 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
             )}
             {page < pageCount ? (
               <Link
-                href={`/o/${orgSlug}/admin/applicants?page=${page + 1}`}
+                href={`/o/${orgSlug}/admin/applicants?${filter ? `screen=${filter}&` : ""}page=${page + 1}`}
                 className="btn-secondary px-3 py-1.5"
               >
                 Next →

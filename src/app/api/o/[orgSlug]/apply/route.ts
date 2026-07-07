@@ -14,7 +14,7 @@ import { getOrganizationBySlug } from "@/lib/organizations";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { extractResumeText } from "@/lib/resume-parsing";
 import { scoreResume } from "@/lib/scoring";
-import { scoreScreen, type ScreenAnswers } from "@/lib/screen-scoring";
+import { evaluateKnockout, scoreScreen, type ScreenAnswers } from "@/lib/screen-scoring";
 import { saveScreenSubmission } from "@/lib/screen-submissions";
 import { DIMENSION_LABELS, getScreen, type ScreenDimension } from "@/lib/screens";
 
@@ -159,6 +159,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     let screenStatus: "none" | "pending" | "completed" = screen ? "pending" : "none";
     let screenScore: number | null = null;
+    let screenOutcome = "";
     let screenResult = null;
     let screenSummary: ScreenSummary | null = null;
 
@@ -168,6 +169,10 @@ export async function POST(request: Request, context: RouteContext) {
         if (screenResult) {
           screenStatus = "completed";
           screenScore = screenResult.overallScore;
+          // Knockout gate: flag applicants who miss the passing bar or a
+          // safety-critical must-pass question (advisory — never auto-rejects).
+          const verdict = evaluateKnockout(job.screen_key, screenResult);
+          screenOutcome = verdict.qualified ? "qualified" : "knockout";
         }
       } catch (screenError) {
         console.error("Screen scoring failed (application still saved):", screenError);
@@ -242,6 +247,7 @@ export async function POST(request: Request, context: RouteContext) {
       desired_pay: desiredPay,
       screen_status: screenStatus,
       screen_score: screenScore,
+      screen_outcome: screenOutcome,
       risk_level: risk.level,
       risk_flags: risk.flags,
       screen_summary: screenSummary,
