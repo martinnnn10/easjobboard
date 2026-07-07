@@ -36,6 +36,7 @@ export default async function AdminLayout({ children, params }: LayoutProps) {
     { key: "pipeline", label: "Pipeline", href: `${base}/pipeline` },
     { key: "candidates", label: "Talent Pool", href: `${base}/candidates` },
     { key: "outreach", label: "Outreach", href: `${base}/outreach` },
+    { key: "reports", label: "Reports", href: `${base}/reports` },
   ];
   if (canManageTeam(user.role)) {
     nav.push({ key: "team", label: "Team", href: `${base}/team` });
