@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-const KINDS = ["Note", "Call", "Meeting", "Text"] as const;
+const KINDS = ["Note", "Call", "Email", "Meeting", "Text"] as const;
 
 export function CandidateNoteForm({ orgSlug, candidateId }: { orgSlug: string; candidateId: string }) {
   const router = useRouter();

@@ -257,7 +257,14 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-lg">🔍</span>
           <div>
             <p className="font-semibold text-zinc-900">Search the pool</p>
-            <p className="text-xs text-zinc-500">Everyone who ever applied</p>
+            <p className="text-xs text-zinc-500">Applicants + sourced candidates</p>
+          </div>
+        </Link>
+        <Link href={`/o/${orgSlug}/admin/outreach`} className="card card-hover flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-lg">📣</span>
+          <div>
+            <p className="font-semibold text-zinc-900">Outreach</p>
+            <p className="text-xs text-zinc-500">Nurture passive candidates</p>
           </div>
         </Link>
       </section>

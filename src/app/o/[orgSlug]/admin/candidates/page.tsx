@@ -4,13 +4,20 @@ import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { getPoolSkills, listCandidates } from "@/lib/candidates";
-import { CANDIDATE_CRM_STATUS_LABELS, CANDIDATE_SOURCE_LABELS, isCandidateCrmStatus, isCandidateSource } from "@/lib/candidate-meta";
+import {
+  CANDIDATE_CRM_STATUS_LABELS,
+  CANDIDATE_CRM_STATUSES,
+  CANDIDATE_SOURCE_LABELS,
+  CANDIDATE_SOURCES,
+  isCandidateCrmStatus,
+  isCandidateSource,
+} from "@/lib/candidate-meta";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ q?: string; skill?: string; stage?: string }>;
+  searchParams: Promise<{ q?: string; skill?: string; stage?: string; source?: string; cstatus?: string }>;
 };
 
 function isStage(value: string | undefined): value is ApplicationStatus {
@@ -29,9 +36,12 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
   const query = sp.q?.trim() || undefined;
   const skill = sp.skill?.trim() || undefined;
   const stage = isStage(sp.stage) ? sp.stage : undefined;
+  const source = isCandidateSource(sp.source) ? sp.source : undefined;
+  const crmStatus = isCandidateCrmStatus(sp.cstatus) ? sp.cstatus : undefined;
 
-  const candidates = listCandidates(organization.id, { query, skill, stage });
+  const candidates = listCandidates(organization.id, { query, skill, stage, source, crmStatus });
   const poolSkills = getPoolSkills(organization.id);
+  const hasFilters = Boolean(query || skill || stage || source || crmStatus);
 
   return (
     <div className="page-shell space-y-6">
@@ -87,11 +97,33 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
             ))}
           </select>
         </label>
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Source</span>
+          <select name="source" defaultValue={source ?? ""} className="field-input">
+            <option value="">Any source</option>
+            {CANDIDATE_SOURCES.map((s) => (
+              <option key={s} value={s}>
+                {CANDIDATE_SOURCE_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Outreach status</span>
+          <select name="cstatus" defaultValue={crmStatus ?? ""} className="field-input">
+            <option value="">Any status</option>
+            {CANDIDATE_CRM_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {CANDIDATE_CRM_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="flex items-end gap-2 sm:col-span-4">
           <button type="submit" className="btn-primary">
             Search
           </button>
-          {query || skill || stage ? (
+          {hasFilters ? (
             <Link href={`/o/${orgSlug}/admin/candidates`} className="btn-secondary">
               Clear
             </Link>

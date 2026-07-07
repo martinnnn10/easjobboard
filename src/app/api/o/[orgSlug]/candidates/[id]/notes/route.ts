@@ -2,14 +2,16 @@ import { NextResponse } from "next/server";
 import { requireOrgCapability } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
 import { canWrite } from "@/lib/roles";
-import { getCandidateById } from "@/lib/candidates";
+import { advanceCandidateAfterOutreach, getCandidateById } from "@/lib/candidates";
 import { recordCandidateEvent } from "@/lib/candidate-events";
 
 export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ orgSlug: string; id: string }> };
 
-const KINDS = new Set(["Note", "Call", "Meeting", "Text"]);
+const KINDS = new Set(["Note", "Call", "Email", "Meeting", "Text"]);
+// A logged Call/Email/Text/Meeting is an outreach touch; a plain Note is not.
+const OUTREACH_KINDS = new Set(["Call", "Email", "Meeting", "Text"]);
 
 /** Log a person-level note/activity directly on a candidate (no application). */
 export async function POST(request: Request, context: RouteContext) {
@@ -41,7 +43,12 @@ export async function POST(request: Request, context: RouteContext) {
       actor: user.name,
     });
 
-    return NextResponse.json({ ok: true });
+    // Logging an outreach touch nudges a fresh prospect to "contacted".
+    const advancedTo = OUTREACH_KINDS.has(kind)
+      ? advanceCandidateAfterOutreach(candidate.id, organization.id)
+      : "";
+
+    return NextResponse.json({ ok: true, crmStatus: advancedTo || undefined });
   } catch (error) {
     const authError = authErrorResponse(error);
     if (authError) return authError;

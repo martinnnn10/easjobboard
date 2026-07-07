@@ -41,6 +41,10 @@ export type CandidateFilters = {
   query?: string;
   skill?: string;
   stage?: ApplicationStatus;
+  /** Entry origin: applied|sourced|imported|referred|manual|unknown. */
+  source?: string;
+  /** Outreach status (see CANDIDATE_CRM_STATUSES). */
+  crmStatus?: string;
 };
 
 type Row = {
@@ -329,6 +333,14 @@ export function listCandidates(organizationId: string, filters: CandidateFilters
     clauses.push("EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.status = ?)");
     params.push(filters.stage);
   }
+  if (filters.source) {
+    clauses.push("c.source = ?");
+    params.push(filters.source);
+  }
+  if (filters.crmStatus) {
+    clauses.push("c.crm_status = ?");
+    params.push(filters.crmStatus);
+  }
 
   const rows = getDb()
     .prepare(`SELECT c.* FROM candidates c WHERE ${clauses.join(" AND ")} ORDER BY c.last_applied_at DESC`)
@@ -564,4 +576,33 @@ function dedupeStrings(values: string[]): string[] {
     }
   }
   return out;
+}
+
+// ─── Outreach worklist ─────────────────────────────────────────────────────
+
+/** Count of candidates in each outreach (crm_status) bucket for an org. */
+export function getOutreachCounts(organizationId: string): Record<string, number> {
+  const rows = getDb()
+    .prepare(
+      "SELECT crm_status, COUNT(*) AS count FROM candidates WHERE organization_id = ? AND crm_status != '' GROUP BY crm_status",
+    )
+    .all(organizationId) as Array<{ crm_status: string; count: number }>;
+  const out: Record<string, number> = {};
+  for (const row of rows) out[row.crm_status] = row.count;
+  return out;
+}
+
+/**
+ * Advance a candidate's outreach status one step when a touch is logged: a
+ * fresh "needs outreach" prospect becomes "contacted". Only nudges that single
+ * transition so it never overwrites a recruiter's explicit later status
+ * (replied/interested/etc.). Returns the new status, or "" if unchanged.
+ */
+export function advanceCandidateAfterOutreach(id: string, organizationId: string): string {
+  const row = getDb()
+    .prepare("SELECT crm_status FROM candidates WHERE id = ? AND organization_id = ?")
+    .get(id, organizationId) as { crm_status?: string } | undefined;
+  if (!row || row.crm_status !== "needs_outreach") return "";
+  setCandidateCrmStatus(id, organizationId, "contacted");
+  return "contacted";
 }
