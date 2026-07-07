@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { updateApplicationStatus } from "@/lib/applications";
-import { requireOrgSessionApi } from "@/lib/auth";
+import { requireOrgCapability } from "@/lib/auth";
+import { authErrorResponse } from "@/lib/api";
+import { canWrite } from "@/lib/roles";
 import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/application-status";
 
 export const runtime = "nodejs";
@@ -17,9 +19,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   let organization;
   let user;
   try {
-    ({ organization, user } = await requireOrgSessionApi(orgSlug));
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    ({ organization, user } = await requireOrgCapability(orgSlug, canWrite));
+  } catch (error) {
+    return authErrorResponse(error) ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: { status?: unknown };

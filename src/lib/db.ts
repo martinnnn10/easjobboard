@@ -26,6 +26,13 @@ export type User = {
   email: string;
   password_hash: string;
   name: string;
+  /** Access role: "owner" | "recruiter" | "viewer". */
+  role: string;
+  /**
+   * ISO timestamp; session tokens issued before this are rejected. Bumping it
+   * revokes every outstanding session for the user (server-side sign-out).
+   */
+  sessions_valid_after: string;
   created_at: string;
 };
 
@@ -388,6 +395,13 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "jobs", "screen_key")) {
     database.exec("ALTER TABLE jobs ADD COLUMN screen_key TEXT NOT NULL DEFAULT ''");
   }
+  // RBAC: existing single-user orgs become "owner"; multi-seat roles + revocation.
+  if (!columnExists(database, "users", "role")) {
+    database.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'");
+  }
+  if (!columnExists(database, "users", "sessions_valid_after")) {
+    database.exec("ALTER TABLE users ADD COLUMN sessions_valid_after TEXT NOT NULL DEFAULT ''");
+  }
   if (!columnExists(database, "jobs", "shift")) {
     database.exec("ALTER TABLE jobs ADD COLUMN shift TEXT NOT NULL DEFAULT ''");
   }
@@ -427,6 +441,8 @@ export function rowToUser(row: Record<string, unknown>): User {
     email: row.email as string,
     password_hash: row.password_hash as string,
     name: row.name as string,
+    role: (row.role as string | undefined) || "owner",
+    sessions_valid_after: (row.sessions_valid_after as string | undefined) ?? "",
     created_at: row.created_at as string,
   };
 }

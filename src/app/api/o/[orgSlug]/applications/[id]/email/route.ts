@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getApplicationDetail } from "@/lib/applications";
-import { requireOrgSessionApi } from "@/lib/auth";
+import { requireOrgCapability } from "@/lib/auth";
+import { authErrorResponse } from "@/lib/api";
+import { canWrite } from "@/lib/roles";
 import { recordCandidateEvent } from "@/lib/candidate-events";
 import { sendCandidateEmail } from "@/lib/email";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
@@ -19,9 +21,9 @@ export async function POST(request: Request, context: RouteContext) {
   let organization;
   let user;
   try {
-    ({ organization, user } = await requireOrgSessionApi(orgSlug));
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    ({ organization, user } = await requireOrgCapability(orgSlug, canWrite));
+  } catch (error) {
+    return authErrorResponse(error) ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const limit = rateLimit(`candidate-email:${orgSlug}:${getClientIp(request)}`, EMAIL_RATE_LIMIT, EMAIL_RATE_WINDOW_MS);

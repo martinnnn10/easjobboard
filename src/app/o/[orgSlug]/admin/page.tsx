@@ -22,6 +22,7 @@ import { resumeTrapCandidates } from "@/lib/gap-analysis";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getRoiStats } from "@/lib/roi";
+import { canManageTeam, isRole, ROLE_LABELS } from "@/lib/roles";
 import { getScreenLabel } from "@/lib/screens";
 
 type PageProps = {
@@ -92,7 +93,10 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
       ) : null}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="section-label">Signed in as {sessionContext.user.name}</p>
+          <p className="section-label">
+            Signed in as {sessionContext.user.name} ·{" "}
+            {isRole(sessionContext.user.role) ? ROLE_LABELS[sessionContext.user.role] : sessionContext.user.role}
+          </p>
           <h1 className="mt-1 text-3xl font-bold text-zinc-900">{organization.name}</h1>
           <p className="mt-1 text-sm text-zinc-600">Resumes are delivered to {organization.application_email}</p>
         </div>
@@ -103,6 +107,11 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <a href={getOrgUrl(orgSlug)} target="_blank" rel="noreferrer" className="btn-secondary">
             View careers page
           </a>
+          {canManageTeam(sessionContext.user.role) ? (
+            <Link href={`/o/${orgSlug}/admin/team`} className="btn-secondary">
+              Team
+            </Link>
+          ) : null}
           <LogoutButton orgSlug={orgSlug} />
         </div>
       </div>

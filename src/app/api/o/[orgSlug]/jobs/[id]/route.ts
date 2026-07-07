@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireOrgSessionApi } from "@/lib/auth";
+import { requireOrgCapability, requireOrgSessionApi } from "@/lib/auth";
+import { authErrorResponse } from "@/lib/api";
+import { canWrite } from "@/lib/roles";
 import { deleteJob, getJobById, updateJob } from "@/lib/jobs";
 import type { JobStatus } from "@/lib/db";
 
@@ -26,7 +28,7 @@ export async function PUT(request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization } = await requireOrgCapability(orgSlug, canWrite);
     const body = await request.json();
 
     const job = updateJob(id, organization.id, {
@@ -56,9 +58,8 @@ export async function PUT(request: Request, context: RouteContext) {
 
     return NextResponse.json({ job });
   } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authError = authErrorResponse(error);
+    if (authError) return authError;
     return NextResponse.json({ error: "Failed to update job" }, { status: 500 });
   }
 }
@@ -67,13 +68,13 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization } = await requireOrgCapability(orgSlug, canWrite);
     const deleted = deleteJob(id, organization.id);
     if (!deleted) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+    return authErrorResponse(error) ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }

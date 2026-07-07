@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireOrgSessionApi } from "@/lib/auth";
+import { requireOrgCapability, requireOrgSessionApi } from "@/lib/auth";
+import { authErrorResponse } from "@/lib/api";
+import { canWrite } from "@/lib/roles";
 import { createJob, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import type { JobStatus } from "@/lib/db";
@@ -23,7 +25,7 @@ export async function POST(request: Request, context: RouteContext) {
   const { orgSlug } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization } = await requireOrgCapability(orgSlug, canWrite);
     const body = await request.json();
 
     const job = createJob(organization.id, organization.name, {
@@ -49,9 +51,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json({ job }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authError = authErrorResponse(error);
+    if (authError) return authError;
     console.error("Create job failed:", error);
     return NextResponse.json({ error: "Failed to create job" }, { status: 500 });
   }

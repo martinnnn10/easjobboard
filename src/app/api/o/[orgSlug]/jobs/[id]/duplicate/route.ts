@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireOrgSessionApi } from "@/lib/auth";
+import { requireOrgCapability } from "@/lib/auth";
+import { authErrorResponse } from "@/lib/api";
+import { canWrite } from "@/lib/roles";
 import { duplicateJob } from "@/lib/jobs";
 
 export const runtime = "nodejs";
@@ -11,16 +13,13 @@ export async function POST(_request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    const { organization } = await requireOrgCapability(orgSlug, canWrite);
     const job = duplicateJob(id, organization.id);
     if (!job) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ job }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    return NextResponse.json({ error: "Failed to duplicate job" }, { status: 500 });
+    return authErrorResponse(error) ?? NextResponse.json({ error: "Failed to duplicate job" }, { status: 500 });
   }
 }

@@ -6,6 +6,8 @@ export type SessionData = {
   userId: string;
   orgId: string;
   orgSlug: string;
+  /** Epoch ms the token was issued — checked against the user's revocation cutoff. */
+  issuedAt: number;
 };
 
 /**
@@ -37,7 +39,7 @@ async function signPayload(payload: string, secret: string): Promise<string> {
     .join("");
 }
 
-function encodePayload(data: SessionData): string {
+function encodePayload(data: Omit<SessionData, "issuedAt">): string {
   return `user:${data.userId}:${data.orgId}:${data.orgSlug}:${Date.now()}`;
 }
 
@@ -52,10 +54,11 @@ function decodePayload(payload: string): SessionData | null {
     userId: match[1],
     orgId: match[2],
     orgSlug: match[3],
+    issuedAt,
   };
 }
 
-export async function createSessionToken(data: SessionData): Promise<string> {
+export async function createSessionToken(data: Omit<SessionData, "issuedAt">): Promise<string> {
   const payload = encodePayload(data);
   return `${payload}.${await signPayload(payload, getAuthSecret())}`;
 }

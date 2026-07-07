@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getApplicationResume } from "@/lib/applications";
-import { requireOrgSessionApi } from "@/lib/auth";
+import { requireOrgCapability } from "@/lib/auth";
+import { authErrorResponse } from "@/lib/api";
 import { sanitizeFilename } from "@/lib/file-validation";
+import { canViewResumes } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
@@ -11,7 +13,8 @@ export async function GET(_request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgSessionApi(orgSlug);
+    // Resumes are PII — viewers (read-only) cannot download them.
+    const { organization } = await requireOrgCapability(orgSlug, canViewResumes);
     const resume = getApplicationResume(id, organization.id);
     if (!resume) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -30,7 +33,7 @@ export async function GET(_request: Request, context: RouteContext) {
         "X-Content-Type-Options": "nosniff",
       },
     });
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  } catch (error) {
+    return authErrorResponse(error) ?? NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 }
