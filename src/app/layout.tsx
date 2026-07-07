@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { headers } from "next/headers";
 import Link from "next/link";
 import "./globals.css";
 import { Brandmark } from "@/components/Brandmark";
@@ -65,29 +66,39 @@ async function HeaderNav() {
   );
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Authenticated app pages (/o/[org]/admin/*) get the sidebar shell from the
+  // admin layout instead of the marketing header/footer.
+  const isAdmin = (await headers()).get("x-is-admin") === "1";
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3.5">
-            <Link href="/" className="flex items-center">
-              <Brandmark />
-            </Link>
-            <HeaderNav />
-          </div>
-        </header>
-        <main className="flex-1">{children}</main>
-        <footer className="mt-auto border-t border-zinc-200 bg-white">
-          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-zinc-500">
-            <Brandmark textClassName="text-base" markSize={26} />
-            <span>Manufacturing hiring intelligence by {getPlatformCompany()}</span>
-          </div>
-        </footer>
+        {isAdmin ? (
+          children
+        ) : (
+          <>
+            <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur">
+              <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3.5">
+                <Link href="/" className="flex items-center">
+                  <Brandmark />
+                </Link>
+                <HeaderNav />
+              </div>
+            </header>
+            <main className="flex-1">{children}</main>
+            <footer className="mt-auto border-t border-zinc-200 bg-white">
+              <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-8 text-sm text-zinc-500">
+                <Brandmark textClassName="text-base" markSize={26} />
+                <span>Manufacturing hiring intelligence by {getPlatformCompany()}</span>
+              </div>
+            </footer>
+          </>
+        )}
       </body>
     </html>
   );

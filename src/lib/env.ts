@@ -37,6 +37,38 @@ export function getSmtpConfig() {
   };
 }
 
+/**
+ * The origin we're willing to SHOW users (feeds, careers links, syndication).
+ * Prefers an explicitly configured public domain; falls back to BASE_URL only
+ * for generating functional feed URLs — display code should gate on
+ * hasConfiguredPublicDomain() so a raw IP / localhost is never shown.
+ */
+export function getPublicBaseUrl(): string {
+  const configured = process.env.PUBLIC_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  return (configured ?? getBaseUrl()).replace(/\/$/, "");
+}
+
+/**
+ * True only when the public origin is a real, shareable domain — not a raw IP
+ * (e.g. 34.x.x.x), not localhost, and not the dev default. Used to decide
+ * whether to display live links or a "set your domain" placeholder.
+ */
+export function hasConfiguredPublicDomain(): boolean {
+  const configured = process.env.PUBLIC_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (!configured) return false;
+  let host: string;
+  try {
+    host = new URL(configured).hostname;
+  } catch {
+    return false;
+  }
+  if (!host || host === "localhost" || host.endsWith(".local")) return false;
+  // Bare IPv4 address → not a shareable domain.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false;
+  // Must look like a real domain (has a dot, e.g. jobs.example.com).
+  return host.includes(".");
+}
+
 export function getOrgUrl(orgSlug: string): string {
   return `${getBaseUrl()}/o/${orgSlug}`;
 }
