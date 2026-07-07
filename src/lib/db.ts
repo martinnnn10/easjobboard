@@ -613,6 +613,13 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "candidates", "created_by")) {
     database.exec("ALTER TABLE candidates ADD COLUMN created_by TEXT NOT NULL DEFAULT ''");
   }
+  // Call-queue workflow: track outreach so the queue can surface who's due.
+  if (!columnExists(database, "candidates", "last_contacted_at")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN last_contacted_at TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "follow_up_at")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN follow_up_at TEXT NOT NULL DEFAULT ''");
+  }
   if (!columnExists(database, "jobs", "shift")) {
     database.exec("ALTER TABLE jobs ADD COLUMN shift TEXT NOT NULL DEFAULT ''");
   }
@@ -751,6 +758,10 @@ export type CandidateRecord = {
   crm_status: string;
   /** User id who added a sourced candidate ("" for organic applicants). */
   created_by: string;
+  /** ISO timestamp of the last logged call/text/email ("" if never). */
+  last_contacted_at: string;
+  /** ISO timestamp a follow-up is due ("" if none). */
+  follow_up_at: string;
   first_applied_at: string;
   last_applied_at: string;
   created_at: string;
@@ -775,6 +786,8 @@ export function rowToCandidate(row: Record<string, unknown>): CandidateRecord {
     source_url: (row.source_url as string | undefined) ?? "",
     crm_status: (row.crm_status as string | undefined) ?? "",
     created_by: (row.created_by as string | undefined) ?? "",
+    last_contacted_at: (row.last_contacted_at as string | undefined) ?? "",
+    follow_up_at: (row.follow_up_at as string | undefined) ?? "",
     first_applied_at: row.first_applied_at as string,
     last_applied_at: row.last_applied_at as string,
     created_at: row.created_at as string,

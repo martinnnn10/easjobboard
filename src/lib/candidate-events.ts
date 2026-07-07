@@ -7,7 +7,7 @@ import { getDb } from "./db";
  * instead of disconnected data points.
  */
 
-export type CandidateEventType = "applied" | "stage_change" | "note" | "email_sent" | "sourced";
+export type CandidateEventType = "applied" | "stage_change" | "note" | "email_sent" | "sourced" | "call";
 
 export type CandidateEvent = {
   id: string;

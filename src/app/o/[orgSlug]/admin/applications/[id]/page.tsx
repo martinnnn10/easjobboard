@@ -33,6 +33,7 @@ const EVENT_ICONS: Record<CandidateEvent["type"], string> = {
   note: "📝",
   email_sent: "✉️",
   sourced: "🔎",
+  call: "📞",
 };
 
 const ANSWER_BAND: Record<string, string> = {

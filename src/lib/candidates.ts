@@ -578,6 +578,29 @@ function dedupeStrings(values: string[]): string[] {
   return out;
 }
 
+export type CandidateContactState = { last_contacted_at: string; follow_up_at: string };
+
+/** Bulk last-contacted / follow-up state for a set of candidate ids (Call Queue). */
+export function getCandidateContactStates(
+  organizationId: string,
+  ids: string[],
+): Record<string, CandidateContactState> {
+  const out: Record<string, CandidateContactState> = {};
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return out;
+  const placeholders = unique.map(() => "?").join(",");
+  const rows = getDb()
+    .prepare(
+      `SELECT id, last_contacted_at, follow_up_at FROM candidates
+       WHERE organization_id = ? AND id IN (${placeholders})`,
+    )
+    .all(organizationId, ...unique) as Array<{ id: string; last_contacted_at: string; follow_up_at: string }>;
+  for (const row of rows) {
+    out[row.id] = { last_contacted_at: row.last_contacted_at ?? "", follow_up_at: row.follow_up_at ?? "" };
+  }
+  return out;
+}
+
 // ─── Outreach worklist ─────────────────────────────────────────────────────
 
 /** Count of candidates in each outreach (crm_status) bucket for an org. */

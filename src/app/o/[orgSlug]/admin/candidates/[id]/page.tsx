@@ -22,6 +22,7 @@ const EVENT_ICON: Record<CandidateEventType, string> = {
   note: "📝",
   email_sent: "✉",
   sourced: "🔎",
+  call: "📞",
 };
 
 export default async function CandidateProfilePage({ params }: PageProps) {
