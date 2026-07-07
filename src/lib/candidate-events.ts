@@ -13,6 +13,7 @@ export type CandidateEvent = {
   id: string;
   organization_id: string;
   application_id: string;
+  candidate_id: string;
   type: CandidateEventType;
   detail: string;
   actor: string;
@@ -22,19 +23,32 @@ export type CandidateEvent = {
 export function recordCandidateEvent(input: {
   organization_id: string;
   application_id: string;
+  candidate_id?: string;
   type: CandidateEventType;
   detail: string;
   actor?: string;
 }): void {
-  getDb()
+  const database = getDb();
+  // Resolve the owning candidate from the application when the caller doesn't
+  // supply it, so every event lands on the person's unified timeline.
+  let candidateId = input.candidate_id ?? "";
+  if (!candidateId) {
+    const row = database
+      .prepare("SELECT candidate_id FROM applications WHERE id = ?")
+      .get(input.application_id) as { candidate_id?: string } | undefined;
+    candidateId = row?.candidate_id ?? "";
+  }
+
+  database
     .prepare(
-      `INSERT INTO candidate_events (id, organization_id, application_id, type, detail, actor, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO candidate_events (id, organization_id, application_id, candidate_id, type, detail, actor, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       randomUUID(),
       input.organization_id,
       input.application_id,
+      candidateId,
       input.type,
       input.detail,
       input.actor ?? "",
@@ -50,4 +64,15 @@ export function listCandidateEvents(applicationId: string, organizationId: strin
        ORDER BY created_at DESC, rowid DESC`,
     )
     .all(applicationId, organizationId) as CandidateEvent[];
+}
+
+/** Unified timeline for a candidate across all their applications. */
+export function listEventsByCandidate(candidateId: string, organizationId: string): CandidateEvent[] {
+  return getDb()
+    .prepare(
+      `SELECT * FROM candidate_events
+       WHERE candidate_id = ? AND organization_id = ?
+       ORDER BY created_at DESC, rowid DESC`,
+    )
+    .all(candidateId, organizationId) as CandidateEvent[];
 }

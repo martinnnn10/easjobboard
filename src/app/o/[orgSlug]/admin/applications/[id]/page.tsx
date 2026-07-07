@@ -123,6 +123,14 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
               {new Date(application.created_at).toLocaleDateString()}
               {application.desired_pay ? ` · wants ${application.desired_pay}` : ""}
             </p>
+            {application.candidate_id ? (
+              <Link
+                href={`/o/${orgSlug}/admin/candidates/${application.candidate_id}`}
+                className="mt-1 inline-block text-sm font-medium text-blue-600 hover:underline"
+              >
+                View full candidate profile →
+              </Link>
+            ) : null}
           </div>
           <div className="flex flex-col items-end gap-2">
             {writable ? (

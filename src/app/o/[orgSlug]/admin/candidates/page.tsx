@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
-import { getPoolSkills, searchCandidates } from "@/lib/candidates";
+import { getPoolSkills, listCandidates } from "@/lib/candidates";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
 type PageProps = {
@@ -27,7 +27,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
   const skill = sp.skill?.trim() || undefined;
   const stage = isStage(sp.stage) ? sp.stage : undefined;
 
-  const candidates = searchCandidates(organization.id, { query, skill, stage });
+  const candidates = listCandidates(organization.id, { query, skill, stage });
   const poolSkills = getPoolSkills(organization.id);
 
   return (
@@ -95,14 +95,33 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
       ) : (
         <div className="space-y-3">
           {candidates.map((candidate) => (
-            <div key={candidate.email} className="card space-y-3">
+            <div key={candidate.id} className="card space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-zinc-900">{candidate.name}</p>
+                <div className="min-w-0">
+                  <Link
+                    href={`/o/${orgSlug}/admin/candidates/${candidate.id}`}
+                    className="font-semibold text-zinc-900 hover:text-blue-700 hover:underline"
+                  >
+                    {candidate.name || candidate.email}
+                  </Link>
                   <p className="text-sm text-zinc-500">
                     {candidate.email}
                     {candidate.phone ? ` · ${candidate.phone}` : ""}
                   </p>
+                  {candidate.tags.length > 0 || candidate.ownerName ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {candidate.tags.map((tag) => (
+                        <span key={tag} className="rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-white">
+                          {tag}
+                        </span>
+                      ))}
+                      {candidate.ownerName ? (
+                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                          Owner: {candidate.ownerName}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="text-right">
                   <ScreenScoreBadge

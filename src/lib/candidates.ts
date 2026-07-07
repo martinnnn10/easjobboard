@@ -1,4 +1,10 @@
-import { getDb, type ApplicationStatus, type ScreenStatus } from "./db";
+import { randomUUID } from "crypto";
+import { getDb, rowToCandidate, type ApplicationStatus, type CandidateRecord, type ScreenStatus } from "./db";
+import { getUserById } from "./users";
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
 
 /**
  * Cross-job candidate directory: dedupes applications by email so the same
@@ -166,4 +172,200 @@ export function getPoolSkills(organizationId: string): string[] {
     for (const skill of parseSkills(row.resume_skills)) skills.add(skill);
   }
   return Array.from(skills).sort((a, b) => a.localeCompare(b));
+}
+
+// ─── Persistent candidate (person) entity ──────────────────────────────────
+
+export type CandidateWithApps = CandidateRecord & {
+  applications: CandidateApplication[];
+  bestScore: number | null;
+  bestScreenScore: number | null;
+  ownerName: string;
+};
+
+/**
+ * Insert or update the persistent candidate for (org, email). Called on every
+ * application so a person accumulates one profile across jobs. Returns the id.
+ */
+export function upsertCandidate(input: {
+  organization_id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  location?: string;
+  skills?: string[];
+  appliedAt?: string;
+}): string {
+  const database = getDb();
+  const email = input.email.trim().toLowerCase();
+  const at = input.appliedAt ?? nowIso();
+  const now = nowIso();
+
+  const existing = database
+    .prepare("SELECT id, skills FROM candidates WHERE organization_id = ? AND email = ?")
+    .get(input.organization_id, email) as { id: string; skills: string } | undefined;
+
+  if (existing) {
+    const merged = new Set<string>(parseSkills(existing.skills));
+    for (const s of input.skills ?? []) merged.add(s);
+    database
+      .prepare(
+        `UPDATE candidates SET name = ?, phone = ?, location = ?, skills = ?, last_applied_at = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        input.name.trim() || email,
+        input.phone?.trim() ?? "",
+        input.location?.trim() ?? "",
+        JSON.stringify([...merged]),
+        at,
+        now,
+        existing.id,
+      );
+    return existing.id;
+  }
+
+  const id = randomUUID();
+  database
+    .prepare(
+      `INSERT INTO candidates (id, organization_id, email, name, phone, location, skills, tags,
+         owner_user_id, first_applied_at, last_applied_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '[]', '', ?, ?, ?, ?)`,
+    )
+    .run(
+      id,
+      input.organization_id,
+      email,
+      input.name.trim() || email,
+      input.phone?.trim() ?? "",
+      input.location?.trim() ?? "",
+      JSON.stringify(input.skills ?? []),
+      at,
+      at,
+      now,
+      now,
+    );
+  return id;
+}
+
+export function getCandidateById(id: string, organizationId: string): CandidateRecord | null {
+  const row = getDb()
+    .prepare("SELECT * FROM candidates WHERE id = ? AND organization_id = ?")
+    .get(id, organizationId);
+  return row ? rowToCandidate(row as Record<string, unknown>) : null;
+}
+
+function applicationsForCandidate(candidateId: string): CandidateApplication[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT a.id, a.status, a.match_score, a.screen_score, a.screen_status, a.resume_filename, a.created_at,
+              j.title AS job_title, j.slug AS job_slug
+       FROM applications a JOIN jobs j ON j.id = a.job_id
+       WHERE a.candidate_id = ? ORDER BY a.created_at DESC`,
+    )
+    .all(candidateId) as Array<{
+    id: string;
+    status: ApplicationStatus;
+    match_score: number | null;
+    screen_score: number | null;
+    screen_status: ScreenStatus;
+    resume_filename: string;
+    created_at: string;
+    job_title: string;
+    job_slug: string;
+  }>;
+
+  return rows.map((r) => ({
+    applicationId: r.id,
+    jobTitle: r.job_title,
+    jobSlug: r.job_slug,
+    status: r.status,
+    matchScore: r.match_score,
+    screenScore: r.screen_score,
+    screenStatus: r.screen_status ?? "none",
+    resumeFilename: r.resume_filename,
+    createdAt: r.created_at,
+  }));
+}
+
+function enrich(candidate: CandidateRecord): CandidateWithApps {
+  const applications = applicationsForCandidate(candidate.id);
+  const bestScore = applications.reduce<number | null>(
+    (best, a) => (a.matchScore != null && (best == null || a.matchScore > best) ? a.matchScore : best),
+    null,
+  );
+  const bestScreenScore = applications.reduce<number | null>(
+    (best, a) => (a.screenScore != null && (best == null || a.screenScore > best) ? a.screenScore : best),
+    null,
+  );
+  const owner = candidate.owner_user_id ? getUserById(candidate.owner_user_id) : null;
+  return { ...candidate, applications, bestScore, bestScreenScore, ownerName: owner?.name ?? "" };
+}
+
+export function getCandidateWithApplications(id: string, organizationId: string): CandidateWithApps | null {
+  const candidate = getCandidateById(id, organizationId);
+  return candidate ? enrich(candidate) : null;
+}
+
+/** Table-backed candidate listing with the same filters as the in-memory search. */
+export function listCandidates(organizationId: string, filters: CandidateFilters = {}): CandidateWithApps[] {
+  const clauses = ["c.organization_id = ?"];
+  const params: Array<string> = [organizationId];
+
+  if (filters.query) {
+    clauses.push(
+      "(c.name LIKE ? OR c.email LIKE ? OR EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.resume_text LIKE ?))",
+    );
+    const like = `%${filters.query}%`;
+    params.push(like, like, like);
+  }
+  if (filters.skill) {
+    clauses.push("c.skills LIKE ?");
+    params.push(`%${JSON.stringify(filters.skill).slice(1, -1)}%`);
+  }
+  if (filters.stage) {
+    clauses.push("EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.status = ?)");
+    params.push(filters.stage);
+  }
+
+  const rows = getDb()
+    .prepare(`SELECT c.* FROM candidates c WHERE ${clauses.join(" AND ")} ORDER BY c.last_applied_at DESC`)
+    .all(...params) as Array<Record<string, unknown>>;
+
+  return rows
+    .map((row) => enrich(rowToCandidate(row)))
+    .sort((a, b) => {
+      const screenDiff = (b.bestScreenScore ?? -1) - (a.bestScreenScore ?? -1);
+      if (screenDiff !== 0) return screenDiff;
+      const scoreDiff = (b.bestScore ?? -1) - (a.bestScore ?? -1);
+      if (scoreDiff !== 0) return scoreDiff;
+      return b.last_applied_at.localeCompare(a.last_applied_at);
+    });
+}
+
+/** Replace a candidate's tags (trimmed, de-duplicated, capped). */
+export function setCandidateTags(id: string, organizationId: string, tags: string[]): boolean {
+  const seen = new Set<string>();
+  const clean: string[] = [];
+  for (const raw of tags) {
+    const t = String(raw).trim().slice(0, 40);
+    const key = t.toLowerCase();
+    if (t && !seen.has(key)) {
+      seen.add(key);
+      clean.push(t);
+    }
+    if (clean.length >= 25) break;
+  }
+  const result = getDb()
+    .prepare("UPDATE candidates SET tags = ?, updated_at = ? WHERE id = ? AND organization_id = ?")
+    .run(JSON.stringify(clean), nowIso(), id, organizationId);
+  return result.changes > 0;
+}
+
+/** Assign (or clear, with "") the owning recruiter. */
+export function setCandidateOwner(id: string, organizationId: string, ownerUserId: string): boolean {
+  const result = getDb()
+    .prepare("UPDATE candidates SET owner_user_id = ?, updated_at = ? WHERE id = ? AND organization_id = ?")
+    .run(ownerUserId, nowIso(), id, organizationId);
+  return result.changes > 0;
 }

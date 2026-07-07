@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { recordCandidateEvent } from "./candidate-events";
+import { upsertCandidate } from "./candidates";
 import {
   getDb,
   rowToApplication,
@@ -46,16 +47,29 @@ export function createApplication(input: {
 }): Application {
   const database = getDb();
   const id = randomUUID();
+  const appliedAt = input.created_at ?? nowIso();
+
+  // Attach to (or create) the persistent candidate for this person, so their
+  // applications, timeline, tags, and owner live on one profile across jobs.
+  const candidateId = upsertCandidate({
+    organization_id: input.organization_id,
+    email: input.applicant_email,
+    name: input.applicant_name,
+    phone: input.applicant_phone,
+    location: input.applicant_location,
+    skills: input.resume_skills,
+    appliedAt,
+  });
 
   database
     .prepare(
       `INSERT INTO applications (
-        id, organization_id, job_id, applicant_name, applicant_email, applicant_phone,
+        id, organization_id, job_id, candidate_id, applicant_name, applicant_email, applicant_phone,
         cover_letter, resume_filename, resume_content_type, resume_data,
         resume_text, resume_skills, match_score, match_method, applicant_location, desired_pay,
         screen_status, screen_score, screen_outcome, risk_level, risk_flags, screen_summary, created_at
       ) VALUES (
-        @id, @organization_id, @job_id, @applicant_name, @applicant_email, @applicant_phone,
+        @id, @organization_id, @job_id, @candidate_id, @applicant_name, @applicant_email, @applicant_phone,
         @cover_letter, @resume_filename, @resume_content_type, @resume_data,
         @resume_text, @resume_skills, @match_score, @match_method, @applicant_location, @desired_pay,
         @screen_status, @screen_score, @screen_outcome, @risk_level, @risk_flags, @screen_summary, @created_at
@@ -65,6 +79,7 @@ export function createApplication(input: {
       id,
       organization_id: input.organization_id,
       job_id: input.job_id,
+      candidate_id: candidateId,
       applicant_name: input.applicant_name,
       applicant_email: input.applicant_email,
       applicant_phone: input.applicant_phone,
@@ -93,6 +108,7 @@ export function createApplication(input: {
   recordCandidateEvent({
     organization_id: input.organization_id,
     application_id: id,
+    candidate_id: candidateId,
     type: "applied",
     detail: jobTitle ? `Applied to ${jobTitle}` : "Application received",
     actor: input.applicant_name,

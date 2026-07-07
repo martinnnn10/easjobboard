@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 
@@ -78,6 +79,8 @@ export type Application = {
   resume_filename: string;
   resume_content_type: string;
   status: ApplicationStatus;
+  /** The persistent candidate (person) this application belongs to. */
+  candidate_id: string;
   resume_skills: string[];
   match_score: number | null;
   /** How match_score was computed: "llm" (semantic) or "heuristic" (keyword). "" = not scored. */
@@ -217,6 +220,105 @@ function migrateLegacyJobs(database: Database.Database): void {
   database.exec("ALTER TABLE jobs_migrated RENAME TO jobs;");
 }
 
+function mergeSkillJson(a: string, b: string): string {
+  const parse = (v: string): string[] => {
+    try {
+      const p = JSON.parse(v);
+      return Array.isArray(p) ? p.filter((s): s is string => typeof s === "string") : [];
+    } catch {
+      return [];
+    }
+  };
+  const set = new Set([...parse(a), ...parse(b)]);
+  return JSON.stringify([...set]);
+}
+
+/**
+ * One-time backfill: group unlinked applications by (org, lowercased email) into
+ * persistent candidate rows, then stamp candidate_id onto each application and
+ * its events. Idempotent — only touches applications whose candidate_id is "".
+ */
+function backfillCandidates(database: Database.Database): void {
+  const pending = database
+    .prepare("SELECT COUNT(*) AS c FROM applications WHERE candidate_id = ''")
+    .get() as { c: number };
+  if (pending.c === 0) return;
+
+  const rows = database
+    .prepare(
+      `SELECT id, organization_id, applicant_name, applicant_email, applicant_phone,
+              applicant_location, resume_skills, created_at
+       FROM applications WHERE candidate_id = '' ORDER BY created_at ASC`,
+    )
+    .all() as Array<{
+    id: string;
+    organization_id: string;
+    applicant_name: string;
+    applicant_email: string;
+    applicant_phone: string;
+    applicant_location: string;
+    resume_skills: string;
+    created_at: string;
+  }>;
+
+  const findCandidate = database.prepare(
+    "SELECT id, skills FROM candidates WHERE organization_id = ? AND email = ?",
+  );
+  const insertCandidate = database.prepare(
+    `INSERT INTO candidates (id, organization_id, email, name, phone, location, skills, tags,
+       owner_user_id, first_applied_at, last_applied_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, '[]', '', ?, ?, ?, ?)`,
+  );
+  const updateCandidate = database.prepare(
+    "UPDATE candidates SET name = ?, phone = ?, location = ?, skills = ?, last_applied_at = ?, updated_at = ? WHERE id = ?",
+  );
+  const linkApplication = database.prepare("UPDATE applications SET candidate_id = ? WHERE id = ?");
+  const linkEvents = database.prepare("UPDATE candidate_events SET candidate_id = ? WHERE application_id = ?");
+
+  const run = database.transaction(() => {
+    for (const row of rows) {
+      const email = row.applicant_email.trim().toLowerCase();
+      const now = row.created_at;
+      const existing = findCandidate.get(row.organization_id, email) as
+        | { id: string; skills: string }
+        | undefined;
+
+      let candidateId: string;
+      if (existing) {
+        candidateId = existing.id;
+        // Rows are oldest-first, so the latest name/phone/location wins.
+        updateCandidate.run(
+          row.applicant_name,
+          row.applicant_phone || "",
+          row.applicant_location || "",
+          mergeSkillJson(existing.skills, row.resume_skills || "[]"),
+          now,
+          now,
+          candidateId,
+        );
+      } else {
+        candidateId = randomUUID();
+        insertCandidate.run(
+          candidateId,
+          row.organization_id,
+          email,
+          row.applicant_name,
+          row.applicant_phone || "",
+          row.applicant_location || "",
+          row.resume_skills || "[]",
+          now,
+          now,
+          now,
+          now,
+        );
+      }
+      linkApplication.run(candidateId, row.id);
+      linkEvents.run(candidateId, row.id);
+    }
+  });
+  run();
+}
+
 function initDb(database: Database.Database): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS organizations (
@@ -327,6 +429,31 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_candidate_events_app ON candidate_events(application_id);
   `);
 
+  // Persistent candidate (person) entity — one row per person per org, keyed by
+  // email. Applications and events link to it so a candidate has a single
+  // profile, unified timeline, tags, and owner across every job they apply to.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS candidates (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      name TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      skills TEXT NOT NULL DEFAULT '[]',
+      tags TEXT NOT NULL DEFAULT '[]',
+      owner_user_id TEXT NOT NULL DEFAULT '',
+      first_applied_at TEXT NOT NULL,
+      last_applied_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(organization_id, email),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_candidates_org ON candidates(organization_id);
+  `);
+
   // Per-application skills-screen submissions (candidate answers + AI scoring).
   database.exec(`
     CREATE TABLE IF NOT EXISTS screen_submissions (
@@ -402,6 +529,14 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "users", "sessions_valid_after")) {
     database.exec("ALTER TABLE users ADD COLUMN sessions_valid_after TEXT NOT NULL DEFAULT ''");
   }
+  // Persistent candidate CRM: link applications + events to a candidate entity.
+  if (!columnExists(database, "applications", "candidate_id")) {
+    database.exec("ALTER TABLE applications ADD COLUMN candidate_id TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidate_events", "candidate_id")) {
+    database.exec("ALTER TABLE candidate_events ADD COLUMN candidate_id TEXT NOT NULL DEFAULT ''");
+  }
+  backfillCandidates(database);
   if (!columnExists(database, "jobs", "shift")) {
     database.exec("ALTER TABLE jobs ADD COLUMN shift TEXT NOT NULL DEFAULT ''");
   }
@@ -500,6 +635,7 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     resume_filename: row.resume_filename as string,
     resume_content_type: row.resume_content_type as string,
     status: (row.status as ApplicationStatus | undefined) ?? "new",
+    candidate_id: (row.candidate_id as string | undefined) ?? "",
     resume_skills: parseSkills(row.resume_skills),
     match_score: row.match_score == null ? null : Number(row.match_score),
     match_method: (row.match_method as string | undefined) ?? "",
@@ -512,6 +648,40 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     risk_flags: parseJson<RiskFlagRecord[]>(row.risk_flags, []),
     screen_summary: parseJson<ScreenSummaryRecord | null>(row.screen_summary, null),
     created_at: row.created_at as string,
+  };
+}
+
+export type CandidateRecord = {
+  id: string;
+  organization_id: string;
+  email: string;
+  name: string;
+  phone: string;
+  location: string;
+  skills: string[];
+  tags: string[];
+  owner_user_id: string;
+  first_applied_at: string;
+  last_applied_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export function rowToCandidate(row: Record<string, unknown>): CandidateRecord {
+  return {
+    id: row.id as string,
+    organization_id: row.organization_id as string,
+    email: row.email as string,
+    name: (row.name as string | undefined) ?? "",
+    phone: (row.phone as string | undefined) ?? "",
+    location: (row.location as string | undefined) ?? "",
+    skills: parseSkills(row.skills),
+    tags: parseSkills(row.tags),
+    owner_user_id: (row.owner_user_id as string | undefined) ?? "",
+    first_applied_at: row.first_applied_at as string,
+    last_applied_at: row.last_applied_at as string,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
   };
 }
 
