@@ -87,6 +87,42 @@ export async function sendCandidateEmail(input: {
   });
 }
 
+/**
+ * Invite email for a newly added teammate: their sign-in link + temporary
+ * password. Sent from the org; replies route to the org's hiring inbox.
+ */
+export async function sendTeamInviteEmail(input: {
+  organization: Organization;
+  to: string;
+  name: string;
+  tempPassword: string;
+  loginUrl: string;
+  inviterName: string;
+}): Promise<void> {
+  const { smtp, transporter } = createTransport();
+  const firstName = input.name.split(/\s+/)[0] || "there";
+
+  await transporter.sendMail({
+    from: `"${input.organization.name}" <${smtp.fromEmail}>`,
+    to: input.to,
+    replyTo: input.organization.application_email,
+    subject: `You've been added to ${input.organization.name} on ${getPlatformName()}`,
+    text: [
+      `Hi ${firstName},`,
+      "",
+      `${input.inviterName} added you to ${input.organization.name} on ${getPlatformName()}.`,
+      "",
+      `Sign in here: ${input.loginUrl}`,
+      `Email: ${input.to}`,
+      `Temporary password: ${input.tempPassword}`,
+      "",
+      "Keep this password private. You can sign in with it right away.",
+      "",
+      `— ${input.organization.name}`,
+    ].join("\n"),
+  });
+}
+
 type ConfirmationEmailInput = {
   organization: Organization;
   job: Job;

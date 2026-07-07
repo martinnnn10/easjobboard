@@ -32,11 +32,16 @@ export default async function JobsPage({ params }: PageProps) {
             {jobs.length} role{jobs.length === 1 ? "" : "s"} · applicants, screened, and strong-fit per posting.
           </p>
         </div>
-        {writable ? (
-          <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
-            + New job
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/o/${orgSlug}/admin/syndication`} className="btn-secondary">
+            Job distribution
           </Link>
-        ) : null}
+          {writable ? (
+            <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
+              + New job
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {jobs.length === 0 ? (

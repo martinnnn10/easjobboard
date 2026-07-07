@@ -636,7 +636,7 @@ export function JobForm({
       });
       const data = (await response.json()) as { description?: string; source?: string; error?: string };
       if (!response.ok || !data.description) {
-        setGenerateNote(data.error ?? "Couldn't generate a description. Add an ANTHROPIC_API_KEY or use a template.");
+        setGenerateNote(data.error ?? "Couldn't generate a description right now — pick a template or write your own.");
         return;
       }
       updateField("description", data.description);

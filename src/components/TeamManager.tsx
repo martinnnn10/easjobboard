@@ -11,6 +11,7 @@ export function TeamManager({ orgSlug, members }: { orgSlug: string; members: Me
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "recruiter" as Role });
+  const [invite, setInvite] = useState<{ email: string; emailed: boolean; tempPassword?: string } | null>(null);
 
   async function post(body: Record<string, unknown>) {
     setBusy(true);
@@ -60,8 +61,32 @@ export function TeamManager({ orgSlug, members }: { orgSlug: string; members: Me
 
   async function addTeammate(event: React.FormEvent) {
     event.preventDefault();
-    const ok = await post({ action: "add", ...form });
-    if (ok) setForm({ name: "", email: "", password: "", role: "recruiter" });
+    setBusy(true);
+    setError("");
+    setInvite(null);
+    try {
+      const res = await fetch(`/api/o/${orgSlug}/team`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add", ...form }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        emailed?: boolean;
+        tempPassword?: string;
+      };
+      if (!res.ok) {
+        setError(data.error ?? "Something went wrong.");
+        return;
+      }
+      setInvite({ email: form.email, emailed: Boolean(data.emailed), tempPassword: data.tempPassword });
+      setForm({ name: "", email: "", password: "", role: "recruiter" });
+      router.refresh();
+    } catch {
+      setError("Network error.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -167,8 +192,7 @@ export function TeamManager({ orgSlug, members }: { orgSlug: string; members: Me
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
               className="field-input"
               minLength={8}
-              placeholder="At least 8 characters"
-              required
+              placeholder="Leave blank to auto-generate"
             />
           </label>
           <label className="block space-y-1">
@@ -187,9 +211,26 @@ export function TeamManager({ orgSlug, members }: { orgSlug: string; members: Me
           </label>
         </div>
         <p className="text-xs text-zinc-500">
-          Share the temporary password with your teammate — they can sign in immediately. (Email invites are not yet
-          wired up.)
+          We&apos;ll email the teammate a sign-in link and their temporary password. If email delivery isn&apos;t
+          configured in Settings, we&apos;ll show the password here so you can share it.
         </p>
+        {invite ? (
+          <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm">
+            {invite.emailed ? (
+              <p className="text-brand-800">
+                Invite emailed to <span className="font-medium">{invite.email}</span>.
+              </p>
+            ) : (
+              <div className="space-y-1 text-zinc-700">
+                <p>
+                  Added <span className="font-medium">{invite.email}</span>. Email delivery isn&apos;t configured, so
+                  share this temporary password with them:
+                </p>
+                <p className="font-mono text-sm font-semibold text-zinc-900">{invite.tempPassword}</p>
+              </div>
+            )}
+          </div>
+        ) : null}
         <button type="submit" disabled={busy} className="btn-primary">
           {busy ? "Saving…" : "Add teammate"}
         </button>

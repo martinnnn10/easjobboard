@@ -1,9 +1,14 @@
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { getDb, rowToUser, type User } from "./db";
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+/** A readable, URL-safe temporary password for emailed teammate invites. */
+export function generateTempPassword(): string {
+  return randomBytes(9).toString("base64url");
 }
 
 export function getUserById(id: string): User | null {
