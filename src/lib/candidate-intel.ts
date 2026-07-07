@@ -283,6 +283,98 @@ export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = {
   high: "High risk",
 };
 
+// ─── "Why this candidate?" ────────────────────────────────────────────────────
+
+const VERIFY_BY_RISK: Record<RiskFlagKey, string> = {
+  pay_mismatch: "Confirm the pay range works long-term — pay gaps are the #1 reason good trades hires walk.",
+  commute_risk: "Confirm the commute, or a genuine willingness to relocate for shift work.",
+  job_hop: "Ask why each recent job ended and what would make them stay.",
+  overqualified: "Confirm they want hands-on work and won't leave the bench when a lead role opens.",
+};
+
+const ASK_HM_BY_RISK: Record<RiskFlagKey, string> = {
+  pay_mismatch: "Any flexibility on the pay range for a candidate who proved the hands-on skills?",
+  commute_risk: "Is relocation support or a schedule tweak on the table for the right person?",
+  job_hop: "How much runway before this role has to be self-sufficient?",
+  overqualified: "Is there a growth path that keeps a lead-caliber person engaged?",
+};
+
+export type WhyThisCandidate = {
+  recommendedAction: string;
+  whyStrong: string[];
+  whyRisky: string[];
+  verifyOnPhone: string[];
+  askHiringManager: string[];
+};
+
+/**
+ * The recruiter-facing "should I call this person, and what do I probe?" answer,
+ * composed from the stored screen summary + risk assessment. Deterministic — no
+ * LLM — so it renders instantly and never contradicts the badges.
+ */
+export function buildWhyThisCandidate(input: {
+  screenScore: number | null;
+  screenStatus: string;
+  matchScore: number | null;
+  riskLevel: RiskLevel;
+  riskFlags: Array<{ key: string; label: string; detail: string }>;
+  summary: ScreenSummary | null;
+}): WhyThisCandidate {
+  const { screenScore, screenStatus, matchScore, riskLevel, riskFlags, summary } = input;
+
+  const recommendedAction =
+    summary?.recommendedAction?.trim() || deriveRecommendedAction(screenScore, screenStatus, riskLevel);
+
+  const whyStrong: string[] = [...(summary?.strengths ?? [])];
+  if (whyStrong.length === 0) {
+    if (screenStatus === "completed" && screenScore !== null && screenScore >= 70) {
+      whyStrong.push(`Scored ${screenScore}/100 on the practical skills screen`);
+    }
+    if (summary?.strongDims?.includes("troubleshooting")) {
+      whyStrong.push("Strong troubleshooting signal on the screen");
+    }
+  }
+
+  const whyRisky: string[] = [
+    ...riskFlags.map((f) => f.detail || f.label),
+    ...(summary?.redFlags ?? []),
+  ];
+
+  const verifyOnPhone: string[] = [];
+  for (const flag of riskFlags) {
+    verifyOnPhone.push(VERIFY_BY_RISK[flag.key as RiskFlagKey] ?? `Verify: ${flag.label.toLowerCase()}.`);
+  }
+  if (matchScore !== null && screenScore !== null && matchScore >= 55 && screenScore < 45) {
+    verifyOnPhone.push("Resume reads stronger than the demonstrated screen — verify hands-on ability by phone.");
+  }
+  if (screenStatus !== "completed") {
+    verifyOnPhone.push("No completed skills screen yet — run a short phone screen to confirm practical ability.");
+  }
+  if (verifyOnPhone.length === 0) {
+    verifyOnPhone.push("No specific red flags surfaced — a standard reference check should suffice.");
+  }
+
+  const askHiringManager: string[] = [];
+  for (const flag of riskFlags) {
+    const q = ASK_HM_BY_RISK[flag.key as RiskFlagKey];
+    if (q) askHiringManager.push(q);
+  }
+  if (whyStrong.length > 0) {
+    askHiringManager.push(`Does "${whyStrong[0]}" match what the crew needs most right now?`);
+  } else {
+    askHiringManager.push("What does success in the first 90 days look like for this role?");
+  }
+
+  const dedupe = (xs: string[]) => [...new Set(xs.filter(Boolean))];
+  return {
+    recommendedAction,
+    whyStrong: dedupe(whyStrong).slice(0, 5),
+    whyRisky: dedupe(whyRisky).slice(0, 5),
+    verifyOnPhone: dedupe(verifyOnPhone).slice(0, 5),
+    askHiringManager: dedupe(askHiringManager).slice(0, 4),
+  };
+}
+
 export function normalizeRiskLevel(value: string): RiskLevel {
   return value === "high" || value === "medium" ? value : "low";
 }
