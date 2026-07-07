@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CANDIDATE_CRM_STATUSES, CANDIDATE_CRM_STATUS_LABELS, isCandidateCrmStatus } from "@/lib/candidate-meta";
 
 type Member = { id: string; name: string };
 
@@ -10,6 +11,7 @@ export function CandidateCrmPanel({
   candidateId,
   initialTags,
   initialOwnerId,
+  initialCrmStatus,
   members,
   canEdit,
 }: {
@@ -17,12 +19,14 @@ export function CandidateCrmPanel({
   candidateId: string;
   initialTags: string[];
   initialOwnerId: string;
+  initialCrmStatus: string;
   members: Member[];
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [tags, setTags] = useState<string[]>(initialTags);
   const [owner, setOwner] = useState(initialOwnerId);
+  const [status, setStatus] = useState(initialCrmStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -69,8 +73,36 @@ export function CandidateCrmPanel({
     await save({ owner_user_id: value });
   }
 
+  async function changeStatus(value: string) {
+    setStatus(value);
+    await save({ crm_status: value });
+  }
+
   return (
     <div className="space-y-4">
+      <div>
+        <p className="section-label">Status</p>
+        {canEdit ? (
+          <select
+            value={status}
+            disabled={busy}
+            onChange={(e) => changeStatus(e.target.value)}
+            className="field-input mt-2 max-w-xs"
+          >
+            <option value="">No status</option>
+            {CANDIDATE_CRM_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {CANDIDATE_CRM_STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="mt-1 text-sm text-zinc-700">
+            {isCandidateCrmStatus(status) ? CANDIDATE_CRM_STATUS_LABELS[status] : "No status"}
+          </p>
+        )}
+      </div>
+
       <div>
         <p className="section-label">Tags</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">

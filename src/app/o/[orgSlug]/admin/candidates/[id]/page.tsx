@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AttachToJobForm } from "@/components/AttachToJobForm";
 import { CandidateCrmPanel } from "@/components/CandidateCrmPanel";
 import { CandidateNoteForm } from "@/components/CandidateNoteForm";
 import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
+import { CANDIDATE_SOURCE_LABELS, isCandidateSource } from "@/lib/candidate-meta";
 import { getCandidateWithApplications } from "@/lib/candidates";
 import { listEventsByCandidate, type CandidateEventType } from "@/lib/candidate-events";
+import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 import { listUsersByOrganization } from "@/lib/users";
@@ -18,6 +21,7 @@ const EVENT_ICON: Record<CandidateEventType, string> = {
   stage_change: "↕",
   note: "📝",
   email_sent: "✉",
+  sourced: "🔎",
 };
 
 export default async function CandidateProfilePage({ params }: PageProps) {
@@ -33,6 +37,11 @@ export default async function CandidateProfilePage({ params }: PageProps) {
 
   const events = listEventsByCandidate(candidate.id, organization.id);
   const members = listUsersByOrganization(organization.id).map((u) => ({ id: u.id, name: u.name }));
+  const jobs = writable
+    ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title }))
+    : [];
+  const sourceLabel = isCandidateSource(candidate.source) ? CANDIDATE_SOURCE_LABELS[candidate.source] : candidate.source;
+  const isSourced = candidate.source !== "applied";
 
   return (
     <div className="page-shell space-y-6">
@@ -57,10 +66,33 @@ export default async function CandidateProfilePage({ params }: PageProps) {
               ) : null}
               {candidate.location ? ` · ${candidate.location}` : ""}
             </p>
+            {candidate.title || candidate.company ? (
+              <p className="mt-0.5 text-sm text-zinc-500">
+                {[candidate.title, candidate.company].filter(Boolean).join(" · ")}
+              </p>
+            ) : null}
             <p className="mt-1 text-xs text-zinc-400">
               {candidate.applications.length} application{candidate.applications.length === 1 ? "" : "s"} · in pool since{" "}
               {new Date(candidate.first_applied_at).toLocaleDateString()}
             </p>
+            {isSourced ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700">
+                  {sourceLabel}
+                  {candidate.source_provider ? ` · ${candidate.source_provider}` : ""}
+                </span>
+                {candidate.source_url ? (
+                  <a
+                    href={candidate.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 hover:underline"
+                  >
+                    View source profile ↗
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {candidate.bestScreenScore !== null ? (
@@ -74,39 +106,50 @@ export default async function CandidateProfilePage({ params }: PageProps) {
         <div className="space-y-6">
           <section className="card space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Applications</h2>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="border-b border-zinc-200 text-zinc-500">
-                  <tr>
-                    <th className="py-2 pr-4 font-medium">Job</th>
-                    <th className="py-2 pr-4 font-medium">Stage</th>
-                    <th className="py-2 pr-4 font-medium">Screen</th>
-                    <th className="py-2 pr-4 font-medium">Applied</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {candidate.applications.map((a) => (
-                    <tr key={a.applicationId} className="border-b border-zinc-100 last:border-0">
-                      <td className="py-2 pr-4">
-                        <Link
-                          href={`/o/${orgSlug}/admin/applications/${a.applicationId}`}
-                          className="font-medium text-zinc-900 hover:text-blue-700"
-                        >
-                          {a.jobTitle}
-                        </Link>
-                      </td>
-                      <td className="py-2 pr-4 text-zinc-600">
-                        {APPLICATION_STATUS_LABELS[a.status] ?? a.status}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <ScreenScoreBadge score={a.screenScore} status={a.screenStatus} />
-                      </td>
-                      <td className="py-2 pr-4 text-zinc-500">{new Date(a.createdAt).toLocaleDateString()}</td>
+            {candidate.applications.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                No applications yet. This candidate is in your pool but hasn&apos;t applied to a job.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-zinc-200 text-zinc-500">
+                    <tr>
+                      <th className="py-2 pr-4 font-medium">Job</th>
+                      <th className="py-2 pr-4 font-medium">Stage</th>
+                      <th className="py-2 pr-4 font-medium">Screen</th>
+                      <th className="py-2 pr-4 font-medium">Applied</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {candidate.applications.map((a) => (
+                      <tr key={a.applicationId} className="border-b border-zinc-100 last:border-0">
+                        <td className="py-2 pr-4">
+                          <Link
+                            href={`/o/${orgSlug}/admin/applications/${a.applicationId}`}
+                            className="font-medium text-zinc-900 hover:text-blue-700"
+                          >
+                            {a.jobTitle}
+                          </Link>
+                        </td>
+                        <td className="py-2 pr-4 text-zinc-600">
+                          {APPLICATION_STATUS_LABELS[a.status] ?? a.status}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <ScreenScoreBadge score={a.screenScore} status={a.screenStatus} />
+                        </td>
+                        <td className="py-2 pr-4 text-zinc-500">{new Date(a.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {writable ? (
+              <div className="border-t border-zinc-100 pt-3">
+                <AttachToJobForm orgSlug={orgSlug} candidateId={candidate.id} jobs={jobs} />
+              </div>
+            ) : null}
           </section>
 
           <section className="card space-y-3">
@@ -142,6 +185,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
               candidateId={candidate.id}
               initialTags={candidate.tags}
               initialOwnerId={candidate.owner_user_id}
+              initialCrmStatus={candidate.crm_status}
               members={members}
               canEdit={writable}
             />

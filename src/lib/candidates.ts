@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import { recordCandidateEvent } from "./candidate-events";
+import { normalizePhone, type CandidateSource } from "./candidate-meta";
 import { getDb, rowToCandidate, type ApplicationStatus, type CandidateRecord, type ScreenStatus } from "./db";
 import { getUserById } from "./users";
 
@@ -368,4 +370,198 @@ export function setCandidateOwner(id: string, organizationId: string, ownerUserI
     .prepare("UPDATE candidates SET owner_user_id = ?, updated_at = ? WHERE id = ? AND organization_id = ?")
     .run(ownerUserId, nowIso(), id, organizationId);
   return result.changes > 0;
+}
+
+/** Set the outreach/pipeline status (see CANDIDATE_CRM_STATUSES). "" clears it. */
+export function setCandidateCrmStatus(id: string, organizationId: string, status: string): boolean {
+  const result = getDb()
+    .prepare("UPDATE candidates SET crm_status = ?, updated_at = ? WHERE id = ? AND organization_id = ?")
+    .run(status, nowIso(), id, organizationId);
+  return result.changes > 0;
+}
+
+// ─── Sourced / passive candidates ──────────────────────────────────────────
+
+export type DuplicateMatch = {
+  candidate: CandidateRecord;
+  /** Which signal matched: "email" | "phone" | "name+company" | "name+location". */
+  matchedBy: string;
+};
+
+/**
+ * Find an existing candidate that is very likely the same person, so we never
+ * create a second record for someone already in the pool. Checks, in order of
+ * confidence: exact email, exact phone (digits only), then name paired with
+ * company or location. Returns the first match or null.
+ */
+export function findDuplicateCandidate(
+  organizationId: string,
+  input: { email?: string; phone?: string; name?: string; company?: string; location?: string },
+): DuplicateMatch | null {
+  const database = getDb();
+  const email = input.email?.trim().toLowerCase() ?? "";
+  const phone = normalizePhone(input.phone ?? "");
+  const name = input.name?.trim().toLowerCase() ?? "";
+  const company = input.company?.trim().toLowerCase() ?? "";
+  const location = input.location?.trim().toLowerCase() ?? "";
+
+  if (email) {
+    const row = database
+      .prepare("SELECT * FROM candidates WHERE organization_id = ? AND email = ?")
+      .get(organizationId, email) as Record<string, unknown> | undefined;
+    if (row) return { candidate: rowToCandidate(row), matchedBy: "email" };
+  }
+
+  // Phone / name matching scans the org pool in JS (phones are stored raw, so we
+  // compare normalized digits). Org pools are small; this stays cheap.
+  const rows = database
+    .prepare("SELECT * FROM candidates WHERE organization_id = ?")
+    .all(organizationId) as Array<Record<string, unknown>>;
+
+  if (phone) {
+    for (const row of rows) {
+      const candPhone = normalizePhone(String(row.phone ?? ""));
+      if (candPhone && candPhone === phone) return { candidate: rowToCandidate(row), matchedBy: "phone" };
+    }
+  }
+
+  if (name && (company || location)) {
+    for (const row of rows) {
+      const candName = String(row.name ?? "").trim().toLowerCase();
+      if (!candName || candName !== name) continue;
+      const candCompany = String(row.company ?? "").trim().toLowerCase();
+      const candLocation = String(row.location ?? "").trim().toLowerCase();
+      if (company && candCompany && candCompany === company) {
+        return { candidate: rowToCandidate(row), matchedBy: "name+company" };
+      }
+      if (location && candLocation && candLocation === location) {
+        return { candidate: rowToCandidate(row), matchedBy: "name+location" };
+      }
+    }
+  }
+
+  return null;
+}
+
+export type SourcedCandidateInput = {
+  organization_id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  location?: string;
+  title?: string;
+  company?: string;
+  source?: CandidateSource;
+  source_provider?: string;
+  source_url?: string;
+  skills?: string[];
+  tags?: string[];
+  crm_status?: string;
+  /** Optional first note to seed the timeline. */
+  notes?: string;
+  created_by?: string;
+  actor?: string;
+};
+
+export type CreateSourcedResult = {
+  candidate: CandidateRecord;
+  /** True when an existing candidate matched and no new record was created. */
+  matched: boolean;
+  matchedBy?: string;
+};
+
+/**
+ * Persist a sourced/passive candidate into the pool — a person who has NOT
+ * applied. Runs duplicate detection first; if the person already exists we
+ * return that record instead of inserting a second one. On a genuinely new
+ * person we insert the candidate row and seed the timeline with a "sourced"
+ * event (plus an optional first note).
+ */
+export function createSourcedCandidate(input: SourcedCandidateInput): CreateSourcedResult {
+  const database = getDb();
+  const email = input.email.trim().toLowerCase();
+
+  const duplicate = findDuplicateCandidate(input.organization_id, {
+    email,
+    phone: input.phone,
+    name: input.name,
+    company: input.company,
+    location: input.location,
+  });
+  if (duplicate) {
+    return { candidate: duplicate.candidate, matched: true, matchedBy: duplicate.matchedBy };
+  }
+
+  const id = randomUUID();
+  const now = nowIso();
+  const source = input.source ?? "sourced";
+  const cleanTags = dedupeStrings(input.tags ?? []);
+  const cleanSkills = dedupeStrings(input.skills ?? []);
+
+  database
+    .prepare(
+      `INSERT INTO candidates (
+         id, organization_id, email, name, phone, location, title, company,
+         skills, tags, owner_user_id, source, source_provider, source_url, crm_status,
+         created_by, first_applied_at, last_applied_at, created_at, updated_at
+       ) VALUES (
+         @id, @organization_id, @email, @name, @phone, @location, @title, @company,
+         @skills, @tags, '', @source, @source_provider, @source_url, @crm_status,
+         @created_by, @now, @now, @now, @now
+       )`,
+    )
+    .run({
+      id,
+      organization_id: input.organization_id,
+      email,
+      name: input.name.trim() || email,
+      phone: input.phone?.trim() ?? "",
+      location: input.location?.trim() ?? "",
+      title: input.title?.trim() ?? "",
+      company: input.company?.trim() ?? "",
+      skills: JSON.stringify(cleanSkills),
+      tags: JSON.stringify(cleanTags),
+      source,
+      source_provider: input.source_provider?.trim() ?? "",
+      source_url: input.source_url?.trim() ?? "",
+      crm_status: input.crm_status ?? "needs_outreach",
+      created_by: input.created_by ?? "",
+      now,
+    });
+
+  const providerLabel = input.source_provider?.trim();
+  recordCandidateEvent({
+    organization_id: input.organization_id,
+    candidate_id: id,
+    type: "sourced",
+    detail: providerLabel ? `Sourced via ${providerLabel}` : "Added to candidate pool",
+    actor: input.actor ?? "",
+  });
+
+  const firstNote = input.notes?.trim();
+  if (firstNote) {
+    recordCandidateEvent({
+      organization_id: input.organization_id,
+      candidate_id: id,
+      type: "note",
+      detail: firstNote,
+      actor: input.actor ?? "",
+    });
+  }
+
+  return { candidate: getCandidateById(id, input.organization_id)!, matched: false };
+}
+
+function dedupeStrings(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of values) {
+    const v = String(raw).trim();
+    const key = v.toLowerCase();
+    if (v && !seen.has(key)) {
+      seen.add(key);
+      out.push(v);
+    }
+  }
+  return out;
 }

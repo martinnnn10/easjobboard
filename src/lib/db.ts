@@ -220,6 +220,55 @@ function migrateLegacyJobs(database: Database.Database): void {
   database.exec("ALTER TABLE jobs_migrated RENAME TO jobs;");
 }
 
+/**
+ * Rebuild candidate_events so application_id is NULLABLE. Person-level activity
+ * (a call/note logged on a sourced candidate who never applied) has no owning
+ * application, so the old `application_id TEXT NOT NULL` + FK forced us to anchor
+ * such events to an arbitrary application. Now the column is nullable: person
+ * events store NULL and are keyed by candidate_id instead. Idempotent — only
+ * rebuilds when the column is still NOT NULL. Existing empty strings become NULL.
+ */
+function migrateCandidateEventsNullableApp(database: Database.Database): void {
+  if (!tableExists(database, "candidate_events")) return;
+  const columns = database.prepare("PRAGMA table_info(candidate_events)").all() as Array<{
+    name: string;
+    notnull: number;
+  }>;
+  const appCol = columns.find((c) => c.name === "application_id");
+  if (!appCol || appCol.notnull === 0) return; // already nullable (or table missing)
+  const hasCandidateId = columns.some((c) => c.name === "candidate_id");
+
+  // Table rebuild is the only way to drop NOT NULL in SQLite. Nothing has a
+  // foreign key pointing AT candidate_events, so dropping it is safe.
+  const rebuild = database.transaction(() => {
+    database.exec(`
+      CREATE TABLE candidate_events_new (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL,
+        application_id TEXT,
+        candidate_id TEXT NOT NULL DEFAULT '',
+        type TEXT NOT NULL,
+        detail TEXT NOT NULL DEFAULT '',
+        actor TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (organization_id) REFERENCES organizations(id),
+        FOREIGN KEY (application_id) REFERENCES applications(id)
+      );
+    `);
+    const candidateExpr = hasCandidateId ? "candidate_id" : "''";
+    database.exec(`
+      INSERT INTO candidate_events_new (id, organization_id, application_id, candidate_id, type, detail, actor, created_at)
+      SELECT id, organization_id, NULLIF(application_id, ''), ${candidateExpr}, type, detail, actor, created_at
+      FROM candidate_events;
+    `);
+    database.exec("DROP TABLE candidate_events;");
+    database.exec("ALTER TABLE candidate_events_new RENAME TO candidate_events;");
+  });
+  rebuild();
+  database.exec("CREATE INDEX IF NOT EXISTS idx_candidate_events_app ON candidate_events(application_id)");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_candidate_events_candidate ON candidate_events(candidate_id)");
+}
+
 function mergeSkillJson(a: string, b: string): string {
   const parse = (v: string): string[] => {
     try {
@@ -537,6 +586,33 @@ function initDb(database: Database.Database): void {
     database.exec("ALTER TABLE candidate_events ADD COLUMN candidate_id TEXT NOT NULL DEFAULT ''");
   }
   backfillCandidates(database);
+  // Person-level activity needs application_id to be optional (run after the
+  // candidate_id column + backfill so existing events keep their linkage).
+  migrateCandidateEventsNullableApp(database);
+  // Sourced/passive candidates: people in the pool who haven't applied yet.
+  // `source` records how they entered (applied|sourced|imported|referred|manual|
+  // unknown); existing candidates all came from applications, so default 'applied'.
+  if (!columnExists(database, "candidates", "title")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN title TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "company")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN company TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "source")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN source TEXT NOT NULL DEFAULT 'applied'");
+  }
+  if (!columnExists(database, "candidates", "source_provider")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN source_provider TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "source_url")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN source_url TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "crm_status")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN crm_status TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "created_by")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN created_by TEXT NOT NULL DEFAULT ''");
+  }
   if (!columnExists(database, "jobs", "shift")) {
     database.exec("ALTER TABLE jobs ADD COLUMN shift TEXT NOT NULL DEFAULT ''");
   }
@@ -658,9 +734,23 @@ export type CandidateRecord = {
   name: string;
   phone: string;
   location: string;
+  /** Current job title (for sourced/passive candidates). */
+  title: string;
+  /** Current employer (for sourced/passive candidates). */
+  company: string;
   skills: string[];
   tags: string[];
   owner_user_id: string;
+  /** How they entered the pool: applied|sourced|imported|referred|manual|unknown. */
+  source: string;
+  /** Sourcing provider, e.g. "Apollo", "LinkedIn", "Manual" ("" when applied). */
+  source_provider: string;
+  /** Link to the sourced profile, if any. */
+  source_url: string;
+  /** Outreach/pipeline status for passive candidates (see CANDIDATE_CRM_STATUSES). */
+  crm_status: string;
+  /** User id who added a sourced candidate ("" for organic applicants). */
+  created_by: string;
   first_applied_at: string;
   last_applied_at: string;
   created_at: string;
@@ -675,9 +765,16 @@ export function rowToCandidate(row: Record<string, unknown>): CandidateRecord {
     name: (row.name as string | undefined) ?? "",
     phone: (row.phone as string | undefined) ?? "",
     location: (row.location as string | undefined) ?? "",
+    title: (row.title as string | undefined) ?? "",
+    company: (row.company as string | undefined) ?? "",
     skills: parseSkills(row.skills),
     tags: parseSkills(row.tags),
     owner_user_id: (row.owner_user_id as string | undefined) ?? "",
+    source: (row.source as string | undefined) || "applied",
+    source_provider: (row.source_provider as string | undefined) ?? "",
+    source_url: (row.source_url as string | undefined) ?? "",
+    crm_status: (row.crm_status as string | undefined) ?? "",
+    created_by: (row.created_by as string | undefined) ?? "",
     first_applied_at: row.first_applied_at as string,
     last_applied_at: row.last_applied_at as string,
     created_at: row.created_at as string,

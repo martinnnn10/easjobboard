@@ -32,6 +32,7 @@ const EVENT_ICONS: Record<CandidateEvent["type"], string> = {
   stage_change: "➡️",
   note: "📝",
   email_sent: "✉️",
+  sourced: "🔎",
 };
 
 const ANSWER_BAND: Record<string, string> = {

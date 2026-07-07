@@ -4,7 +4,9 @@ import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { getPoolSkills, listCandidates } from "@/lib/candidates";
+import { CANDIDATE_CRM_STATUS_LABELS, CANDIDATE_SOURCE_LABELS, isCandidateCrmStatus, isCandidateSource } from "@/lib/candidate-meta";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { canWrite } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
@@ -20,7 +22,8 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+  const writable = canWrite(user.role);
 
   const sp = await searchParams;
   const query = sp.q?.trim() || undefined;
@@ -36,11 +39,20 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
         <Link href={`/o/${orgSlug}/admin`} className="text-sm text-blue-600 hover:underline">
           ← Back to admin
         </Link>
-        <h1 className="mt-2 text-3xl font-bold text-zinc-900">Candidate pool</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Everyone who has applied, deduplicated across jobs. Search by name, email, or resume text and filter by skill
-          or stage.
-        </p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-900">Candidate pool</h1>
+            <p className="mt-1 text-sm text-zinc-600">
+              Applicants and sourced/passive candidates, deduplicated across jobs. Search by name, email, or resume text
+              and filter by skill or stage.
+            </p>
+          </div>
+          {writable ? (
+            <Link href={`/o/${orgSlug}/admin/candidates/new`} className="btn-primary shrink-0">
+              + Add candidate
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <form className="card grid gap-3 sm:grid-cols-4" method="get">
@@ -108,20 +120,34 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                     {candidate.email}
                     {candidate.phone ? ` · ${candidate.phone}` : ""}
                   </p>
-                  {candidate.tags.length > 0 || candidate.ownerName ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      {candidate.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-white">
-                          {tag}
-                        </span>
-                      ))}
-                      {candidate.ownerName ? (
-                        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-                          Owner: {candidate.ownerName}
-                        </span>
-                      ) : null}
-                    </div>
+                  {candidate.title || candidate.company ? (
+                    <p className="text-xs text-zinc-500">
+                      {[candidate.title, candidate.company].filter(Boolean).join(" · ")}
+                    </p>
                   ) : null}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {candidate.source !== "applied" ? (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                        {isCandidateSource(candidate.source) ? CANDIDATE_SOURCE_LABELS[candidate.source] : candidate.source}
+                        {candidate.source_provider ? ` · ${candidate.source_provider}` : ""}
+                      </span>
+                    ) : null}
+                    {isCandidateCrmStatus(candidate.crm_status) ? (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                        {CANDIDATE_CRM_STATUS_LABELS[candidate.crm_status]}
+                      </span>
+                    ) : null}
+                    {candidate.tags.map((tag) => (
+                      <span key={tag} className="rounded-full bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-white">
+                        {tag}
+                      </span>
+                    ))}
+                    {candidate.ownerName ? (
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                        Owner: {candidate.ownerName}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="text-right">
                   <ScreenScoreBadge
@@ -134,6 +160,11 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                 </div>
               </div>
 
+              {candidate.applications.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-zinc-200 px-3 py-2 text-xs text-zinc-500">
+                  No applications yet — sourced candidate. Open the profile to log outreach or attach them to a job.
+                </p>
+              ) : (
               <div className="rounded-lg border border-zinc-200">
                 <table className="min-w-full text-left text-sm">
                   <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
@@ -174,6 +205,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           ))}
         </div>

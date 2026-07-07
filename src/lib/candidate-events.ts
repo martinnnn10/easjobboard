@@ -7,12 +7,13 @@ import { getDb } from "./db";
  * instead of disconnected data points.
  */
 
-export type CandidateEventType = "applied" | "stage_change" | "note" | "email_sent";
+export type CandidateEventType = "applied" | "stage_change" | "note" | "email_sent" | "sourced";
 
 export type CandidateEvent = {
   id: string;
   organization_id: string;
-  application_id: string;
+  /** Null for person-level events logged directly on a candidate (no application). */
+  application_id: string | null;
   candidate_id: string;
   type: CandidateEventType;
   detail: string;
@@ -22,7 +23,7 @@ export type CandidateEvent = {
 
 export function recordCandidateEvent(input: {
   organization_id: string;
-  /** Empty for person-level events logged directly on a candidate. */
+  /** Omit for person-level events logged directly on a candidate. */
   application_id?: string;
   candidate_id?: string;
   type: CandidateEventType;
@@ -30,7 +31,9 @@ export function recordCandidateEvent(input: {
   actor?: string;
 }): void {
   const database = getDb();
-  let applicationId = input.application_id ?? "";
+  // Person-level events (a sourced candidate with no application yet) store NULL
+  // for application_id — the column is nullable, so no FK anchoring is needed.
+  const applicationId = input.application_id?.trim() || null;
   // Resolve the owning candidate from the application when the caller doesn't
   // supply it, so every event lands on the person's unified timeline.
   let candidateId = input.candidate_id ?? "";
@@ -39,15 +42,6 @@ export function recordCandidateEvent(input: {
       .prepare("SELECT candidate_id FROM applications WHERE id = ?")
       .get(applicationId) as { candidate_id?: string } | undefined;
     candidateId = row?.candidate_id ?? "";
-  }
-  // Person-level events (no application) anchor to the candidate's most recent
-  // application so the application_id foreign key stays valid; the timeline is
-  // queried by candidate_id, so the note still shows on the unified profile.
-  if (!applicationId && candidateId) {
-    const row = database
-      .prepare("SELECT id FROM applications WHERE candidate_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
-      .get(candidateId) as { id?: string } | undefined;
-    applicationId = row?.id ?? "";
   }
 
   database

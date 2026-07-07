@@ -122,6 +122,65 @@ export function getApplicationById(id: string): Application | null {
   return row ? rowToApplication(row as Record<string, unknown>) : null;
 }
 
+function parseSkillsJson(value: unknown): string[] {
+  if (typeof value !== "string" || value.length === 0) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Attach an existing (typically sourced) candidate to a job by opening an
+ * application for them from their stored profile — no resume required. Reuses
+ * createApplication, which re-attaches to the same candidate via email, so the
+ * new application lands on their existing timeline. Guards against duplicating
+ * an application for the same (candidate, job).
+ */
+export function attachCandidateToJob(input: {
+  organization_id: string;
+  candidate_id: string;
+  job_id: string;
+  actor?: string;
+}): { ok: true; application: Application } | { ok: false; error: string } {
+  const database = getDb();
+  const candidate = database
+    .prepare("SELECT * FROM candidates WHERE id = ? AND organization_id = ?")
+    .get(input.candidate_id, input.organization_id) as Record<string, unknown> | undefined;
+  if (!candidate) return { ok: false, error: "Candidate not found." };
+
+  const job = database
+    .prepare("SELECT id FROM jobs WHERE id = ? AND organization_id = ?")
+    .get(input.job_id, input.organization_id) as { id?: string } | undefined;
+  if (!job) return { ok: false, error: "Job not found." };
+
+  const email = String(candidate.email ?? "").trim();
+  if (!email) return { ok: false, error: "This candidate has no email to attach an application." };
+
+  const existing = database
+    .prepare("SELECT id FROM applications WHERE candidate_id = ? AND job_id = ?")
+    .get(input.candidate_id, input.job_id) as { id?: string } | undefined;
+  if (existing) return { ok: false, error: "This candidate is already attached to that job." };
+
+  const application = createApplication({
+    organization_id: input.organization_id,
+    job_id: input.job_id,
+    applicant_name: String(candidate.name ?? ""),
+    applicant_email: email,
+    applicant_phone: String(candidate.phone ?? ""),
+    cover_letter: "",
+    resume_filename: "",
+    resume_content_type: "",
+    resume_data: Buffer.alloc(0),
+    resume_skills: parseSkillsJson(candidate.skills),
+    applicant_location: String(candidate.location ?? ""),
+  });
+
+  return { ok: true, application };
+}
+
 /**
  * Single application with its job, org-scoped and without loading the resume
  * BLOB — the shape the candidate detail page needs.

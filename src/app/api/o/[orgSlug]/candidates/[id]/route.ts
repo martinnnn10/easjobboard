@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireOrgCapability } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
 import { canWrite } from "@/lib/roles";
-import { getCandidateById, setCandidateOwner, setCandidateTags } from "@/lib/candidates";
+import { getCandidateById, setCandidateCrmStatus, setCandidateOwner, setCandidateTags } from "@/lib/candidates";
+import { isCandidateCrmStatus } from "@/lib/candidate-meta";
 import { getUserById } from "@/lib/users";
 
 export const runtime = "nodejs";
@@ -35,6 +36,14 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
       }
       setCandidateOwner(id, organization.id, ownerId);
+    }
+
+    if (typeof body.crm_status === "string") {
+      const status = body.crm_status.trim();
+      if (status && !isCandidateCrmStatus(status)) {
+        return NextResponse.json({ error: "Unknown status." }, { status: 400 });
+      }
+      setCandidateCrmStatus(id, organization.id, status);
     }
 
     const updated = getCandidateById(id, organization.id);
