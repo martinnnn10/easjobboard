@@ -43,6 +43,8 @@ export async function POST(request: Request, context: RouteContext) {
       reference_number: body.reference_number,
       status: (body.status as JobStatus) ?? "draft",
       screen_key: body.screen_key,
+      shift: body.shift,
+      certifications: Array.isArray(body.certifications) ? body.certifications : undefined,
     });
 
     return NextResponse.json({ job }, { status: 201 });

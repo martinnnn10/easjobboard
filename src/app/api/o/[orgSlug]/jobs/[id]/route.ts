@@ -46,6 +46,8 @@ export async function PUT(request: Request, context: RouteContext) {
       reference_number: body.reference_number,
       status: body.status as JobStatus,
       screen_key: body.screen_key,
+      shift: body.shift,
+      certifications: Array.isArray(body.certifications) ? body.certifications : undefined,
     });
 
     if (!job) {

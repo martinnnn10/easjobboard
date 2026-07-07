@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoSeedButton } from "@/components/DemoSeedButton";
+import { DuplicateJobButton } from "@/components/DuplicateJobButton";
 import { LogoutButton } from "@/components/LogoutButton";
 import { BadgeRow, ClaimVsProof, ScreenScoreBadge } from "@/components/ScreenSignals";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -356,6 +357,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
                         <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-blue-600 hover:underline">
                           Source
                         </Link>
+                        <DuplicateJobButton orgSlug={orgSlug} jobId={job.id} />
                         {job.status === "published" ? (
                           <>
                             <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">

@@ -54,6 +54,14 @@ export function buildGoogleJobPostingJsonLd(organization: Organization, job: Job
     };
   }
 
+  if (job.shift) {
+    posting.workHours = job.shift;
+  }
+
+  if (job.certifications.length > 0) {
+    posting.qualifications = job.certifications.join(", ");
+  }
+
   return posting;
 }
 

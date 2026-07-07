@@ -50,6 +50,10 @@ export type Job = {
   status: JobStatus;
   /** Skills-screen template key attached to this job ("" = no screen). */
   screen_key: string;
+  /** Work schedule label, e.g. "1st Shift (Day)" ("" = unspecified). */
+  shift: string;
+  /** Required certifications/licenses (e.g. "Journeyman", "OSHA 30"). */
+  certifications: string[];
   created_at: string;
   updated_at: string;
   published_at: string | null;
@@ -374,6 +378,12 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "jobs", "screen_key")) {
     database.exec("ALTER TABLE jobs ADD COLUMN screen_key TEXT NOT NULL DEFAULT ''");
   }
+  if (!columnExists(database, "jobs", "shift")) {
+    database.exec("ALTER TABLE jobs ADD COLUMN shift TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "jobs", "certifications")) {
+    database.exec("ALTER TABLE jobs ADD COLUMN certifications TEXT NOT NULL DEFAULT '[]'");
+  }
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_screen_score ON applications(screen_score)");
 }
@@ -411,6 +421,17 @@ export function rowToUser(row: Record<string, unknown>): User {
   };
 }
 
+/** Parse a JSON-encoded string array column, tolerating null/legacy values. */
+function parseStringArray(value: unknown): string[] {
+  if (typeof value !== "string" || value.trim() === "") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export function rowToJob(row: Record<string, unknown>): Job {
   return {
     id: row.id as string,
@@ -432,6 +453,8 @@ export function rowToJob(row: Record<string, unknown>): Job {
     reference_number: row.reference_number as string,
     status: row.status as JobStatus,
     screen_key: (row.screen_key as string | undefined) ?? "",
+    shift: (row.shift as string | undefined) ?? "",
+    certifications: parseStringArray(row.certifications),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
     published_at: row.published_at as string | null,

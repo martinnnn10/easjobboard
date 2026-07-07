@@ -74,11 +74,28 @@ export default async function OrgJobPage({ params }: PageProps) {
             <p className="mt-2 text-zinc-600">{job.location}</p>
             <p className="mt-1 text-sm text-zinc-500">
               {job.employment_type.replace("_", " ")}
+              {job.shift ? ` · ${job.shift}` : ""}
               {job.salary_min || job.salary_max
                 ? ` · ${job.salary_min ?? ""}${job.salary_max ? `–${job.salary_max}` : ""} ${job.salary_currency}/${job.salary_period.toLowerCase()}`
                 : ""}
             </p>
           </div>
+
+          {job.certifications.length > 0 ? (
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-700">Required certifications</h2>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {job.certifications.map((cert) => (
+                  <li
+                    key={cert}
+                    className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700"
+                  >
+                    {cert}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           <div className="prose prose-zinc max-w-none whitespace-pre-wrap text-zinc-800">{job.description}</div>
         </article>

@@ -23,7 +23,35 @@ type JobFormValues = {
   reference_number: string;
   status: JobStatus;
   screen_key: string;
+  shift: string;
+  certifications: string[];
 };
+
+const SHIFT_OPTIONS = [
+  "",
+  "1st Shift (Day)",
+  "2nd Shift (Evening)",
+  "3rd Shift (Night)",
+  "Rotating",
+  "Weekends",
+  "4x10",
+  "On-call",
+];
+
+// Common skilled-trades certifications/licenses offered as quick toggles;
+// employers can still type a custom one.
+const CERT_SUGGESTIONS = [
+  "Journeyman",
+  "Master Electrician",
+  "OSHA 10",
+  "OSHA 30",
+  "EPA 608",
+  "NFPA 70E",
+  "CDL",
+  "Forklift",
+  "AWS Welding",
+  "First Aid/CPR",
+];
 
 const QUESTION_TYPE_LABELS: Record<string, string> = {
   multiple_choice: "Multiple choice",
@@ -390,6 +418,8 @@ function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
     // Default the screen ON for new jobs (suggested from the title once typed,
     // otherwise the maintenance-tech screen); editing preserves the saved choice.
     screen_key: job ? job.screen_key : "maintenance_tech",
+    shift: job?.shift ?? "",
+    certifications: job?.certifications ?? [],
   };
 }
 
@@ -916,6 +946,22 @@ export function JobForm({
           </label>
 
           <label className="block space-y-1">
+            <span className="text-sm font-medium">Shift / schedule</span>
+            <select
+              value={values.shift}
+              onChange={(event) => updateField("shift", event.target.value)}
+              className="field-input"
+            >
+              {SHIFT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === "" ? "Not specified" : option}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-zinc-500">Trades workers often filter by shift first.</span>
+          </label>
+
+          <label className="block space-y-1">
             <span className="text-sm font-medium">Salary period</span>
             <select
               value={values.salary_period}
@@ -952,6 +998,85 @@ export function JobForm({
             />
           </label>
         </div>
+      </fieldset>
+
+      {/* Required Certifications */}
+      <fieldset className="space-y-3 rounded-lg border border-zinc-200 p-4">
+        <legend className="px-2 text-sm font-semibold text-zinc-700">Required Certifications</legend>
+        <p className="text-xs text-zinc-500">
+          Licenses or certifications a candidate must hold. Shown on the posting; use these to filter unqualified applicants.
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          {CERT_SUGGESTIONS.map((cert) => {
+            const active = values.certifications.includes(cert);
+            return (
+              <button
+                key={cert}
+                type="button"
+                onClick={() =>
+                  updateField(
+                    "certifications",
+                    active
+                      ? values.certifications.filter((c) => c !== cert)
+                      : [...values.certifications, cert],
+                  )
+                }
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  active
+                    ? "border-zinc-900 bg-zinc-900 text-white"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+                }`}
+              >
+                {active ? "✓ " : ""}
+                {cert}
+              </button>
+            );
+          })}
+        </div>
+
+        {values.certifications.filter((c) => !CERT_SUGGESTIONS.includes(c)).length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {values.certifications
+              .filter((c) => !CERT_SUGGESTIONS.includes(c))
+              .map((cert) => (
+                <span
+                  key={cert}
+                  className="inline-flex items-center gap-1 rounded-full border border-zinc-900 bg-zinc-900 px-3 py-1 text-xs font-medium text-white"
+                >
+                  {cert}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${cert}`}
+                    onClick={() =>
+                      updateField(
+                        "certifications",
+                        values.certifications.filter((c) => c !== cert),
+                      )
+                    }
+                    className="text-zinc-300 hover:text-white"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+          </div>
+        ) : null}
+
+        <input
+          type="text"
+          placeholder="Add another certification and press Enter"
+          className="field-input"
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            const value = event.currentTarget.value.trim();
+            if (value && !values.certifications.some((c) => c.toLowerCase() === value.toLowerCase())) {
+              updateField("certifications", [...values.certifications, value]);
+            }
+            event.currentTarget.value = "";
+          }}
+        />
       </fieldset>
 
       {/* Posting Details */}

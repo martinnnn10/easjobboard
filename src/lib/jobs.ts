@@ -10,6 +10,24 @@ function slugify(text: string): string {
     .slice(0, 80);
 }
 
+/** Trim, drop empties, de-duplicate (case-insensitive), and cap the cert list. */
+function normalizeCertifications(input: string[] | undefined): string[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const value = raw.trim().slice(0, 80);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 function uniqueSlug(organizationId: string, base: string): string {
   const database = getDb();
   let slug = slugify(base);
@@ -82,11 +100,13 @@ export function createJob(
       `INSERT INTO jobs (
         id, organization_id, slug, title, description, location, city, state, country, zip,
         employment_type, salary_min, salary_max, salary_currency, salary_period,
-        company_name, reference_number, status, screen_key, created_at, updated_at, published_at, closed_at
+        company_name, reference_number, status, screen_key, shift, certifications,
+        created_at, updated_at, published_at, closed_at
       ) VALUES (
         @id, @organization_id, @slug, @title, @description, @location, @city, @state, @country, @zip,
         @employment_type, @salary_min, @salary_max, @salary_currency, @salary_period,
-        @company_name, @reference_number, @status, @screen_key, @created_at, @updated_at, @published_at, @closed_at
+        @company_name, @reference_number, @status, @screen_key, @shift, @certifications,
+        @created_at, @updated_at, @published_at, @closed_at
       )`,
     )
     .run({
@@ -109,6 +129,8 @@ export function createJob(
       reference_number: referenceNumber,
       status: input.status ?? "draft",
       screen_key: input.screen_key?.trim() ?? "",
+      shift: input.shift?.trim() ?? "",
+      certifications: JSON.stringify(normalizeCertifications(input.certifications)),
       created_at: timestamp,
       updated_at: timestamp,
       published_at: input.status === "published" ? timestamp : null,
@@ -157,6 +179,8 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
         reference_number = @reference_number,
         status = @status,
         screen_key = @screen_key,
+        shift = @shift,
+        certifications = @certifications,
         updated_at = @updated_at,
         published_at = @published_at,
         closed_at = @closed_at
@@ -181,6 +205,12 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
       reference_number: (input.reference_number ?? existing.reference_number).trim(),
       status: nextStatus,
       screen_key: input.screen_key !== undefined ? input.screen_key.trim() : existing.screen_key,
+      shift: input.shift !== undefined ? input.shift.trim() : existing.shift,
+      certifications: JSON.stringify(
+        input.certifications !== undefined
+          ? normalizeCertifications(input.certifications)
+          : existing.certifications,
+      ),
       updated_at: timestamp,
       published_at: publishedAt,
       closed_at: closedAt,
@@ -194,6 +224,38 @@ export function deleteJob(id: string, organizationId: string): boolean {
     .prepare("DELETE FROM jobs WHERE id = ? AND organization_id = ?")
     .run(id, organizationId);
   return result.changes > 0;
+}
+
+/**
+ * Clone an existing job into a new draft (fresh id/slug/reference number),
+ * copying every posting field. Returns the new job, or null if the source
+ * doesn't belong to the organization. Handy for reposting the same role in a
+ * different city.
+ */
+export function duplicateJob(id: string, organizationId: string): Job | null {
+  const source = getJobById(id);
+  if (!source || source.organization_id !== organizationId) return null;
+
+  return createJob(organizationId, source.company_name, {
+    title: `${source.title} (Copy)`.slice(0, 200),
+    description: source.description,
+    location: source.location,
+    city: source.city,
+    state: source.state,
+    country: source.country,
+    zip: source.zip,
+    employment_type: source.employment_type,
+    salary_min: source.salary_min,
+    salary_max: source.salary_max,
+    salary_currency: source.salary_currency,
+    salary_period: source.salary_period,
+    company_name: source.company_name,
+    screen_key: source.screen_key,
+    shift: source.shift,
+    certifications: source.certifications,
+    // New reference number + slug are generated; always starts as a draft.
+    status: "draft",
+  });
 }
 
 export function getJobPublicUrl(orgSlug: string, jobSlug: string): string {
