@@ -5,6 +5,7 @@ import { listApplicationsByOrganization } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { canWrite } from "@/lib/roles";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
 
@@ -17,7 +18,8 @@ export default async function PipelinePage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+  const writable = canWrite(user.role);
 
   const applications = listApplicationsByOrganization(organization.id, {
     orderBy: "score",
@@ -59,7 +61,7 @@ export default async function PipelinePage({ params }: PageProps) {
           hiring stages.
         </div>
       ) : (
-        <PipelineBoard orgSlug={orgSlug} initialCards={cards} />
+        <PipelineBoard orgSlug={orgSlug} initialCards={cards} readOnly={!writable} />
       )}
     </div>
   );

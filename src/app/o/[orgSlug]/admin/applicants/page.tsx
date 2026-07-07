@@ -7,8 +7,10 @@ import {
   listApplicationsByOrganization,
 } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { badgesForApplication } from "@/lib/candidate-intel";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { canViewResumes, canWrite } from "@/lib/roles";
 
 const PAGE_SIZE = 25;
 
@@ -22,7 +24,9 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+  const writable = canWrite(user.role);
+  const resumesOk = canViewResumes(user.role);
 
   const sp = await searchParams;
   const filter = sp.screen === "qualified" || sp.screen === "knockout" ? sp.screen : undefined;
@@ -142,17 +146,27 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                     <BadgeRow badges={badgesForApplication(application)} max={3} />
                   </td>
                   <td className="px-4 py-3">
-                    <ApplicationStatusSelect
-                      orgSlug={orgSlug}
-                      applicationId={application.id}
-                      initialStatus={application.status}
-                    />
+                    {writable ? (
+                      <ApplicationStatusSelect
+                        orgSlug={orgSlug}
+                        applicationId={application.id}
+                        initialStatus={application.status}
+                      />
+                    ) : (
+                      <span className="inline-flex rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
+                        {APPLICATION_STATUS_LABELS[application.status] ?? application.status}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleString()}</td>
                   <td className="px-4 py-3">
-                    <a href={`/api/o/${orgSlug}/applications/${application.id}/resume`} className="text-blue-600 hover:underline">
-                      {application.resume_filename}
-                    </a>
+                    {resumesOk ? (
+                      <a href={`/api/o/${orgSlug}/applications/${application.id}/resume`} className="text-blue-600 hover:underline">
+                        {application.resume_filename}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-zinc-400">Restricted</span>
+                    )}
                   </td>
                 </tr>
               ))}

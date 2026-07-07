@@ -9,7 +9,22 @@ const EMPLOYMENT_TYPE_MAP: Record<string, string> = {
   INTERN: "INTERN",
 };
 
+/** Google drops postings with no validThrough after a while; give published jobs a rolling 60-day window. */
+function computeValidThrough(job: Job): string {
+  const base = new Date(job.published_at ?? job.created_at);
+  if (Number.isNaN(base.getTime())) return "";
+  base.setDate(base.getDate() + 60);
+  return base.toISOString().slice(0, 10);
+}
+
+function isRemote(job: Job): boolean {
+  return /(^|\W)(remote|work from home|telecommute)(\W|$)/i.test(`${job.location} ${job.city}`);
+}
+
 export function buildGoogleJobPostingJsonLd(organization: Organization, job: Job): Record<string, unknown> {
+  const validThrough = computeValidThrough(job);
+  const remote = isRemote(job);
+
   const posting: Record<string, unknown> = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
@@ -21,6 +36,7 @@ export function buildGoogleJobPostingJsonLd(organization: Organization, job: Job
       value: job.reference_number,
     },
     datePosted: (job.published_at ?? job.created_at).slice(0, 10),
+    ...(validThrough ? { validThrough } : {}),
     employmentType: EMPLOYMENT_TYPE_MAP[job.employment_type] ?? "FULL_TIME",
     hiringOrganization: {
       "@type": "Organization",
@@ -34,9 +50,21 @@ export function buildGoogleJobPostingJsonLd(organization: Organization, job: Job
         addressLocality: job.city || job.location,
         addressRegion: job.state,
         postalCode: job.zip || undefined,
-        addressCountry: job.country,
+        addressCountry: job.country || "US",
       },
     },
+    // Remote roles must declare TELECOMMUTE + where applicants may be located,
+    // or Google flags the location as invalid.
+    ...(remote
+      ? {
+          jobLocationType: "TELECOMMUTE",
+          applicantLocationRequirements: {
+            "@type": "Country",
+            name: job.country || "US",
+          },
+        }
+      : {}),
+    // Candidates apply on this careers page (the application form is on-page).
     directApply: true,
     url: getOrgJobUrl(organization.slug, job.slug),
   };

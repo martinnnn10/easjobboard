@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { SourcingPanel } from "@/components/SourcingPanel";
 import { extractSkills } from "@/lib/skills";
 import { requireOrgSession } from "@/lib/auth";
+import { canWrite } from "@/lib/roles";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
@@ -13,7 +14,8 @@ export default async function SourceCandidatesPage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+  if (!canWrite(user.role)) redirect(`/o/${orgSlug}/admin`);
 
   const job = getJobById(id);
   if (!job || job.organization_id !== organization.id) notFound();

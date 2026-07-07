@@ -22,7 +22,7 @@ import { resumeTrapCandidates } from "@/lib/gap-analysis";
 import { getJobPublicUrl, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getRoiStats } from "@/lib/roi";
-import { canManageTeam, isRole, ROLE_LABELS } from "@/lib/roles";
+import { canManageTeam, canWrite, isRole, ROLE_LABELS } from "@/lib/roles";
 import { getScreenLabel } from "@/lib/screens";
 
 type PageProps = {
@@ -62,6 +62,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
 
   const llmOn = isLlmConfigured();
+  const writable = canWrite(sessionContext.user.role);
 
   return (
     <div className="page-shell space-y-8">
@@ -101,9 +102,11 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <p className="mt-1 text-sm text-zinc-600">Resumes are delivered to {organization.application_email}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
-            + New job
-          </Link>
+          {writable ? (
+            <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
+              + New job
+            </Link>
+          ) : null}
           <a href={getOrgUrl(orgSlug)} target="_blank" rel="noreferrer" className="btn-secondary">
             View careers page
           </a>
@@ -234,13 +237,15 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
 
       {/* Quick actions */}
       <section className="grid gap-3 sm:grid-cols-3">
-        <Link href={`/o/${orgSlug}/admin/jobs/new`} className="card card-hover flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-lg">📝</span>
-          <div>
-            <p className="font-semibold text-zinc-900">Post a job</p>
-            <p className="text-xs text-zinc-500">Template + AI in under a minute</p>
-          </div>
-        </Link>
+        {writable ? (
+          <Link href={`/o/${orgSlug}/admin/jobs/new`} className="card card-hover flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-lg">📝</span>
+            <div>
+              <p className="font-semibold text-zinc-900">Post a job</p>
+              <p className="text-xs text-zinc-500">Template + AI in under a minute</p>
+            </div>
+          </Link>
+        ) : null}
         <Link href={`/o/${orgSlug}/admin/pipeline`} className="card card-hover flex items-center gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 text-lg">🗂️</span>
           <div>
@@ -310,10 +315,16 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary inline-block">
-                Post your first job →
-              </Link>
-              <DemoSeedButton orgSlug={orgSlug} />
+              {writable ? (
+                <>
+                  <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary inline-block">
+                    Post your first job →
+                  </Link>
+                  <DemoSeedButton orgSlug={orgSlug} />
+                </>
+              ) : (
+                <p className="text-sm text-zinc-500">No jobs yet.</p>
+              )}
             </div>
             <p className="text-xs text-zinc-500">
               1. Pick a role &amp; screen &nbsp;·&nbsp; 2. Publish &nbsp;·&nbsp; 3. Review who can actually do the job — or
@@ -371,13 +382,17 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
-                        <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="text-blue-600 hover:underline">
-                          Edit
-                        </Link>
-                        <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-blue-600 hover:underline">
-                          Source
-                        </Link>
-                        <DuplicateJobButton orgSlug={orgSlug} jobId={job.id} />
+                        {writable ? (
+                          <>
+                            <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="text-blue-600 hover:underline">
+                              Edit
+                            </Link>
+                            <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-blue-600 hover:underline">
+                              Source
+                            </Link>
+                            <DuplicateJobButton orgSlug={orgSlug} jobId={job.id} />
+                          </>
+                        ) : null}
                         {job.status === "published" ? (
                           <>
                             <a href={getJobPublicUrl(orgSlug, job.slug)} className="text-blue-600 hover:underline" target="_blank" rel="noreferrer">

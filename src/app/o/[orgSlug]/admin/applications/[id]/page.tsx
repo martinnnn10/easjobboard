@@ -14,6 +14,7 @@ import {
 } from "@/components/ScreenSignals";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { canViewResumes, canWrite } from "@/lib/roles";
 import { benchmarkLabel, getScoreBenchmark } from "@/lib/benchmarks";
 import { badgesForApplication, normalizeRiskLevel } from "@/lib/candidate-intel";
 import { listCandidateEvents, type CandidateEvent } from "@/lib/candidate-events";
@@ -51,6 +52,8 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   if (!organization) notFound();
 
   const sessionContext = await requireOrgSession(orgSlug);
+  const writable = canWrite(sessionContext.user.role);
+  const resumesOk = canViewResumes(sessionContext.user.role);
 
   const application = getApplicationDetail(id, organization.id);
   if (!application) notFound();
@@ -122,22 +125,32 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <ApplicationStatusSelect
-              orgSlug={orgSlug}
-              applicationId={application.id}
-              initialStatus={application.status}
-            />
+            {writable ? (
+              <ApplicationStatusSelect
+                orgSlug={orgSlug}
+                applicationId={application.id}
+                initialStatus={application.status}
+              />
+            ) : (
+              <span className="inline-flex rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
+                {application.status}
+              </span>
+            )}
             {submission ? (
               <Link href={`/o/${orgSlug}/admin/applications/${application.id}/kit`} className="btn-primary text-sm">
                 📋 Interview kit
               </Link>
             ) : null}
-            <a
-              href={`/api/o/${orgSlug}/applications/${application.id}/resume`}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              ⬇ {application.resume_filename}
-            </a>
+            {resumesOk ? (
+              <a
+                href={`/api/o/${orgSlug}/applications/${application.id}/resume`}
+                className="text-sm text-blue-600 hover:underline"
+              >
+                ⬇ {application.resume_filename}
+              </a>
+            ) : (
+              <span className="text-xs text-zinc-400">Resume access restricted</span>
+            )}
           </div>
         </div>
       </div>
@@ -365,22 +378,28 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
                 </a>
               ) : null}
             </div>
-            <EmailPanel
-              orgSlug={orgSlug}
-              applicationId={application.id}
-              currentStatus={application.status}
-              tokens={{
-                candidateName: application.applicant_name,
-                jobTitle: application.job_title,
-                orgName: organization.name,
-                recruiterName: sessionContext.user.name,
-              }}
-            />
+            {writable ? (
+              <EmailPanel
+                orgSlug={orgSlug}
+                applicationId={application.id}
+                currentStatus={application.status}
+                tokens={{
+                  candidateName: application.applicant_name,
+                  jobTitle: application.job_title,
+                  orgName: organization.name,
+                  recruiterName: sessionContext.user.name,
+                }}
+              />
+            ) : null}
           </section>
 
           <section className="card space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Notes</h2>
-            <NoteForm orgSlug={orgSlug} applicationId={application.id} />
+            {writable ? (
+              <NoteForm orgSlug={orgSlug} applicationId={application.id} />
+            ) : (
+              <p className="text-sm text-zinc-500">Read-only: your role can&apos;t add notes.</p>
+            )}
           </section>
 
           <section className="card space-y-4">

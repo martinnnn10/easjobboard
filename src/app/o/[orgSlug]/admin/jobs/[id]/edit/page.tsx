@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { JobForm } from "@/components/JobForm";
 import { requireOrgSession } from "@/lib/auth";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { canWrite } from "@/lib/roles";
 
 type PageProps = { params: Promise<{ orgSlug: string; id: string }> };
 
@@ -12,7 +13,8 @@ export default async function EditOrgJobPage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+  if (!canWrite(user.role)) redirect(`/o/${orgSlug}/admin`);
 
   const job = getJobById(id);
   if (!job || job.organization_id !== organization.id) notFound();

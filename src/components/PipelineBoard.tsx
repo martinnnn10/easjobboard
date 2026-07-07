@@ -36,7 +36,15 @@ const COLUMN_ACCENTS: Record<ApplicationStatus, string> = {
  * Drag-and-drop pipeline: drag a candidate card between stage columns; the
  * stage change is saved optimistically and reverted if the API call fails.
  */
-export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; initialCards: PipelineCard[] }) {
+export function PipelineBoard({
+  orgSlug,
+  initialCards,
+  readOnly = false,
+}: {
+  orgSlug: string;
+  initialCards: PipelineCard[];
+  readOnly?: boolean;
+}) {
   const [cards, setCards] = useState(initialCards);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<ApplicationStatus | null>(null);
@@ -72,12 +80,12 @@ export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; init
           return (
             <div
               key={status}
-              onDragOver={(event) => {
+              onDragOver={readOnly ? undefined : (event) => {
                 event.preventDefault();
                 setOverColumn(status);
               }}
-              onDragLeave={() => setOverColumn((current) => (current === status ? null : current))}
-              onDrop={(event) => {
+              onDragLeave={readOnly ? undefined : () => setOverColumn((current) => (current === status ? null : current))}
+              onDrop={readOnly ? undefined : (event) => {
                 event.preventDefault();
                 const id = event.dataTransfer.getData("text/plain") || dragId;
                 setOverColumn(null);
@@ -98,16 +106,16 @@ export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; init
                 {columnCards.map((card) => (
                   <div
                     key={card.id}
-                    draggable
-                    onDragStart={(event) => {
+                    draggable={!readOnly}
+                    onDragStart={readOnly ? undefined : (event) => {
                       event.dataTransfer.setData("text/plain", card.id);
                       event.dataTransfer.effectAllowed = "move";
                       setDragId(card.id);
                     }}
-                    onDragEnd={() => setDragId(null)}
-                    className={`cursor-grab rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition active:cursor-grabbing ${
-                      dragId === card.id ? "opacity-50" : ""
-                    }`}
+                    onDragEnd={readOnly ? undefined : () => setDragId(null)}
+                    className={`rounded-lg border border-zinc-200 bg-white p-3 shadow-sm transition ${
+                      readOnly ? "" : "cursor-grab active:cursor-grabbing"
+                    } ${dragId === card.id ? "opacity-50" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <Link
@@ -135,7 +143,9 @@ export function PipelineBoard({ orgSlug, initialCards }: { orgSlug: string; init
         })}
       </div>
       <p className="text-xs text-zinc-500">
-        Drag a card to move a candidate between stages. Click a name to open their full profile and activity.
+        {readOnly
+          ? "Read-only view. Click a name to open their full profile and activity."
+          : "Drag a card to move a candidate between stages. Click a name to open their full profile and activity."}
       </p>
     </div>
   );
