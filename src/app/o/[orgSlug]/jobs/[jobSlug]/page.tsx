@@ -3,7 +3,7 @@ import Script from "next/script";
 import Link from "next/link";
 import { ApplicationForm } from "@/components/ApplicationForm";
 import { getOrgJobUrl } from "@/lib/env";
-import { buildGoogleJobPostingJsonLd } from "@/lib/feeds/google-jobs";
+import { buildGoogleJobPostingJsonLd, serializeJsonLd } from "@/lib/feeds/google-jobs";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getScreen, toPublicScreen } from "@/lib/screens";
@@ -65,7 +65,7 @@ export default async function OrgJobPage({ params }: PageProps) {
         <Script
           id="google-job-posting"
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
 
         <article className="card space-y-4">

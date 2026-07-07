@@ -20,15 +20,15 @@ export async function extractResumeText(buffer: Buffer, kind: ResumeKind): Promi
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText();
-    return normalize(result.text ?? "");
-  } finally {
-    // Release the worker/document resources if the library exposes a cleanup.
-    await parser.destroy?.();
-  }
+  // pdf-parse v1's bundled pdf.js runs headless in Node. (v2 pulls in
+  // pdfjs-dist, which references browser globals like DOMMatrix and throws in
+  // the standalone/production Node runtime.) Import the internal lib entry to
+  // skip the package's index.js debug self-test, which reads a sample file on
+  // import. Dynamic import keeps the heavy library out of the initial bundle.
+  const mod = await import("pdf-parse/lib/pdf-parse.js");
+  const pdfParse = mod.default;
+  const result = await pdfParse(buffer);
+  return normalize(result.text ?? "");
 }
 
 async function extractDocxText(buffer: Buffer): Promise<string> {

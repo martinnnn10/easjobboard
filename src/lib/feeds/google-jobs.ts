@@ -56,3 +56,17 @@ export function buildGoogleJobPostingJsonLd(organization: Organization, job: Job
 
   return posting;
 }
+
+/**
+ * Serialize a JSON-LD object for safe embedding inside an inline
+ * <script type="application/ld+json"> tag. JSON.stringify alone does not
+ * escape "<", so a job field containing "</script>" (or "<!--") could break
+ * out of the script element. Escaping the HTML-significant characters as
+ * unicode escapes keeps the JSON valid while making breakout impossible.
+ */
+export function serializeJsonLd(data: Record<string, unknown>): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026");
+}
