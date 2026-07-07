@@ -20,10 +20,10 @@ export type SyndicationBoard = {
 export const SYNDICATION_BOARDS: SyndicationBoard[] = [
   {
     name: "Indeed",
-    tier: "automatic",
+    tier: "register",
     feed: "Indeed / generic XML",
     url: "https://www.indeed.com",
-    note: "Submit your Indeed XML feed URL once in Indeed's employer/XML feed program; updates are then pulled automatically.",
+    note: "Register your Indeed XML feed URL once in Indeed's employer/XML feed program; after that one-time setup Indeed pulls updates automatically. Not zero-setup — it requires the manual registration.",
   },
   {
     name: "Google for Jobs",

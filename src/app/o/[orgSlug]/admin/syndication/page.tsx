@@ -58,8 +58,10 @@ export default async function SyndicationPage({ params }: PageProps) {
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-zinc-900">Job distribution</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Your published jobs syndicate automatically to <span className="font-medium">{automaticCount}</span> channels,
-          and the same feeds can be registered with <span className="font-medium">{registerCount}</span> more aggregators.
+          <span className="font-medium">{automaticCount === 1 ? "One channel is" : `${automaticCount} channels are`} fully
+          automatic</span> — Google for Jobs reads structured data embedded on every job page, no setup required. Your
+          other <span className="font-medium">{registerCount}</span> channels use the same feeds below: register the feed
+          URL once with each board, then updates flow automatically.
         </p>
       </div>
 

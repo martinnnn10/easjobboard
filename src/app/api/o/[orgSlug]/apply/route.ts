@@ -120,6 +120,7 @@ export async function POST(request: Request, context: RouteContext) {
     let resumeText = "";
     let resumeSkills: string[] = [];
     let matchScore: number | null = null;
+    let matchMethod = "";
     try {
       resumeText = await extractResumeText(buffer, resumeKind);
       if (resumeText) {
@@ -130,6 +131,9 @@ export async function POST(request: Request, context: RouteContext) {
         });
         resumeSkills = result.resumeSkills;
         matchScore = result.score;
+        // Record HOW the score was computed so a silent LLM→keyword fallback is
+        // never invisible — the value surfaces next to the score in the admin UI.
+        matchMethod = result.score === null ? "" : result.method;
       }
     } catch (parseError) {
       console.error("Resume parsing/scoring failed (application still saved):", parseError);
@@ -233,6 +237,7 @@ export async function POST(request: Request, context: RouteContext) {
       resume_text: resumeText,
       resume_skills: resumeSkills,
       match_score: matchScore,
+      match_method: matchMethod,
       applicant_location: applicantLocation,
       desired_pay: desiredPay,
       screen_status: screenStatus,

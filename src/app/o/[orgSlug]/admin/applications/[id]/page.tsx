@@ -156,9 +156,13 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
             </div>
           </div>
           <div>
-            <p className="section-label">Resume keyword match</p>
+            <p className="section-label">Resume match</p>
             <p className="mt-1.5 text-sm font-semibold text-zinc-500">
-              {application.match_score === null ? "Not scored" : `${application.match_score}% — secondary signal`}
+              {application.match_score === null
+                ? "Not scored"
+                : `${application.match_score}% · ${
+                    application.match_method === "llm" ? "AI semantic" : "keyword-only"
+                  } — secondary signal`}
             </p>
           </div>
           <div>

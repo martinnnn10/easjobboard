@@ -73,6 +73,8 @@ export type Application = {
   status: ApplicationStatus;
   resume_skills: string[];
   match_score: number | null;
+  /** How match_score was computed: "llm" (semantic) or "heuristic" (keyword). "" = not scored. */
+  match_method: string;
   /** Applicant-supplied context that powers risk flags. */
   applicant_location: string;
   desired_pay: string;
@@ -353,6 +355,9 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "applications", "match_score")) {
     database.exec("ALTER TABLE applications ADD COLUMN match_score INTEGER");
   }
+  if (!columnExists(database, "applications", "match_method")) {
+    database.exec("ALTER TABLE applications ADD COLUMN match_method TEXT NOT NULL DEFAULT ''");
+  }
   // Skills-screen + candidate-intelligence columns.
   if (!columnExists(database, "applications", "applicant_location")) {
     database.exec("ALTER TABLE applications ADD COLUMN applicant_location TEXT NOT NULL DEFAULT ''");
@@ -476,6 +481,7 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     status: (row.status as ApplicationStatus | undefined) ?? "new",
     resume_skills: parseSkills(row.resume_skills),
     match_score: row.match_score == null ? null : Number(row.match_score),
+    match_method: (row.match_method as string | undefined) ?? "",
     applicant_location: (row.applicant_location as string | undefined) ?? "",
     desired_pay: (row.desired_pay as string | undefined) ?? "",
     screen_status: (row.screen_status as ScreenStatus | undefined) ?? "none",

@@ -13,6 +13,7 @@ import {
   getScreeningStats,
   listApplicationsByOrganization,
 } from "@/lib/applications";
+import { isLlmConfigured } from "@/lib/anthropic";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { badgesForApplication } from "@/lib/candidate-intel";
@@ -59,14 +60,24 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const publishedSlug = (await searchParams).published;
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
 
+  const llmOn = isLlmConfigured();
+
   return (
     <div className="page-shell space-y-8">
+      {!llmOn ? (
+        <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span className="font-semibold">AI matching is off.</span> Resume match scores are computed with the
+          keyword-only fallback (labeled &ldquo;keyword-only&rdquo; on each candidate). Set{" "}
+          <code className="rounded bg-white/70 px-1">ANTHROPIC_API_KEY</code> to enable semantic scoring. Skills-screen
+          scores are unaffected.
+        </section>
+      ) : null}
       {publishedJob ? (
         <section className="rounded-xl border border-green-200 bg-green-50 p-6">
           <h2 className="text-lg font-semibold text-green-900">🎉 Your job is live!</h2>
           <p className="mt-1 text-sm text-green-800">
-            <span className="font-medium">{publishedJob.title}</span> is now on your careers page and syndicating to
-            job boards. Share it:
+            <span className="font-medium">{publishedJob.title}</span> is now on your careers page and discoverable via
+            Google for Jobs. Register your feeds under Distribution to reach more boards. Share it:
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <code className="rounded bg-white px-2 py-1 text-green-900">{getJobPublicUrl(orgSlug, publishedJob.slug)}</code>
@@ -262,7 +273,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <div>
             <h2 className="font-semibold text-zinc-900">Job distribution</h2>
             <p className="text-sm text-zinc-600">
-              Published jobs syndicate to Indeed and Google for Jobs automatically.
+              Published jobs appear on Google for Jobs automatically; register your feeds once to reach Indeed and more.
             </p>
           </div>
         </div>
@@ -286,7 +297,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
               <h3 className="text-lg font-semibold text-zinc-900">Post your first job in under a minute</h3>
               <p className="mx-auto mt-1 max-w-md text-sm text-zinc-600">
                 Pick a role template, confirm the location, and publish. Your job goes live on your careers page and
-                starts syndicating to job boards immediately.
+                becomes discoverable on Google for Jobs immediately.
               </p>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3">

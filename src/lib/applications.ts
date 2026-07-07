@@ -33,6 +33,7 @@ export function createApplication(input: {
   resume_text?: string;
   resume_skills?: string[];
   match_score?: number | null;
+  match_method?: string;
   applicant_location?: string;
   desired_pay?: string;
   screen_status?: ScreenStatus;
@@ -50,12 +51,12 @@ export function createApplication(input: {
       `INSERT INTO applications (
         id, organization_id, job_id, applicant_name, applicant_email, applicant_phone,
         cover_letter, resume_filename, resume_content_type, resume_data,
-        resume_text, resume_skills, match_score, applicant_location, desired_pay,
+        resume_text, resume_skills, match_score, match_method, applicant_location, desired_pay,
         screen_status, screen_score, risk_level, risk_flags, screen_summary, created_at
       ) VALUES (
         @id, @organization_id, @job_id, @applicant_name, @applicant_email, @applicant_phone,
         @cover_letter, @resume_filename, @resume_content_type, @resume_data,
-        @resume_text, @resume_skills, @match_score, @applicant_location, @desired_pay,
+        @resume_text, @resume_skills, @match_score, @match_method, @applicant_location, @desired_pay,
         @screen_status, @screen_score, @risk_level, @risk_flags, @screen_summary, @created_at
       )`,
     )
@@ -73,6 +74,7 @@ export function createApplication(input: {
       resume_text: input.resume_text ?? "",
       resume_skills: JSON.stringify(input.resume_skills ?? []),
       match_score: input.match_score ?? null,
+      match_method: input.match_method ?? "",
       applicant_location: input.applicant_location ?? "",
       desired_pay: input.desired_pay ?? "",
       screen_status: input.screen_status ?? "none",
