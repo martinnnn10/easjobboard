@@ -9,11 +9,12 @@ import {
   listApplicationsByOrganization,
 } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { careAlertsForOwner, sweepEscalations } from "@/lib/candidate-care";
 import { resumeTrapCandidates } from "@/lib/gap-analysis";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getRoiStats } from "@/lib/roi";
-import { canWrite } from "@/lib/roles";
+import { canManageTeam, canWrite } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
@@ -27,6 +28,12 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
 
   const sessionContext = await requireOrgSession(orgSlug);
   const writable = canWrite(sessionContext.user.role);
+  const isOwner = canManageTeam(sessionContext.user.role);
+
+  // Owners drive the Candidate Care SLA — sweep lapsed follow-ups on load, then
+  // surface what needs attention.
+  if (isOwner) await sweepEscalations(organization.id);
+  const careAlerts = isOwner ? careAlertsForOwner(organization.id) : null;
 
   const jobs = listJobsByOrganization(organization.id);
   const allApplicants = listApplicationsByOrganization(organization.id, { orderBy: "score" });
@@ -163,6 +170,62 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <p className="mt-1 text-xs text-zinc-500">Roles that need sourcing attention →</p>
         </Link>
       </section>
+
+      {/* Candidate Care alerts — owner accountability view */}
+      {careAlerts && careAlerts.totalOpen > 0 ? (
+        <section
+          className={`rounded-2xl border p-5 ${
+            careAlerts.escalated.length > 0 ? "border-red-200 bg-red-50" : "border-zinc-200 bg-white"
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">Candidate Care alerts</p>
+              <h2 className="mt-1 text-lg font-bold text-zinc-900">
+                {careAlerts.escalated.length > 0
+                  ? `${careAlerts.escalated.length} follow-up${careAlerts.escalated.length === 1 ? "" : "s"} escalated past SLA`
+                  : careAlerts.overdue.length > 0
+                    ? `${careAlerts.overdue.length} follow-up${careAlerts.overdue.length === 1 ? "" : "s"} overdue`
+                    : "Candidate care on track"}
+              </h2>
+            </div>
+            <Link href={`/o/${orgSlug}/admin/care`} className="btn-secondary text-sm">
+              Open Candidate Care →
+            </Link>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-zinc-200 bg-white p-3">
+              <p className="text-2xl font-bold text-red-600">{careAlerts.escalated.length}</p>
+              <p className="text-xs text-zinc-500">Escalated to you</p>
+            </div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-3">
+              <p className="text-2xl font-bold text-amber-600">{careAlerts.overdue.length}</p>
+              <p className="text-xs text-zinc-500">Overdue, not yet escalated</p>
+            </div>
+            <div className="rounded-xl border border-zinc-200 bg-white p-3">
+              <p className="text-2xl font-bold text-amber-600">{careAlerts.interviewsSoonNoCheckin.length}</p>
+              <p className="text-xs text-zinc-500">Interviews ≤48h, no check-in</p>
+            </div>
+          </div>
+          {careAlerts.escalated.length > 0 ? (
+            <ul className="mt-3 space-y-1.5 text-sm">
+              {careAlerts.escalated.slice(0, 4).map((t) => (
+                <li key={t.id} className="flex flex-wrap items-center gap-x-2">
+                  <Link
+                    href={`/o/${orgSlug}/admin/candidates/${t.candidate_id}`}
+                    className="font-medium text-zinc-900 hover:text-brand-700"
+                  >
+                    {t.candidateName}
+                  </Link>
+                  <span className="text-xs text-zinc-500">
+                    {t.jobTitle && t.jobTitle !== "—" ? `${t.jobTitle} · ` : ""}owner {t.recruiterName}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* The resume trap — the differentiated hook */}
       {trapCandidates.length > 0 ? (

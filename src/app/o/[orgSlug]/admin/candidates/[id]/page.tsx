@@ -1,19 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AssignRecruiterSelect } from "@/components/AssignRecruiterSelect";
 import { AttachToJobForm } from "@/components/AttachToJobForm";
 import { CandidateCrmPanel } from "@/components/CandidateCrmPanel";
 import { CandidateNoteForm } from "@/components/CandidateNoteForm";
+import { ConfirmCareTaskPanel } from "@/components/ConfirmCareTaskPanel";
+import { ScheduleInterviewForm } from "@/components/ScheduleInterviewForm";
 import { ConfidencePill, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { careForCandidate } from "@/lib/candidate-care";
 import { CANDIDATE_SOURCE_LABELS, isCandidateSource } from "@/lib/candidate-meta";
 import { buildWhyThisCandidate, normalizeRiskLevel } from "@/lib/candidate-intel";
+import { CARE_STATUS_LABELS, careTaskTypeLabel, interviewTypeLabel, type CareTaskStatus } from "@/lib/care-meta";
 import { getCandidateWithApplications } from "@/lib/candidates";
 import { listEventsByCandidate, type CandidateEventType } from "@/lib/candidate-events";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
-import { canWrite } from "@/lib/roles";
+import { canManageTeam, canWrite } from "@/lib/roles";
 import { getScreenSubmission } from "@/lib/screen-submissions";
 import { listUsersByOrganization } from "@/lib/users";
 
@@ -26,6 +31,22 @@ const EVENT_ICON: Record<CandidateEventType, string> = {
   email_sent: "✉",
   sourced: "🔎",
   call: "📞",
+  interview: "📅",
+  care: "🛎",
+};
+
+function careWhen(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? new Date(t).toLocaleString() : iso;
+}
+
+const CARE_STATUS_STYLE: Partial<Record<CareTaskStatus, string>> = {
+  open: "bg-zinc-100 text-zinc-600",
+  snoozed: "bg-zinc-100 text-zinc-600",
+  confirmed: "bg-brand-50 text-brand-700",
+  escalated: "bg-red-100 text-red-700",
+  missed: "bg-red-100 text-red-700",
+  cancelled: "bg-zinc-100 text-zinc-400",
 };
 
 function WhyColumn({ title, tone, items, empty }: {
@@ -61,15 +82,29 @@ export default async function CandidateProfilePage({ params }: PageProps) {
 
   const { user } = await requireOrgSession(orgSlug);
   const writable = canWrite(user.role);
+  const isOwner = canManageTeam(user.role);
 
   const candidate = getCandidateWithApplications(id, organization.id);
   if (!candidate) notFound();
 
   const events = listEventsByCandidate(candidate.id, organization.id);
-  const members = listUsersByOrganization(organization.id).map((u) => ({ id: u.id, name: u.name }));
+  const orgUsers = listUsersByOrganization(organization.id);
+  const members = orgUsers.map((u) => ({ id: u.id, name: u.name }));
+  const recruiters = orgUsers.filter((u) => u.role !== "viewer").map((u) => ({ id: u.id, name: u.name }));
   const jobs = writable
     ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title }))
     : [];
+
+  // Candidate Care: assignments, interviews, and the follow-up tasks that keep
+  // this candidate warm around each interview.
+  const care = careForCandidate(organization.id, candidate.id);
+  const nowIso = new Date().toISOString();
+  const upcomingInterviews = care.interviews.filter((iv) => iv.interview_datetime >= nowIso);
+  const pastInterviews = care.interviews.filter((iv) => iv.interview_datetime < nowIso);
+  const outstandingTasks = care.tasks.filter((t) => ["open", "snoozed", "escalated"].includes(t.status));
+  const completedTasks = care.tasks.filter((t) => t.status === "confirmed");
+  const closedTasks = care.tasks.filter((t) => ["missed", "cancelled"].includes(t.status));
+  const hasCare = care.assignments.length > 0 || care.interviews.length > 0 || care.tasks.length > 0;
   const sourceLabel = isCandidateSource(candidate.source) ? CANDIDATE_SOURCE_LABELS[candidate.source] : candidate.source;
   const isSourced = candidate.source !== "applied";
 
@@ -230,6 +265,161 @@ export default async function CandidateProfilePage({ params }: PageProps) {
               ? "Attach this candidate to a job below to screen their practical ability."
               : "Once their screen is completed, the intelligence — strengths, risks, and what to verify — appears here."}
           </p>
+        )}
+      </section>
+
+      {/* Candidate Care — recruiter accountability around interviews. */}
+      <section className="card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-900">Candidate Care</h2>
+            <p className="text-xs text-zinc-500">Interviews and the follow-ups that keep this candidate engaged.</p>
+          </div>
+          {writable ? (
+            <ScheduleInterviewForm orgSlug={orgSlug} candidateId={candidate.id} jobs={jobs} compact />
+          ) : null}
+        </div>
+
+        {!hasCare ? (
+          <p className="text-sm text-zinc-500">
+            No interviews scheduled yet.{" "}
+            {writable ? "Schedule one to auto-create the pre-interview, day-of, and post-interview follow-ups." : ""}
+          </p>
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-2">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Assigned</p>
+                {care.assignments.length === 0 ? (
+                  <p className="mt-1 text-sm text-zinc-400">No recruiter assigned on a req yet.</p>
+                ) : (
+                  <ul className="mt-1 space-y-2">
+                    {care.assignments.map((a) => (
+                      <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span className="text-zinc-700">
+                          {a.jobTitle}
+                          {a.status !== "active" ? (
+                            <span className="ml-1 text-xs text-zinc-400">({a.status})</span>
+                          ) : null}
+                        </span>
+                        {writable && a.status === "active" ? (
+                          <AssignRecruiterSelect
+                            orgSlug={orgSlug}
+                            jobId={a.job_id}
+                            candidateId={candidate.id}
+                            recruiters={recruiters}
+                            currentRecruiterId={a.assigned_recruiter_id}
+                          />
+                        ) : (
+                          <span className="text-xs font-medium text-zinc-600">{a.recruiterName}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Upcoming interviews</p>
+                {upcomingInterviews.length === 0 ? (
+                  <p className="mt-1 text-sm text-zinc-400">None scheduled.</p>
+                ) : (
+                  <ul className="mt-1 space-y-1.5 text-sm text-zinc-700">
+                    {upcomingInterviews.map((iv) => (
+                      <li key={iv.id}>
+                        <span className="font-medium">{careWhen(iv.interview_datetime)}</span>
+                        {" · "}
+                        {iv.interview_title || interviewTypeLabel(iv.interview_type)}
+                        {iv.stage ? ` · ${iv.stage}` : ""}
+                        {iv.location ? <span className="block text-xs text-zinc-500">{iv.location}</span> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {pastInterviews.length > 0 ? (
+                  <p className="mt-1 text-xs text-zinc-400">
+                    {pastInterviews.length} past interview{pastInterviews.length === 1 ? "" : "s"}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Required follow-ups ({outstandingTasks.length})
+                </p>
+                {outstandingTasks.length === 0 ? (
+                  <p className="mt-1 text-sm text-zinc-400">All follow-ups handled.</p>
+                ) : (
+                  <ul className="mt-1 space-y-2">
+                    {outstandingTasks.map((t) => {
+                      const overdue = t.due_at <= nowIso;
+                      return (
+                        <li key={t.id} className="rounded-lg border border-zinc-200 p-2.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-zinc-800">{careTaskTypeLabel(t.task_type)}</span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                CARE_STATUS_STYLE[t.status as CareTaskStatus] ?? "bg-zinc-100 text-zinc-600"
+                              }`}
+                            >
+                              {t.status === "escalated"
+                                ? "Escalated"
+                                : overdue
+                                  ? "Overdue"
+                                  : CARE_STATUS_LABELS[t.status as CareTaskStatus] ?? t.status}
+                            </span>
+                          </div>
+                          <p className={`text-xs ${overdue ? "font-medium text-red-600" : "text-zinc-500"}`}>
+                            Due {careWhen(t.due_at)}
+                          </p>
+                          <div className="mt-2">
+                            <ConfirmCareTaskPanel
+                              orgSlug={orgSlug}
+                              taskId={t.id}
+                              canConfirm={writable && (isOwner || t.assigned_recruiter_id === user.id)}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+
+              {completedTasks.length > 0 ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Completed ({completedTasks.length})
+                  </p>
+                  <ul className="mt-1 space-y-1 text-sm text-zinc-600">
+                    {completedTasks.map((t) => (
+                      <li key={t.id} className="flex items-center gap-1.5">
+                        <span aria-hidden className="text-brand-600">✓</span>
+                        {careTaskTypeLabel(t.task_type)}
+                        <span className="text-xs text-zinc-400">· {careWhen(t.confirmed_at || t.updated_at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {closedTasks.length > 0 ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Missed / cancelled</p>
+                  <ul className="mt-1 space-y-1 text-sm text-zinc-500">
+                    {closedTasks.map((t) => (
+                      <li key={t.id}>
+                        {careTaskTypeLabel(t.task_type)} —{" "}
+                        {CARE_STATUS_LABELS[t.status as CareTaskStatus] ?? t.status}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          </div>
         )}
       </section>
 

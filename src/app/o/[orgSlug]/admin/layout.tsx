@@ -31,6 +31,7 @@ export default async function AdminLayout({ children, params }: LayoutProps) {
   const nav: NavItem[] = [
     { key: "dashboard", label: "Dashboard", href: base },
     { key: "queue", label: "Call Queue", href: `${base}/queue` },
+    { key: "care", label: "Candidate Care", href: `${base}/care` },
     { key: "jobs", label: "Jobs", href: `${base}/jobs` },
     { key: "applicants", label: "Applicants", href: `${base}/applicants` },
     { key: "pipeline", label: "Pipeline", href: `${base}/pipeline` },

@@ -172,6 +172,12 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
         <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
       </>
     ),
+    care: (
+      <>
+        <path d="M12 21s-7-4.5-9.5-9A4.5 4.5 0 0 1 12 6.5 4.5 4.5 0 0 1 21.5 12c-2.5 4.5-9.5 9-9.5 9z" />
+        <path d="M3 12h4l1.5-3 2.5 5 1.5-3H21" />
+      </>
+    ),
     team: (
       <>
         <circle cx="9" cy="8" r="3" />

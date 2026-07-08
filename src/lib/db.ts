@@ -547,6 +547,73 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_screen_submissions_job ON screen_submissions(job_id);
   `);
 
+  // Candidate Care: per-req recruiter assignment, scheduled interviews, and the
+  // SLA follow-up tasks that keep candidates engaged before/after each step.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS candidate_assignments (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      candidate_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      assigned_recruiter_id TEXT NOT NULL,
+      assigned_by TEXT NOT NULL DEFAULT '',
+      assigned_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_assignments_job ON candidate_assignments(job_id);
+    CREATE INDEX IF NOT EXISTS idx_assignments_candidate ON candidate_assignments(candidate_id);
+
+    CREATE TABLE IF NOT EXISTS interviews (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      candidate_id TEXT NOT NULL,
+      job_id TEXT NOT NULL DEFAULT '',
+      application_id TEXT,
+      client TEXT NOT NULL DEFAULT '',
+      interview_title TEXT NOT NULL DEFAULT '',
+      interview_type TEXT NOT NULL DEFAULT '',
+      interview_datetime TEXT NOT NULL,
+      timezone TEXT NOT NULL DEFAULT '',
+      location TEXT NOT NULL DEFAULT '',
+      hiring_manager TEXT NOT NULL DEFAULT '',
+      stage TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_by TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_interviews_candidate ON interviews(candidate_id);
+    CREATE INDEX IF NOT EXISTS idx_interviews_job ON interviews(job_id);
+
+    CREATE TABLE IF NOT EXISTS care_tasks (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      candidate_id TEXT NOT NULL,
+      job_id TEXT NOT NULL DEFAULT '',
+      application_id TEXT,
+      interview_id TEXT,
+      assigned_recruiter_id TEXT NOT NULL DEFAULT '',
+      task_type TEXT NOT NULL,
+      due_at TEXT NOT NULL,
+      escalation_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      confirmed_at TEXT NOT NULL DEFAULT '',
+      confirmed_by TEXT NOT NULL DEFAULT '',
+      contact_method TEXT NOT NULL DEFAULT '',
+      outcome TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      escalated_at TEXT NOT NULL DEFAULT '',
+      escalated_to TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_care_tasks_recruiter ON care_tasks(assigned_recruiter_id);
+    CREATE INDEX IF NOT EXISTS idx_care_tasks_candidate ON care_tasks(candidate_id);
+    CREATE INDEX IF NOT EXISTS idx_care_tasks_status ON care_tasks(status);
+  `);
+
   // Migrations: add columns to databases created before these features existed.
   if (!columnExists(database, "applications", "status")) {
     database.exec("ALTER TABLE applications ADD COLUMN status TEXT NOT NULL DEFAULT 'new'");

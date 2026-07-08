@@ -123,6 +123,53 @@ export async function sendTeamInviteEmail(input: {
   });
 }
 
+/**
+ * Escalation to the owner/director when a required Candidate Care follow-up
+ * wasn't confirmed within the SLA window.
+ */
+export async function sendCareEscalationEmail(input: {
+  organization: Organization;
+  to: string[];
+  candidateName: string;
+  jobTitle: string;
+  interviewWhen: string;
+  recruiterName: string;
+  taskLabel: string;
+  dueAt: string;
+  profileUrl: string;
+  careUrl: string;
+}): Promise<void> {
+  const { smtp, transporter } = createTransport();
+  const dueLocal = (() => {
+    const t = Date.parse(input.dueAt);
+    return Number.isFinite(t) ? new Date(t).toLocaleString() : input.dueAt;
+  })();
+
+  await transporter.sendMail({
+    from: `"${input.organization.name}" <${smtp.fromEmail}>`,
+    to: input.to.join(", "),
+    replyTo: input.organization.application_email,
+    subject: `Candidate Care overdue: ${input.candidateName}${input.jobTitle ? ` — ${input.jobTitle}` : ""}`,
+    text: [
+      "A required Candidate Care follow-up wasn't confirmed within the SLA window.",
+      "",
+      `Candidate: ${input.candidateName}`,
+      input.jobTitle ? `Job req: ${input.jobTitle}` : "",
+      input.interviewWhen ? `Interview: ${input.interviewWhen}` : "",
+      `Assigned recruiter: ${input.recruiterName}`,
+      `Missed task: ${input.taskLabel}`,
+      `Due: ${dueLocal}`,
+      "",
+      `Candidate profile: ${input.profileUrl}`,
+      `Candidate Care queue: ${input.careUrl}`,
+      "",
+      `— ${getPlatformName()}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  });
+}
+
 type ConfirmationEmailInput = {
   organization: Organization;
   job: Job;

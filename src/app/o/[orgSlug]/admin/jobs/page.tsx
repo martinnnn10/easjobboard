@@ -86,7 +86,12 @@ export default async function JobsPage({ params }: PageProps) {
                 return (
                   <tr key={job.id} className="border-b border-zinc-100 last:border-0">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-zinc-900">{job.title}</div>
+                      <Link
+                        href={`/o/${orgSlug}/admin/jobs/${job.id}`}
+                        className="font-medium text-zinc-900 hover:text-brand-700"
+                      >
+                        {job.title}
+                      </Link>
                       <div className="text-xs text-zinc-500">{job.location}</div>
                     </td>
                     <td className="px-4 py-3">
