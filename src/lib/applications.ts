@@ -404,6 +404,9 @@ export type JobScreeningSummary = {
   completed: number;
   strongFit: number;
   needsReview: number;
+  highRisk: number;
+  /** Queue-eligible: completed screen ≥ review floor, still new/screening. */
+  callsDue: number;
 };
 
 /**
@@ -417,15 +420,19 @@ export function getJobScreeningSummaries(organizationId: string): Record<string,
          COUNT(*) AS applicants,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN 1 ELSE 0 END) AS completed,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND risk_level != 'high' THEN 1 ELSE 0 END) AS strong,
-         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND screen_score < ? THEN 1 ELSE 0 END) AS review
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND screen_score < ? THEN 1 ELSE 0 END) AS review,
+         SUM(CASE WHEN risk_level = 'high' THEN 1 ELSE 0 END) AS high_risk,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND status IN ('new','screening') THEN 1 ELSE 0 END) AS calls_due
        FROM applications WHERE organization_id = ? GROUP BY job_id`,
     )
-    .all(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId) as Array<{
+    .all(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, REVIEW_FLOOR, organizationId) as Array<{
     job_id: string;
     applicants: number;
     completed: number;
     strong: number;
     review: number;
+    high_risk: number;
+    calls_due: number;
   }>;
 
   const out: Record<string, JobScreeningSummary> = {};
@@ -435,6 +442,8 @@ export function getJobScreeningSummaries(organizationId: string): Record<string,
       completed: row.completed,
       strongFit: row.strong,
       needsReview: row.review,
+      highRisk: row.high_risk,
+      callsDue: row.calls_due,
     };
   }
   return out;

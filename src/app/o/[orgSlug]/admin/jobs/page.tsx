@@ -74,6 +74,8 @@ export default async function JobsPage({ params }: PageProps) {
                 <th className="px-4 py-3 text-right font-medium">Screened</th>
                 <th className="px-4 py-3 text-right font-medium">Strong-fit</th>
                 <th className="px-4 py-3 text-right font-medium">Review</th>
+                <th className="px-4 py-3 text-right font-medium">High-risk</th>
+                <th className="px-4 py-3 text-right font-medium">Calls due</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -110,6 +112,20 @@ export default async function JobsPage({ params }: PageProps) {
                       <span className={summary?.needsReview ? "font-semibold text-amber-600" : "text-zinc-400"}>
                         {summary?.needsReview ?? 0}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      <span className={summary?.highRisk ? "font-semibold text-red-600" : "text-zinc-400"}>
+                        {summary?.highRisk ?? 0}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {summary?.callsDue ? (
+                        <Link href={`/o/${orgSlug}/admin/queue`} className="font-semibold text-brand-700 hover:underline">
+                          {summary.callsDue}
+                        </Link>
+                      ) : (
+                        <span className="text-zinc-400">0</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2 text-sm">

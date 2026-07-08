@@ -50,6 +50,16 @@ export async function PUT(request: Request, context: RouteContext) {
       screen_key: body.screen_key,
       shift: body.shift,
       certifications: Array.isArray(body.certifications) ? body.certifications : undefined,
+      schedule: body.schedule,
+      overtime: body.overtime,
+      union_status: body.union_status,
+      relocation: body.relocation,
+      plc_platforms: body.plc_platforms,
+      vfd_experience: body.vfd_experience,
+      refrigeration: body.refrigeration,
+      industry: body.industry,
+      travel: body.travel,
+      application_deadline: body.application_deadline,
     });
 
     if (!job) {

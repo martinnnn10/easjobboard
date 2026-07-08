@@ -25,6 +25,16 @@ type JobFormValues = {
   screen_key: string;
   shift: string;
   certifications: string[];
+  schedule: string;
+  overtime: string;
+  union_status: string;
+  relocation: string;
+  plc_platforms: string;
+  vfd_experience: string;
+  refrigeration: string;
+  industry: string;
+  travel: string;
+  application_deadline: string;
 };
 
 const SHIFT_OPTIONS = [
@@ -420,6 +430,16 @@ function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
     screen_key: job ? job.screen_key : "maintenance_tech",
     shift: job?.shift ?? "",
     certifications: job?.certifications ?? [],
+    schedule: job?.schedule ?? "",
+    overtime: job?.overtime ?? "",
+    union_status: job?.union_status ?? "",
+    relocation: job?.relocation ?? "",
+    plc_platforms: job?.plc_platforms ?? "",
+    vfd_experience: job?.vfd_experience ?? "",
+    refrigeration: job?.refrigeration ?? "",
+    industry: job?.industry ?? "",
+    travel: job?.travel ?? "",
+    application_deadline: job?.application_deadline ?? "",
   };
 }
 
@@ -1077,6 +1097,107 @@ export function JobForm({
             event.currentTarget.value = "";
           }}
         />
+      </fieldset>
+
+      {/* Manufacturing details */}
+      <fieldset className="space-y-3 rounded-lg border border-zinc-200 p-4">
+        <legend className="px-2 text-sm font-semibold text-zinc-700">Manufacturing details</legend>
+        <p className="text-xs text-zinc-500">
+          Optional, but these are what skilled-trades candidates screen for first. Shown on the posting.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Schedule</span>
+            <input
+              value={values.schedule}
+              onChange={(e) => updateField("schedule", e.target.value)}
+              placeholder="e.g. Mon–Fri, 4x10, rotating weekends"
+              className="field-input"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Overtime</span>
+            <select value={values.overtime} onChange={(e) => updateField("overtime", e.target.value)} className="field-input">
+              <option value="">Not specified</option>
+              <option value="None">None</option>
+              <option value="Occasional">Occasional</option>
+              <option value="Frequent">Frequent</option>
+              <option value="Required">Required</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Union status</span>
+            <select value={values.union_status} onChange={(e) => updateField("union_status", e.target.value)} className="field-input">
+              <option value="">Not specified</option>
+              <option value="Union">Union</option>
+              <option value="Non-union">Non-union</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Relocation support</span>
+            <select value={values.relocation} onChange={(e) => updateField("relocation", e.target.value)} className="field-input">
+              <option value="">Not specified</option>
+              <option value="Offered">Offered</option>
+              <option value="Case-by-case">Case-by-case</option>
+              <option value="None">None</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">PLC platforms</span>
+            <input
+              value={values.plc_platforms}
+              onChange={(e) => updateField("plc_platforms", e.target.value)}
+              placeholder="e.g. Allen-Bradley, Siemens"
+              className="field-input"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Industry</span>
+            <input
+              value={values.industry}
+              onChange={(e) => updateField("industry", e.target.value)}
+              placeholder="e.g. Food & Beverage, Automotive"
+              className="field-input"
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">VFD experience</span>
+            <select value={values.vfd_experience} onChange={(e) => updateField("vfd_experience", e.target.value)} className="field-input">
+              <option value="">Not specified</option>
+              <option value="Required">Required</option>
+              <option value="Preferred">Preferred</option>
+              <option value="Not required">Not required</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Ammonia / refrigeration</span>
+            <select value={values.refrigeration} onChange={(e) => updateField("refrigeration", e.target.value)} className="field-input">
+              <option value="">Not specified</option>
+              <option value="Required">Required</option>
+              <option value="Preferred">Preferred</option>
+              <option value="Not required">Not required</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Travel</span>
+            <select value={values.travel} onChange={(e) => updateField("travel", e.target.value)} className="field-input">
+              <option value="">Not specified</option>
+              <option value="None">None</option>
+              <option value="Occasional">Occasional</option>
+              <option value="Up to 25%">Up to 25%</option>
+              <option value="Frequent">Frequent</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Application deadline</span>
+            <input
+              type="date"
+              value={values.application_deadline}
+              onChange={(e) => updateField("application_deadline", e.target.value)}
+              className="field-input"
+            />
+          </label>
+        </div>
       </fieldset>
 
       {/* Posting Details */}

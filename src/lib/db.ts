@@ -62,6 +62,26 @@ export type Job = {
   shift: string;
   /** Required certifications/licenses (e.g. "Journeyman", "OSHA 30"). */
   certifications: string[];
+  /** Weekly schedule, e.g. "Mon–Fri, 4x10" ("" = unspecified). */
+  schedule: string;
+  /** Overtime expectation, e.g. "Occasional", "Frequent", "Required". */
+  overtime: string;
+  /** "Union" | "Non-union" | "" (unspecified). */
+  union_status: string;
+  /** Relocation support, e.g. "Offered", "Case-by-case", "None". */
+  relocation: string;
+  /** PLC platforms, e.g. "Allen-Bradley, Siemens". */
+  plc_platforms: string;
+  /** VFD experience expectation: "Required" | "Preferred" | "". */
+  vfd_experience: string;
+  /** Ammonia/refrigeration expectation: "Required" | "Preferred" | "". */
+  refrigeration: string;
+  /** Industry, e.g. "Food & Beverage", "Automotive". */
+  industry: string;
+  /** Travel expectation, e.g. "None", "Occasional", "Up to 25%". */
+  travel: string;
+  /** Application deadline (YYYY-MM-DD) ("" = none). */
+  application_deadline: string;
   created_at: string;
   updated_at: string;
   published_at: string | null;
@@ -626,6 +646,23 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "jobs", "certifications")) {
     database.exec("ALTER TABLE jobs ADD COLUMN certifications TEXT NOT NULL DEFAULT '[]'");
   }
+  // Manufacturing-relevant job fields (all optional TEXT).
+  for (const col of [
+    "schedule",
+    "overtime",
+    "union_status",
+    "relocation",
+    "plc_platforms",
+    "vfd_experience",
+    "refrigeration",
+    "industry",
+    "travel",
+    "application_deadline",
+  ]) {
+    if (!columnExists(database, "jobs", col)) {
+      database.exec(`ALTER TABLE jobs ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_screen_score ON applications(screen_score)");
 }
@@ -699,6 +736,16 @@ export function rowToJob(row: Record<string, unknown>): Job {
     screen_key: (row.screen_key as string | undefined) ?? "",
     shift: (row.shift as string | undefined) ?? "",
     certifications: parseStringArray(row.certifications),
+    schedule: (row.schedule as string | undefined) ?? "",
+    overtime: (row.overtime as string | undefined) ?? "",
+    union_status: (row.union_status as string | undefined) ?? "",
+    relocation: (row.relocation as string | undefined) ?? "",
+    plc_platforms: (row.plc_platforms as string | undefined) ?? "",
+    vfd_experience: (row.vfd_experience as string | undefined) ?? "",
+    refrigeration: (row.refrigeration as string | undefined) ?? "",
+    industry: (row.industry as string | undefined) ?? "",
+    travel: (row.travel as string | undefined) ?? "",
+    application_deadline: (row.application_deadline as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
     published_at: row.published_at as string | null,
