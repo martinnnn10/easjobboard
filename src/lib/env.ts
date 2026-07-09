@@ -69,6 +69,24 @@ export function hasConfiguredPublicDomain(): boolean {
   return host.includes(".");
 }
 
+/** Stripe billing config. Absent keys ⇒ billing runs in "not configured" mode. */
+export function getStripeConfig() {
+  return {
+    secretKey: process.env.STRIPE_SECRET_KEY ?? "",
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    priceId: process.env.STRIPE_PRICE_ID ?? "",
+    // Monthly per-seat price shown in the UI; keep in sync with the Stripe price.
+    seatPriceUsd: Number(process.env.STRIPE_SEAT_PRICE_USD ?? "99"),
+    trialDays: Number(process.env.STRIPE_TRIAL_DAYS ?? "14"),
+  };
+}
+
+/** True only when Stripe can actually transact (secret key + a price to sell). */
+export function isStripeConfigured(): boolean {
+  const { secretKey, priceId } = getStripeConfig();
+  return Boolean(secretKey && priceId);
+}
+
 export function getOrgUrl(orgSlug: string): string {
   return `${getBaseUrl()}/o/${orgSlug}`;
 }

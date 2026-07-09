@@ -17,6 +17,15 @@ export type Organization = {
   website: string;
   application_email: string;
   brand_color: string;
+  /** trialing | active | past_due | canceled | none */
+  billing_status: string;
+  trial_ends_at: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  /** Raw Stripe subscription status when present (trialing|active|past_due|…). */
+  subscription_status: string;
+  plan_seats: number;
+  current_period_end: string;
   created_at: string;
   updated_at: string;
 };
@@ -419,6 +428,21 @@ function initDb(database: Database.Database): void {
     database.exec("ALTER TABLE organizations ADD COLUMN brand_color TEXT NOT NULL DEFAULT ''");
   }
 
+  // Migration: subscription/billing state. Trial is tracked locally so an org
+  // has an honest 14-day trial from signup even before Stripe is involved;
+  // Stripe columns fill in once a subscription is created.
+  for (const [col, ddl] of [
+    ["billing_status", "ALTER TABLE organizations ADD COLUMN billing_status TEXT NOT NULL DEFAULT 'trialing'"],
+    ["trial_ends_at", "ALTER TABLE organizations ADD COLUMN trial_ends_at TEXT NOT NULL DEFAULT ''"],
+    ["stripe_customer_id", "ALTER TABLE organizations ADD COLUMN stripe_customer_id TEXT NOT NULL DEFAULT ''"],
+    ["stripe_subscription_id", "ALTER TABLE organizations ADD COLUMN stripe_subscription_id TEXT NOT NULL DEFAULT ''"],
+    ["subscription_status", "ALTER TABLE organizations ADD COLUMN subscription_status TEXT NOT NULL DEFAULT ''"],
+    ["plan_seats", "ALTER TABLE organizations ADD COLUMN plan_seats INTEGER NOT NULL DEFAULT 0"],
+    ["current_period_end", "ALTER TABLE organizations ADD COLUMN current_period_end TEXT NOT NULL DEFAULT ''"],
+  ] as const) {
+    if (!columnExists(database, "organizations", col)) database.exec(ddl);
+  }
+
   migrateLegacyJobs(database);
 
   if (!tableExists(database, "jobs")) {
@@ -751,6 +775,13 @@ export function rowToOrganization(row: Record<string, unknown>): Organization {
     website: row.website as string,
     application_email: row.application_email as string,
     brand_color: (row.brand_color as string | undefined) ?? "",
+    billing_status: (row.billing_status as string | undefined) ?? "trialing",
+    trial_ends_at: (row.trial_ends_at as string | undefined) ?? "",
+    stripe_customer_id: (row.stripe_customer_id as string | undefined) ?? "",
+    stripe_subscription_id: (row.stripe_subscription_id as string | undefined) ?? "",
+    subscription_status: (row.subscription_status as string | undefined) ?? "",
+    plan_seats: Number(row.plan_seats ?? 0),
+    current_period_end: (row.current_period_end as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };

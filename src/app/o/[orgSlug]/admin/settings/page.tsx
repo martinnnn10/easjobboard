@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
+import { BillingPanel } from "@/components/BillingPanel";
 import { OrgSettingsForm } from "@/components/OrgSettingsForm";
 import { isLlmConfigured } from "@/lib/anthropic";
 import { requireOrgSession } from "@/lib/auth";
-import { getPublicBaseUrl, hasConfiguredPublicDomain } from "@/lib/env";
+import { getBillingState } from "@/lib/billing";
+import { getPlatformEmail, getPublicBaseUrl, hasConfiguredPublicDomain } from "@/lib/env";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam } from "@/lib/roles";
 
@@ -47,13 +49,16 @@ export default async function SettingsPage({ params }: PageProps) {
   }
 
   const domainConfigured = hasConfiguredPublicDomain();
+  const billing = getBillingState(organization);
 
   return (
     <div className="page-shell max-w-3xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Settings</h1>
-        <p className="mt-1 text-sm text-zinc-600">Organization profile and platform configuration.</p>
+        <p className="mt-1 text-sm text-zinc-600">Organization profile, billing, and platform configuration.</p>
       </div>
+
+      <BillingPanel orgSlug={orgSlug} state={billing} contactEmail={getPlatformEmail()} />
 
       <OrgSettingsForm
         orgSlug={orgSlug}
@@ -75,9 +80,9 @@ export default async function SettingsPage({ params }: PageProps) {
           </p>
         ) : (
           <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            No public domain set yet. Configure <code className="rounded bg-white/70 px-1">PUBLIC_BASE_URL</code> (e.g.{" "}
-            <code className="rounded bg-white/70 px-1">https://jobs.yourcompany.com</code>) so shared links show your
-            brand instead of a server address.
+            No public domain set yet. Once your careers domain is configured (e.g.{" "}
+            <span className="font-medium">jobs.yourcompany.com</span>), shared links, QR codes, and job-board feeds show
+            your brand instead of a server address.
           </p>
         )}
       </section>
@@ -93,7 +98,7 @@ export default async function SettingsPage({ params }: PageProps) {
           note={
             isLlmConfigured()
               ? "Resume match scores use semantic AI analysis."
-              : "Resume match scores use keyword matching. Set ANTHROPIC_API_KEY to enable semantic scoring."
+              : "Resume match scores use keyword matching. AI scoring can be enabled in your deployment configuration."
           }
         />
         <StatusRow
@@ -104,7 +109,7 @@ export default async function SettingsPage({ params }: PageProps) {
           note={
             smtpConfigured()
               ? "Applicant confirmations and teammate invites are emailed automatically."
-              : "Set SMTP_HOST / SMTP_USER / SMTP_PASS to send applicant confirmations and teammate invites."
+              : "Email delivery can be enabled in your deployment configuration to send applicant confirmations and teammate invites."
           }
         />
       </section>

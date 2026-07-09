@@ -56,11 +56,14 @@ async function HeaderNav() {
 
   return (
     <nav className="flex items-center gap-4 text-sm">
+      <Link href="/#pricing" className="hidden text-zinc-600 hover:text-zinc-900 sm:inline">
+        Pricing
+      </Link>
       <Link href="/login" className="text-zinc-600 hover:text-zinc-900">
         Sign in
       </Link>
       <Link href="/signup" className="btn-primary px-3 py-1.5 text-sm">
-        Get started
+        Start free trial
       </Link>
     </nav>
   );

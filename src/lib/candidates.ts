@@ -37,6 +37,8 @@ export type Candidate = {
   applications: CandidateApplication[];
 };
 
+export type CandidateView = "all" | "applicants" | "sourced" | "needs_follow_up" | "high_risk";
+
 export type CandidateFilters = {
   query?: string;
   skill?: string;
@@ -45,6 +47,8 @@ export type CandidateFilters = {
   source?: string;
   /** Outreach status (see CANDIDATE_CRM_STATUSES). */
   crmStatus?: string;
+  /** High-level tab on the Candidates page — composes several conditions. */
+  view?: CandidateView;
 };
 
 type Row = {
@@ -340,6 +344,26 @@ export function listCandidates(organizationId: string, filters: CandidateFilters
   if (filters.crmStatus) {
     clauses.push("c.crm_status = ?");
     params.push(filters.crmStatus);
+  }
+  // Tab views compose conditions the plain filters can't express on their own.
+  switch (filters.view) {
+    case "applicants":
+      clauses.push("EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id)");
+      break;
+    case "sourced":
+      clauses.push("c.source != 'applied'");
+      break;
+    case "needs_follow_up":
+      clauses.push("c.follow_up_at IS NOT NULL AND c.follow_up_at != '' AND c.follow_up_at <= ?");
+      params.push(new Date().toISOString());
+      break;
+    case "high_risk":
+      clauses.push(
+        "EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.risk_level = 'high')",
+      );
+      break;
+    default:
+      break;
   }
 
   const rows = getDb()

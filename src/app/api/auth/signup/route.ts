@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { startTrialIfUnset } from "@/lib/billing";
+import { getStripeConfig } from "@/lib/env";
 import { createOrganization } from "@/lib/organizations";
 import { createUser, getUserByEmail } from "@/lib/users";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
@@ -56,6 +58,9 @@ export async function POST(request: Request) {
       application_email: applicationEmail,
       brand_color: brandColor,
     });
+
+    // Every new workspace gets an honest local trial window from day one.
+    startTrialIfUnset(organization.id, getStripeConfig().trialDays);
 
     const user = createUser({
       organization_id: organization.id,

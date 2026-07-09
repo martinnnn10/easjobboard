@@ -28,14 +28,16 @@ export default async function AdminLayout({ children, params }: LayoutProps) {
   }
 
   const base = `/o/${orgSlug}/admin`;
+  // One clear home for each job-to-be-done. Applicants and sourced/passive
+  // candidates now live as tabs inside Candidates (the CRM), so a recruiter
+  // never has to guess which of four lists a person is in.
   const nav: NavItem[] = [
     { key: "dashboard", label: "Dashboard", href: base },
     { key: "queue", label: "Call Queue", href: `${base}/queue` },
-    { key: "care", label: "Candidate Care", href: `${base}/care` },
     { key: "jobs", label: "Jobs", href: `${base}/jobs` },
-    { key: "applicants", label: "Applicants", href: `${base}/applicants` },
+    { key: "candidates", label: "Candidates", href: `${base}/candidates` },
     { key: "pipeline", label: "Pipeline", href: `${base}/pipeline` },
-    { key: "candidates", label: "Talent Pool", href: `${base}/candidates` },
+    { key: "care", label: "Candidate Care", href: `${base}/care` },
     { key: "outreach", label: "Outreach", href: `${base}/outreach` },
     { key: "reports", label: "Reports", href: `${base}/reports` },
   ];

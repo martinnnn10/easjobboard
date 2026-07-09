@@ -9,6 +9,7 @@ import {
   listApplicationsByOrganization,
 } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { getBillingState } from "@/lib/billing";
 import { careAlertsForOwner, sweepEscalations } from "@/lib/candidate-care";
 import { resumeTrapCandidates } from "@/lib/gap-analysis";
 import { listJobsByOrganization } from "@/lib/jobs";
@@ -51,8 +52,46 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const publishedSlug = (await searchParams).published;
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;
 
+  const billing = getBillingState(organization);
+  const showTrialBanner =
+    billing.status === "trialing" && billing.trialDaysLeft !== null && !billing.hasSubscription;
+  const setupIncomplete = jobs.length === 0;
+
   return (
     <div className="page-shell space-y-6">
+      {showTrialBanner ? (
+        <section
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+            billing.trialDaysLeft !== null && billing.trialDaysLeft <= 3
+              ? "border-amber-200 bg-amber-50"
+              : "border-brand-200 bg-brand-50"
+          }`}
+        >
+          <p className="text-sm text-zinc-700">
+            {billing.trialDaysLeft !== null && billing.trialDaysLeft > 0 ? (
+              <>
+                <span className="font-semibold">Free trial — {billing.trialDaysLeft} day
+                  {billing.trialDaysLeft === 1 ? "" : "s"} left.</span> Full access to EAS Recruit.
+              </>
+            ) : (
+              <span className="font-semibold">Your free trial has ended.</span>
+            )}
+          </p>
+          <div className="flex gap-2">
+            {setupIncomplete ? (
+              <Link href={`/o/${orgSlug}/admin/onboarding`} className="btn-secondary text-sm">
+                Finish setup
+              </Link>
+            ) : null}
+            {writable ? (
+              <Link href={`/o/${orgSlug}/admin/settings`} className="btn-primary text-sm">
+                {billing.trialDaysLeft !== null && billing.trialDaysLeft <= 0 ? "Add payment method" : "View plan"}
+              </Link>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
       {publishedJob ? (
         <section className="rounded-xl border border-brand-200 bg-brand-50 p-5">
           <h2 className="text-base font-semibold text-brand-800">Your job is live</h2>
@@ -140,7 +179,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <p className="stat-value mt-2 text-amber-600">{stats.needsReview}</p>
           <p className="mt-1 text-xs text-zinc-500">Borderline screens — worth a phone screen →</p>
         </Link>
-        <Link href={`/o/${orgSlug}/admin/applicants`} className="card card-hover border-l-4 border-l-red-400">
+        <Link href={`/o/${orgSlug}/admin/candidates?view=high_risk`} className="card card-hover border-l-4 border-l-red-400">
           <p className="section-label">High-risk applicants</p>
           <p className="stat-value mt-2 text-red-600">{stats.highRisk}</p>
           <p className="mt-1 text-xs text-zinc-500">Pay, commute, or job-hop flags →</p>
@@ -266,13 +305,13 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <p className="font-semibold text-zinc-900">Call queue</p>
           <p className="mt-1 text-xs text-zinc-500">{callQueueCount} to call, ranked by ability</p>
         </Link>
-        <Link href={`/o/${orgSlug}/admin/applicants`} className="card card-hover">
+        <Link href={`/o/${orgSlug}/admin/candidates?view=applicants`} className="card card-hover">
           <p className="font-semibold text-zinc-900">Applicants</p>
           <p className="mt-1 text-xs text-zinc-500">Every applicant with signals & risk</p>
         </Link>
         <Link href={`/o/${orgSlug}/admin/candidates`} className="card card-hover">
-          <p className="font-semibold text-zinc-900">Talent pool</p>
-          <p className="mt-1 text-xs text-zinc-500">Applicants + sourced candidates</p>
+          <p className="font-semibold text-zinc-900">Candidates</p>
+          <p className="mt-1 text-xs text-zinc-500">Applicants + sourced candidates in one pool</p>
         </Link>
       </section>
 

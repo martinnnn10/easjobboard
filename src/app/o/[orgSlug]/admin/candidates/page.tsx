@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
-import { getPoolSkills, listCandidates } from "@/lib/candidates";
+import { getPoolSkills, listCandidates, type CandidateView } from "@/lib/candidates";
 import {
   CANDIDATE_CRM_STATUS_LABELS,
   CANDIDATE_CRM_STATUSES,
@@ -17,11 +17,31 @@ import { canWrite } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ q?: string; skill?: string; stage?: string; source?: string; cstatus?: string }>;
+  searchParams: Promise<{ q?: string; skill?: string; stage?: string; source?: string; cstatus?: string; view?: string }>;
+};
+
+const TABS: { key: CandidateView; label: string }[] = [
+  { key: "all", label: "All candidates" },
+  { key: "applicants", label: "Applicants" },
+  { key: "sourced", label: "Sourced" },
+  { key: "needs_follow_up", label: "Needs follow-up" },
+  { key: "high_risk", label: "High risk" },
+];
+
+const TAB_HELP: Record<CandidateView, string> = {
+  all: "Everyone in your pool — applicants and sourced/passive candidates, deduplicated across jobs.",
+  applicants: "People who applied to one of your roles.",
+  sourced: "Passive and sourced prospects you added or imported — they haven't applied yet.",
+  needs_follow_up: "Candidates with a follow-up date that's now due.",
+  high_risk: "Candidates flagged high-risk on a screen — pay, commute, or job-hop concerns to verify.",
 };
 
 function isStage(value: string | undefined): value is ApplicationStatus {
   return !!value && (APPLICATION_STATUSES as string[]).includes(value);
+}
+
+function isView(value: string | undefined): value is CandidateView {
+  return !!value && TABS.some((t) => t.key === value);
 }
 
 export default async function CandidatesPage({ params, searchParams }: PageProps) {
@@ -38,23 +58,24 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
   const stage = isStage(sp.stage) ? sp.stage : undefined;
   const source = isCandidateSource(sp.source) ? sp.source : undefined;
   const crmStatus = isCandidateCrmStatus(sp.cstatus) ? sp.cstatus : undefined;
+  const view: CandidateView = isView(sp.view) ? sp.view : "all";
 
-  const candidates = listCandidates(organization.id, { query, skill, stage, source, crmStatus });
+  const candidates = listCandidates(organization.id, { query, skill, stage, source, crmStatus, view });
   const poolSkills = getPoolSkills(organization.id);
   const hasFilters = Boolean(query || skill || stage || source || crmStatus);
+
+  // Preserve the active tab when the filter form submits.
+  const tabQuery = (v: CandidateView) => (v === "all" ? "" : `?view=${v}`);
 
   return (
     <div className="page-shell space-y-6">
       <div>
-        <Link href={`/o/${orgSlug}/admin`} className="text-sm text-blue-600 hover:underline">
-          ← Back to admin
-        </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Candidate pool</h1>
+            <h1 className="text-3xl font-bold text-zinc-900">Candidates</h1>
             <p className="mt-1 text-sm text-zinc-600">
-              Applicants and sourced/passive candidates, deduplicated across jobs. Search by name, email, or resume text
-              and filter by skill or stage.
+              One home for everyone you&apos;re recruiting — applicants and sourced/passive candidates, deduplicated
+              across jobs. Use the tabs to narrow the pool.
             </p>
           </div>
           {writable ? (
@@ -65,7 +86,34 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
         </div>
       </div>
 
+      {/* Tabs — Applicants / Sourced / Needs follow-up / High risk are views of
+          this one pool, not separate pages, so nobody has to guess where a
+          person lives. */}
+      <div className="border-b border-zinc-200">
+        <nav className="-mb-px flex flex-wrap gap-1">
+          {TABS.map((t) => {
+            const active = view === t.key;
+            return (
+              <Link
+                key={t.key}
+                href={`/o/${orgSlug}/admin/candidates${tabQuery(t.key)}`}
+                aria-current={active ? "page" : undefined}
+                className={`border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "border-brand-600 text-brand-700"
+                    : "border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-800"
+                }`}
+              >
+                {t.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+      <p className="-mt-2 text-sm text-zinc-500">{TAB_HELP[view]}</p>
+
       <form className="card grid gap-3 sm:grid-cols-4" method="get">
+        <input type="hidden" name="view" value={view} />
         <label className="sm:col-span-2 block space-y-1">
           <span className="text-sm font-medium">Search</span>
           <input
@@ -124,7 +172,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
             Search
           </button>
           {hasFilters ? (
-            <Link href={`/o/${orgSlug}/admin/candidates`} className="btn-secondary">
+            <Link href={`/o/${orgSlug}/admin/candidates${tabQuery(view)}`} className="btn-secondary">
               Clear
             </Link>
           ) : null}
@@ -144,7 +192,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                 <div className="min-w-0">
                   <Link
                     href={`/o/${orgSlug}/admin/candidates/${candidate.id}`}
-                    className="font-semibold text-zinc-900 hover:text-blue-700 hover:underline"
+                    className="font-semibold text-zinc-900 hover:text-brand-700 hover:underline"
                   >
                     {candidate.name || candidate.email}
                   </Link>
@@ -175,7 +223,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                       </span>
                     ))}
                     {candidate.ownerName ? (
-                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
                         Owner: {candidate.ownerName}
                       </span>
                     ) : null}
@@ -214,7 +262,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                         <td className="px-3 py-2">
                           <Link
                             href={`/o/${orgSlug}/admin/applications/${app.applicationId}`}
-                            className="text-zinc-900 hover:text-blue-700 hover:underline"
+                            className="text-zinc-900 hover:text-brand-700 hover:underline"
                           >
                             {app.jobTitle}
                           </Link>
@@ -227,7 +275,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                         <td className="px-3 py-2">
                           <a
                             href={`/api/o/${orgSlug}/applications/${app.applicationId}/resume`}
-                            className="text-blue-600 hover:underline"
+                            className="text-brand-700 hover:underline"
                           >
                             {app.resumeFilename}
                           </a>

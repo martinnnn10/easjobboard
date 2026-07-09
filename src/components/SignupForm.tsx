@@ -8,7 +8,7 @@ export function SignupForm() {
   const [values, setValues] = useState({
     orgName: "",
     website: "",
-    brandColor: "#2563eb",
+    brandColor: "#4a7d1e",
     applicationEmail: "",
     adminName: "",
     adminEmail: "",
@@ -36,17 +36,28 @@ export function SignupForm() {
       return;
     }
 
-    router.push(`/o/${data.organization!.slug}/admin`);
+    router.push(`/o/${data.organization!.slug}/admin/onboarding`);
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="card mx-auto w-full max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Create your organization</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">Start your 14-day free trial</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Each organization gets its own careers portal, job board feed, and applicant inbox.
+          Create your workspace and see your first ranked Call Queue this week. Each organization gets its own careers
+          portal, job board feed, and applicant inbox.
         </p>
+      </div>
+
+      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
+        <p className="text-sm font-semibold text-brand-800">What you get</p>
+        <ul className="mt-2 grid gap-1.5 text-sm text-brand-800/90 sm:grid-cols-2">
+          <li>· Full access for 14 days</li>
+          <li>· No credit card required to start</li>
+          <li>· $99/month per seat after the trial</li>
+          <li>· Cancel anytime — no long-term contract</li>
+        </ul>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -133,9 +144,14 @@ export function SignupForm() {
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Creating..." : "Create organization"}
-      </button>
+      <div className="space-y-2">
+        <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+          {loading ? "Creating your workspace..." : "Start free trial"}
+        </button>
+        <p className="text-center text-xs text-zinc-500">
+          No credit card required. Your 14-day trial starts as soon as your workspace is created.
+        </p>
+      </div>
     </form>
   );
 }

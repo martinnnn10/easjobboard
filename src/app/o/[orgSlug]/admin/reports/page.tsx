@@ -1,10 +1,14 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrgSession } from "@/lib/auth";
 import { CANDIDATE_SOURCE_LABELS, isCandidateSource } from "@/lib/candidate-meta";
 import { getOrganizationBySlug } from "@/lib/organizations";
-import { getReportData } from "@/lib/reports";
+import { getReportData, isRangePreset, RANGE_PRESETS, resolveRange, type RangePreset } from "@/lib/reports";
 
-type PageProps = { params: Promise<{ orgSlug: string }> };
+type PageProps = {
+  params: Promise<{ orgSlug: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+};
 
 function Stat({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: string }) {
   return (
@@ -16,31 +20,94 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
   );
 }
 
-export default async function ReportsPage({ params }: PageProps) {
+export default async function ReportsPage({ params, searchParams }: PageProps) {
   const { orgSlug } = await params;
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
   await requireOrgSession(orgSlug);
-  const r = getReportData(organization.id);
 
-  const noData = r.totalApplicants === 0;
+  const sp = await searchParams;
+  const preset: RangePreset = isRangePreset(sp.range) ? sp.range : "all";
+  const { range, label } = resolveRange(preset, sp.from, sp.to, new Date());
+  const r = getReportData(organization.id, range);
+
+  const noData = r.totalApplicants === 0 && r.callsLogged === 0 && r.interviewsScheduled === 0;
+
+  // Preserve custom dates in preset links so switching back keeps them.
+  const presetHref = (key: RangePreset) => {
+    const qs = new URLSearchParams({ range: key });
+    if (sp.from) qs.set("from", sp.from);
+    if (sp.to) qs.set("to", sp.to);
+    return `/o/${orgSlug}/admin/reports?${qs.toString()}`;
+  };
+  const exportHref = (() => {
+    const qs = new URLSearchParams({ range: preset });
+    if (sp.from) qs.set("from", sp.from);
+    if (sp.to) qs.set("to", sp.to);
+    return `/api/o/${orgSlug}/reports/export?${qs.toString()}`;
+  })();
 
   return (
     <div className="page-shell space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Reports</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Proof the screen saves time and improves quality. Figures come from your real activity — nothing is estimated.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Reports</h1>
+          <p className="mt-1 text-sm text-zinc-600">
+            Proof the screen saves time and improves quality. Figures come from your real activity — nothing is
+            estimated. Showing: <span className="font-medium text-zinc-800">{label}</span>.
+          </p>
+        </div>
+        <a href={exportHref} className="btn-secondary text-sm">
+          Export CSV
+        </a>
+      </div>
+
+      {/* Date range filter */}
+      <div className="card space-y-3">
+        <div className="flex flex-wrap gap-2">
+          {RANGE_PRESETS.map((p) => {
+            const active = preset === p.key;
+            return (
+              <Link
+                key={p.key}
+                href={presetHref(p.key)}
+                className={`rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? "border-brand-600 bg-brand-600 text-white"
+                    : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
+                }`}
+              >
+                {p.label}
+              </Link>
+            );
+          })}
+        </div>
+        <form method="get" className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="range" value="custom" />
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-zinc-600">From</span>
+            <input type="date" name="from" defaultValue={sp.from ?? ""} className="field-input py-2 text-sm" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-zinc-600">To</span>
+            <input type="date" name="to" defaultValue={sp.to ?? ""} className="field-input py-2 text-sm" />
+          </label>
+          <button type="submit" className="btn-secondary text-sm">
+            Apply custom range
+          </button>
+        </form>
       </div>
 
       {noData ? (
         <div className="card space-y-2 py-10 text-center">
-          <p className="font-medium text-zinc-800">No applicant data yet.</p>
+          <p className="font-medium text-zinc-800">
+            {preset === "all" ? "No applicant data yet." : "No activity in this date range."}
+          </p>
           <p className="mx-auto max-w-md text-sm text-zinc-600">
-            Once candidates apply and complete skills screens, this page fills in — screen completion, average scores by
-            role, source quality, calls logged, time to first contact, and hires.
+            {preset === "all"
+              ? "Once candidates apply and complete skills screens, this page fills in — screen completion, average scores by role, source quality, calls logged, time to first contact, interviews, and hires."
+              : "Try a wider range, or check back once there's activity in this window."}
           </p>
         </div>
       ) : (
@@ -74,10 +141,11 @@ export default async function ReportsPage({ params }: PageProps) {
             />
           </section>
 
-          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <Stat label="Calls logged" value={String(r.callsLogged)} />
-            <Stat label="Submitted to hiring manager" value={String(r.submittedToHM)} tone="text-brand-700" />
-            <Stat label="In interview" value={String(r.inInterview)} />
+            <Stat label="Submitted to HM" value={String(r.submittedToHM)} tone="text-brand-700" />
+            <Stat label="Interviews scheduled" value={String(r.interviewsScheduled)} />
+            <Stat label="Moved to interview" value={String(r.inInterview)} />
             <Stat label="Hired" value={String(r.hired)} tone="text-brand-700" />
           </section>
 
@@ -85,7 +153,7 @@ export default async function ReportsPage({ params }: PageProps) {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Applicants by source</h2>
             {r.bySource.length === 0 ? (
-              <div className="card text-sm text-zinc-500">No candidates in the pool yet.</div>
+              <div className="card text-sm text-zinc-500">No candidates added in this range.</div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
                 <table className="min-w-full text-left text-sm">
@@ -99,11 +167,11 @@ export default async function ReportsPage({ params }: PageProps) {
                   </thead>
                   <tbody>
                     {r.bySource.map((s) => {
-                      const label = isCandidateSource(s.source) ? CANDIDATE_SOURCE_LABELS[s.source] : s.source;
+                      const sourceLabel = isCandidateSource(s.source) ? CANDIDATE_SOURCE_LABELS[s.source] : s.source;
                       const rate = s.applicants === 0 ? 0 : Math.round((s.strongFit / s.applicants) * 100);
                       return (
                         <tr key={s.source} className="border-b border-zinc-100 last:border-0">
-                          <td className="px-4 py-3 text-zinc-800">{label}</td>
+                          <td className="px-4 py-3 text-zinc-800">{sourceLabel}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-zinc-700">{s.applicants}</td>
                           <td className="px-4 py-3 text-right tabular-nums font-medium text-brand-700">{s.strongFit}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-zinc-600">{rate}%</td>
@@ -121,7 +189,7 @@ export default async function ReportsPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-zinc-900">Average skills score by role</h2>
             {r.avgScoreByRole.length === 0 ? (
               <div className="card text-sm text-zinc-500">
-                No completed screens yet — averages appear once candidates finish a skills screen.
+                No completed screens in this range — averages appear once candidates finish a skills screen.
               </div>
             ) : (
               <div className="space-y-2">
