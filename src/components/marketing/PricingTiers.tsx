@@ -17,56 +17,53 @@ function Check() {
 export function PricingTiers() {
   return (
     <div className="grid gap-5 lg:grid-cols-3">
-      {PRICING_TIERS.map((tier) => {
-        const highlight = tier.active;
-        return (
-          <div
-            key={tier.key}
-            className={`card flex flex-col ${highlight ? "border-2 border-brand-500 shadow-md" : ""}`}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold uppercase tracking-wide text-brand-700">{tier.name}</p>
-              {highlight ? (
-                <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white">
-                  Most popular
-                </span>
-              ) : tier.contactSales ? (
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">
-                  Contact sales
-                </span>
-              ) : null}
-            </div>
-
-            <p className="mt-3">
-              <span className="text-4xl font-bold tracking-tight text-zinc-900">{tier.priceLabel}</span>
-              {tier.cadence ? <span className="text-base font-medium text-zinc-500">{tier.cadence}</span> : null}
-            </p>
-            <p className="mt-1 text-sm text-zinc-600">{tier.seats}</p>
-            <p className="mt-1 text-sm text-zinc-500">{tier.tagline}</p>
-
-            <ul className="mt-4 flex-1 space-y-2">
-              {tier.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-zinc-700">
-                  <Check />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="mt-6">
-              {tier.active ? (
-                <Link href="/signup" className="btn-primary w-full py-2.5">
-                  Start free trial
-                </Link>
-              ) : (
-                <Link href="/book-demo" className="btn-secondary w-full py-2.5">
-                  {tier.key === "enterprise" ? "Contact sales" : "Talk to us"}
-                </Link>
-              )}
-            </div>
+      {PRICING_TIERS.map((tier) => (
+        <div
+          key={tier.key}
+          className={`card flex flex-col ${tier.popular ? "border-2 border-brand-500 shadow-md" : ""}`}
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold uppercase tracking-wide text-brand-700">{tier.name}</p>
+            {tier.popular ? (
+              <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                Most popular
+              </span>
+            ) : !tier.selfServe ? (
+              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-500">
+                Contact sales
+              </span>
+            ) : null}
           </div>
-        );
-      })}
+
+          <p className="mt-3">
+            <span className="text-4xl font-bold tracking-tight text-zinc-900">{tier.priceLabel}</span>
+            {tier.cadence ? <span className="text-base font-medium text-zinc-500">{tier.cadence}</span> : null}
+          </p>
+          <p className="mt-1 text-sm text-zinc-600">{tier.seats}</p>
+          <p className="mt-1 text-sm text-zinc-500">{tier.tagline}</p>
+
+          <ul className="mt-4 flex-1 space-y-2">
+            {tier.features.map((f) => (
+              <li key={f} className="flex items-start gap-2 text-sm text-zinc-700">
+                <Check />
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-6">
+            {tier.selfServe ? (
+              <Link href="/signup" className={`w-full py-2.5 ${tier.popular ? "btn-primary" : "btn-secondary"}`}>
+                Start free trial
+              </Link>
+            ) : (
+              <Link href="/book-demo" className="btn-secondary w-full py-2.5">
+                Contact sales
+              </Link>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

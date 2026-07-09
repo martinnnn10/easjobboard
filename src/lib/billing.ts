@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import { getDb, type Organization } from "./db";
 import { isStripeConfigured } from "./env";
 import { getOrganizationById } from "./organizations";
-import { ACTIVE_PLAN, ACTIVE_PLAN_PRICE_USD } from "./pricing";
+import { BILLING_PLAN_FEATURES, SEAT_PRICE_USD } from "./pricing";
 import { listUsersByOrganization } from "./users";
 
 /**
@@ -47,10 +47,9 @@ const STATUS_LABELS: Record<BillingState["status"], string> = {
 };
 
 export function getBillingState(org: Organization, now: Date = new Date()): BillingState {
-  // Display price comes from the canonical pricing model, never from a Stripe
-  // env var — so a misconfigured deployment can't show a price that disagrees
-  // with the homepage.
-  const seatPriceUsd = ACTIVE_PLAN_PRICE_USD;
+  // Per-seat price comes from the canonical pricing model (matches the live
+  // Stripe price), never from a stray env var.
+  const seatPriceUsd = SEAT_PRICE_USD;
   const seatsUsed = listUsersByOrganization(org.id).length;
 
   // Normalize the stored status; Stripe's raw status wins when a sub exists.
@@ -81,8 +80,8 @@ export function getBillingState(org: Organization, now: Date = new Date()): Bill
     currentPeriodEnd: org.current_period_end,
     seatPriceUsd,
     monthlyTotalUsd: seatsPaid * seatPriceUsd,
-    planName: ACTIVE_PLAN.name,
-    planFeatures: ACTIVE_PLAN.features,
+    planName: "Seat-based",
+    planFeatures: BILLING_PLAN_FEATURES,
   };
 }
 

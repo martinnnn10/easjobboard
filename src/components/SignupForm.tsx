@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ACTIVE_PLAN_PRICE_USD, TRIAL_DAYS } from "@/lib/pricing";
+import { SEAT_PRICE_USD, TRIAL_DAYS } from "@/lib/pricing";
 
 const COMPANY_TYPES = [
   { value: "employer", label: "Employer" },
@@ -62,7 +62,7 @@ export function SignupForm() {
         <ul className="grid gap-1.5 sm:grid-cols-2">
           <li>· {TRIAL_DAYS}-day free trial</li>
           <li>· No credit card required</li>
-          <li>· ${ACTIVE_PLAN_PRICE_USD}/month after the trial</li>
+          <li>· From ${SEAT_PRICE_USD}/month per seat after the trial</li>
           <li>· Cancel anytime</li>
         </ul>
       </div>

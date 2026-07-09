@@ -68,7 +68,7 @@ export function BillingPanel({
         <div>
           <h2 className="text-base font-semibold text-zinc-900">Billing &amp; plan</h2>
           <p className="text-sm text-zinc-600">
-            EAS Recruit {state.planName} · ${state.seatPriceUsd}/month
+            EAS Recruit · ${state.seatPriceUsd}/month per seat
           </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[state.status]}`}>

@@ -3,34 +3,41 @@
  * homepage, signup copy, and the in-app billing panel — renders from here so a
  * price can never disagree with itself across the product.
  *
- * IMPORTANT: the displayed price is intentionally decoupled from any Stripe env
- * var (e.g. STRIPE_SEAT_PRICE_USD). The *charged* amount is whatever the Stripe
- * Price object is set to; keep the Stripe dashboard price for the active plan in
- * sync with ACTIVE_PLAN.priceUsd below. See README-DEPLOY / the deploy notes.
+ * Pricing model (per Manus's launch plan):
+ *   • Starter — $45/month per seat (the active, self-serve, Stripe-charged plan)
+ *   • Pro     — $99/month for up to 3 seats (bundle)
+ *   • Agency/Enterprise — custom
+ *
+ * SEAT_PRICE_USD is the per-seat rate Stripe actually charges today
+ * (STRIPE_PRICE_ID). The billing panel bills seats × SEAT_PRICE_USD, matching
+ * the live Stripe price object — keep the Stripe dashboard price at $45/seat.
  */
+
+export const SEAT_PRICE_USD = 45;
+export const TRIAL_DAYS = 14;
 
 export type PricingTier = {
   key: "starter" | "pro" | "enterprise";
   name: string;
-  priceLabel: string; // what the buyer reads, e.g. "$49" or "Custom"
+  priceLabel: string; // what the buyer reads, e.g. "$45" or "Custom"
   priceUsd: number | null; // numeric for math; null for custom/contact-sales
-  cadence: string; // "/month" or ""
+  cadence: string; // "/month per seat", "/month", or ""
   seats: string;
   tagline: string;
   features: string[];
-  /** The one plan Stripe actually charges for today. */
-  active: boolean;
-  /** Shown as "Contact sales" instead of a self-serve checkout. */
-  contactSales: boolean;
+  /** Self-serve via the 14-day trial + Stripe checkout. */
+  selfServe: boolean;
+  /** Highlighted as the recommended plan on the pricing grid. */
+  popular: boolean;
 };
 
 export const PRICING_TIERS: PricingTier[] = [
   {
     key: "starter",
     name: "Starter",
-    priceLabel: "$49",
-    priceUsd: 49,
-    cadence: "/month",
+    priceLabel: "$45",
+    priceUsd: 45,
+    cadence: "/month per seat",
     seats: "1 seat",
     tagline: "For a single recruiter getting started.",
     features: [
@@ -39,8 +46,8 @@ export const PRICING_TIERS: PricingTier[] = [
       "Resume Trap dashboard",
       "Candidate profiles",
     ],
-    active: false,
-    contactSales: true, // self-serve Starter checkout is coming soon
+    selfServe: true,
+    popular: false,
   },
   {
     key: "pro",
@@ -57,8 +64,8 @@ export const PRICING_TIERS: PricingTier[] = [
       "Custom branding",
       "Everything in Starter",
     ],
-    active: true,
-    contactSales: false,
+    selfServe: true,
+    popular: true,
   },
   {
     key: "enterprise",
@@ -74,15 +81,10 @@ export const PRICING_TIERS: PricingTier[] = [
       "Multi-site support",
       "Priority onboarding",
     ],
-    active: false,
-    contactSales: true,
+    selfServe: false,
+    popular: false,
   },
 ];
 
-/** The plan Stripe charges for right now (Pro). */
-export const ACTIVE_PLAN = PRICING_TIERS.find((t) => t.active)!;
-
-/** Canonical monthly price of the active paid plan, for display everywhere. */
-export const ACTIVE_PLAN_PRICE_USD = ACTIVE_PLAN.priceUsd ?? 99;
-
-export const TRIAL_DAYS = 14;
+/** Features a paying customer gets, for the in-app billing panel. */
+export const BILLING_PLAN_FEATURES = PRICING_TIERS.find((t) => t.key === "pro")!.features;
