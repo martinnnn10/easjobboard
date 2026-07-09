@@ -53,6 +53,8 @@ export function createOrganization(input: {
   website?: string;
   application_email: string;
   brand_color?: string;
+  company_type?: string;
+  is_demo?: boolean;
 }): Organization {
   const database = getDb();
   const id = randomUUID();
@@ -61,8 +63,8 @@ export function createOrganization(input: {
 
   database
     .prepare(
-      `INSERT INTO organizations (id, slug, name, website, application_email, brand_color, created_at, updated_at)
-       VALUES (@id, @slug, @name, @website, @application_email, @brand_color, @created_at, @updated_at)`,
+      `INSERT INTO organizations (id, slug, name, website, application_email, brand_color, company_type, is_demo, created_at, updated_at)
+       VALUES (@id, @slug, @name, @website, @application_email, @brand_color, @company_type, @is_demo, @created_at, @updated_at)`,
     )
     .run({
       id,
@@ -71,11 +73,20 @@ export function createOrganization(input: {
       website: input.website?.trim() ?? "",
       application_email: input.application_email.trim(),
       brand_color: input.brand_color?.trim() ?? "",
+      company_type: input.company_type?.trim() ?? "",
+      is_demo: input.is_demo ? 1 : 0,
       created_at: timestamp,
       updated_at: timestamp,
     });
 
   return getOrganizationById(id)!;
+}
+
+/** Mark the onboarding checklist dismissed (or re-shown) for an org. */
+export function setOnboardingDismissed(id: string, dismissed: boolean): void {
+  getDb()
+    .prepare("UPDATE organizations SET onboarding_dismissed = ?, updated_at = ? WHERE id = ?")
+    .run(dismissed ? 1 : 0, nowIso(), id);
 }
 
 export function updateOrganization(

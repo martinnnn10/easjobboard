@@ -56,6 +56,7 @@ export default async function AdminLayout({ children, params }: LayoutProps) {
       userName={user.name}
       roleLabel={roleLabel}
       nav={nav}
+      isDemo={organization.is_demo}
     >
       {children}
     </AdminShell>

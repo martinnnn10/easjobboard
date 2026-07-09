@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { ClaimVsProof } from "@/components/ScreenSignals";
+import { PricingTiers } from "@/components/marketing/PricingTiers";
 import { ProductPreviews } from "@/components/marketing/ProductPreviews";
 import { getPlatformEmail } from "@/lib/env";
-
-const demoMailto = (email: string) =>
-  `mailto:${email}?subject=${encodeURIComponent("EAS Recruit — book a demo")}`;
 
 const VALUE_PROPS = [
   {
@@ -48,37 +46,34 @@ const FAQS = [
     a: "It can be used standalone, but it's strongest as a manufacturing hiring intelligence layer — the part that tells you who can actually do the job before you interview.",
   },
   {
-    q: "Does it work for agencies?",
-    a: "Yes — especially for manufacturing recruiting agencies that need to prove candidate quality to their clients before submitting.",
-  },
-  {
-    q: "Does it replace Indeed?",
+    q: "Does this replace Indeed?",
     a: "No. Indeed and other boards bring you applicants; EAS Recruit helps you qualify, rank, and manage them after they apply or are sourced.",
   },
   {
-    q: "What roles is it built for?",
+    q: "Is this for agencies or employers?",
+    a: "Both. Employers use it to hire faster with fewer wasted interviews; manufacturing recruiting agencies use it to prove candidate quality to clients before submitting.",
+  },
+  {
+    q: "What roles does it support?",
     a: "Maintenance, controls, electrical, automation, refrigeration, and manufacturing leadership — skilled-trades roles where practical ability matters more than a resume.",
   },
   {
-    q: "Do I need AI enabled?",
-    a: "No. Skills screens and scoring work without semantic AI. When you configure AI, it improves scoring nuance and candidate summaries — but the core product runs without it.",
+    q: "How does Resume Trap work?",
+    a: "Every candidate's resume keyword match is scored against how they actually perform on a practical skills screen. When the resume looks strong but the demonstrated score is low, that gap is the Resume Trap — surfaced before you spend an interview.",
+  },
+  {
+    q: "Do candidates need to complete a skills screen?",
+    a: "That's the core signal, and it's short — a handful of real plant-floor scenarios that take a few minutes on a phone. You can also review applicants without a screen, but the screen is what powers the ranking.",
+  },
+  {
+    q: "Is there a free trial?",
+    a: "Yes — a 14-day free trial, no credit card required. You can explore a labelled demo workspace or start with your real jobs right away.",
+  },
+  {
+    q: "Is my candidate data private?",
+    a: "Yes. Each organization's candidates, resumes, and screens are isolated to that workspace. Demo data is clearly labelled and never mixed into a real account.",
   },
 ];
-
-function CheckRow({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-2.5 text-sm text-zinc-700">
-      <svg viewBox="0 0 20 20" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" fill="currentColor" aria-hidden>
-        <path
-          fillRule="evenodd"
-          d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.3 3.29 6.8-6.8a1 1 0 0 1 1.4 0z"
-          clipRule="evenodd"
-        />
-      </svg>
-      <span>{children}</span>
-    </li>
-  );
-}
 
 export default function HomePage() {
   const email = getPlatformEmail();
@@ -103,15 +98,16 @@ export default function HomePage() {
               <Link href="/signup" className="btn-accent px-6 py-3 text-base">
                 Start free trial
               </Link>
-              <a
-                href={demoMailto(email)}
+              <Link
+                href="/book-demo"
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/25 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
               >
                 Book a demo
-              </a>
+              </Link>
             </div>
             <p className="mt-6 text-sm text-zinc-400">
-              Built for maintenance, controls, automation, skilled trades, and manufacturing recruiting teams.
+              Built for maintenance, controls, automation, skilled trades, and manufacturing recruiting teams. No credit
+              card required to start.
             </p>
           </div>
         </div>
@@ -274,35 +270,87 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* 7b — Competitor comparison */}
+      <section className="mx-auto w-full max-w-4xl px-4">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="section-label">Why not a generic ATS?</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">
+            EAS Recruit vs. a generic ATS or job board
+          </h2>
+        </div>
+        <div className="mt-8 overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+          <table className="min-w-full text-left text-sm">
+            <thead className="border-b border-zinc-200 bg-zinc-50">
+              <tr>
+                <th className="px-4 py-3 font-semibold text-zinc-700">Capability</th>
+                <th className="px-4 py-3 text-center font-semibold text-brand-700">EAS Recruit</th>
+                <th className="px-4 py-3 text-center font-semibold text-zinc-500">Generic ATS / job board</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["Practical skills screening", true, false],
+                ["Resume Trap detection", true, false],
+                ["Ranked Call Queue", true, false],
+                ["Manufacturing-specific scoring", true, false],
+                ["Interview kits", true, false],
+                ["Candidate intelligence profile", true, false],
+                ["Job posting & applicant tracking", true, true],
+              ].map(([label, eas, ats]) => (
+                <tr key={label as string} className="border-b border-zinc-100 last:border-0">
+                  <td className="px-4 py-3 text-zinc-800">{label}</td>
+                  <td className="px-4 py-3 text-center">
+                    {eas ? <span className="font-bold text-brand-600">✓</span> : <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {ats ? <span className="font-semibold text-zinc-500">✓</span> : <span className="text-zinc-300">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {/* 8 — Pricing */}
       <section id="pricing" className="mx-auto w-full max-w-6xl px-4">
         <div className="mx-auto max-w-2xl text-center">
           <p className="section-label">Pricing</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">Simple, per-seat pricing</h2>
-          <p className="mt-4 text-zinc-600">Start with a 14-day free trial. No long-term contract.</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">Simple, transparent pricing</h2>
+          <p className="mt-4 text-zinc-600">
+            Every plan starts with a 14-day free trial — no credit card required, cancel anytime.
+          </p>
         </div>
-        <div className="mx-auto mt-10 max-w-lg">
-          <div className="card space-y-6 border-2 border-brand-500">
-            <div className="text-center">
-              <p className="text-sm font-semibold uppercase tracking-wide text-brand-700">EAS Recruit</p>
-              <p className="mt-2">
-                <span className="text-5xl font-bold tracking-tight text-zinc-900">$99</span>
-                <span className="text-lg font-medium text-zinc-500">/month per seat</span>
-              </p>
-              <p className="mt-2 text-sm text-zinc-600">14-day free trial · no credit card required to start</p>
-            </div>
-            <ul className="space-y-2.5">
-              <CheckRow>Practical skills screening on every applicant</CheckRow>
-              <CheckRow>Call Queue ranked by demonstrated ability</CheckRow>
-              <CheckRow>Resume Trap detection &amp; candidate intelligence</CheckRow>
-              <CheckRow>Interview kits &amp; client presentations</CheckRow>
-              <CheckRow>Branded careers page &amp; job board syndication</CheckRow>
-              <CheckRow>No long-term contract — cancel anytime</CheckRow>
-            </ul>
-            <Link href="/signup" className="btn-primary w-full py-3 text-base">
-              Start your 14-day free trial
+        <div className="mt-10">
+          <PricingTiers />
+        </div>
+      </section>
+
+      {/* 8b — Trust / founder */}
+      <section className="mx-auto w-full max-w-5xl px-4">
+        <div className="rounded-3xl border border-zinc-200 bg-white p-8 md:p-12">
+          <p className="section-label text-brand-700">Built from real manufacturing recruiting workflows</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900">
+            Made by operators who&apos;ve done this hiring themselves.
+          </h2>
+          <p className="mt-4 max-w-3xl text-zinc-600">
+            EAS Recruit was built by manufacturing recruiting operators who were tired of interviewing candidates who
+            looked great on paper and couldn&apos;t do the work. The skills screens, Resume Trap scoring, and Call Queue
+            come straight from how skilled-trades hiring actually gets done on the plant floor — not a generic HR
+            playbook.
+          </p>
+          <div className="mt-6 flex flex-wrap gap-3 text-sm">
+            <Link href="/book-demo" className="btn-secondary">
+              See a sample skills screen &amp; interview kit
             </Link>
+            <a href={`mailto:${email}`} className="btn-secondary">
+              Talk to the team
+            </a>
           </div>
+          <p className="mt-4 text-xs text-zinc-400">
+            Each organization&apos;s candidate data is private to that workspace. We don&apos;t publish customer names
+            without permission — so you won&apos;t find invented testimonials here.
+          </p>
         </div>
       </section>
 
@@ -319,12 +367,12 @@ export default function HomePage() {
             <Link href="/signup" className="btn-accent px-6 py-3 text-base">
               Start your 14-day free trial
             </Link>
-            <a
-              href={demoMailto(email)}
+            <Link
+              href="/book-demo"
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/25 px-6 py-3 text-base font-semibold text-white transition hover:bg-white/10"
             >
               Book a demo
-            </a>
+            </Link>
           </div>
         </div>
       </section>

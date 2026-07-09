@@ -37,7 +37,7 @@ export type Candidate = {
   applications: CandidateApplication[];
 };
 
-export type CandidateView = "all" | "applicants" | "sourced" | "needs_follow_up" | "high_risk";
+export type CandidateView = "all" | "applicants" | "sourced" | "needs_follow_up" | "high_risk" | "strong_fit";
 
 export type CandidateFilters = {
   query?: string;
@@ -360,6 +360,12 @@ export function listCandidates(organizationId: string, filters: CandidateFilters
     case "high_risk":
       clauses.push(
         "EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.risk_level = 'high')",
+      );
+      break;
+    case "strong_fit":
+      // Passed the screen at/above the strong bar and not flagged high-risk.
+      clauses.push(
+        "EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.screen_status = 'completed' AND a.screen_score >= 70 AND a.risk_level != 'high')",
       );
       break;
     default:

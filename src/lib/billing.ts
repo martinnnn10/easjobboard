@@ -1,7 +1,8 @@
 import type Stripe from "stripe";
 import { getDb, type Organization } from "./db";
-import { getStripeConfig, isStripeConfigured } from "./env";
+import { isStripeConfigured } from "./env";
 import { getOrganizationById } from "./organizations";
+import { ACTIVE_PLAN, ACTIVE_PLAN_PRICE_USD } from "./pricing";
 import { listUsersByOrganization } from "./users";
 
 /**
@@ -25,8 +26,10 @@ export type BillingState = {
   seatsUsed: number; // real active members
   seatsPaid: number; // quantity on the Stripe subscription
   currentPeriodEnd: string;
-  seatPriceUsd: number;
+  seatPriceUsd: number; // canonical active-plan price (display), not the env var
   monthlyTotalUsd: number; // seatsPaid × price (0 while on trial with no sub)
+  planName: string; // active paid plan name (e.g. "Pro")
+  planFeatures: string[]; // what's included, for the paywall
 };
 
 function daysBetween(fromIso: string, to: Date): number | null {
@@ -44,7 +47,10 @@ const STATUS_LABELS: Record<BillingState["status"], string> = {
 };
 
 export function getBillingState(org: Organization, now: Date = new Date()): BillingState {
-  const { seatPriceUsd } = getStripeConfig();
+  // Display price comes from the canonical pricing model, never from a Stripe
+  // env var — so a misconfigured deployment can't show a price that disagrees
+  // with the homepage.
+  const seatPriceUsd = ACTIVE_PLAN_PRICE_USD;
   const seatsUsed = listUsersByOrganization(org.id).length;
 
   // Normalize the stored status; Stripe's raw status wins when a sub exists.
@@ -75,6 +81,8 @@ export function getBillingState(org: Organization, now: Date = new Date()): Bill
     currentPeriodEnd: org.current_period_end,
     seatPriceUsd,
     monthlyTotalUsd: seatsPaid * seatPriceUsd,
+    planName: ACTIVE_PLAN.name,
+    planFeatures: ACTIVE_PLAN.features,
   };
 }
 

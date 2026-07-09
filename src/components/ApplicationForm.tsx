@@ -49,6 +49,15 @@ export function ApplicationForm({
     setAnswers((current) => ({ ...current, [id]: value }));
   }
 
+  // How many screen questions have a usable answer — drives the progress bar.
+  const answeredCount = (screen?.questions ?? []).filter((q) => {
+    const v = answers[q.id];
+    if (typeof v === "number") return true;
+    if (typeof v === "string") return v.trim().length > 0;
+    if (Array.isArray(v)) return v.length > 0;
+    return false;
+  }).length;
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!resume) {
@@ -197,12 +206,24 @@ export function ApplicationForm({
       </label>
 
       {screen ? (
-        <div className="space-y-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+        <div className="space-y-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
           <div>
-            <p className="section-label text-blue-700">Skills check</p>
+            <p className="section-label text-brand-700">Skills check · {screen.questions.length} short questions</p>
             <p className="mt-1 text-sm text-zinc-700">
-              {screen.blurb} There are no trick questions — answer the way you actually would on the floor.
+              This short screen helps you show what you can actually do, even if your resume doesn&apos;t tell the full
+              story. There are no trick questions — answer the way you actually would on the floor.
             </p>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+                <div
+                  className="h-full rounded-full bg-brand-500 transition-all"
+                  style={{ width: `${screen.questions.length ? (answeredCount / screen.questions.length) * 100 : 0}%` }}
+                />
+              </div>
+              <span className="text-xs font-medium text-zinc-500">
+                {answeredCount}/{screen.questions.length} answered
+              </span>
+            </div>
           </div>
           <ScreenQuestions questions={screen.questions} answers={answers} onChange={setAnswer} />
         </div>
@@ -210,9 +231,12 @@ export function ApplicationForm({
 
       {status === "error" ? <p className="text-sm text-red-600">{message}</p> : null}
 
-      <button type="submit" disabled={status === "loading"} className="btn-primary w-full">
-        {status === "loading" ? "Submitting…" : "Submit application"}
-      </button>
+      {/* Sticky on small screens so the submit is always within thumb reach. */}
+      <div className="sticky bottom-0 -mx-6 -mb-5 border-t border-zinc-100 bg-white/95 px-6 py-3 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
+        <button type="submit" disabled={status === "loading"} className="btn-primary w-full py-3 text-base">
+          {status === "loading" ? "Submitting…" : "Submit application"}
+        </button>
+      </div>
     </form>
   );
 }

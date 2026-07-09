@@ -17,14 +17,16 @@ export function ScreenQuestions({
   answers: Record<string, ScreenAnswerValue>;
   onChange: (id: string, value: ScreenAnswerValue) => void;
 }) {
+  const total = questions.length;
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {questions.map((question, index) => (
-        <div key={question.id} className="space-y-2">
-          <p className="text-sm font-semibold text-zinc-900">
-            <span className="text-zinc-400">{index + 1}.</span> {question.prompt}
+        <div key={question.id} className="space-y-2 rounded-xl border border-zinc-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-700">
+            Question {index + 1} of {total}
           </p>
-          {question.help ? <p className="text-xs text-zinc-500">{question.help}</p> : null}
+          <p className="text-base font-semibold text-zinc-900">{question.prompt}</p>
+          {question.help ? <p className="text-sm text-zinc-500">{question.help}</p> : null}
           {renderInput(question, answers[question.id], onChange)}
         </div>
       ))}
@@ -40,12 +42,12 @@ function renderInput(
   if (question.type === "multiple_choice" || question.type === "experience") {
     const selected = typeof value === "number" ? value : null;
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {(question.options ?? []).map((option, i) => (
           <label
             key={i}
-            className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-sm transition ${
-              selected === i ? "border-blue-600 bg-blue-50" : "border-zinc-200 hover:border-zinc-300"
+            className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+              selected === i ? "border-brand-600 bg-brand-50" : "border-zinc-200 hover:border-zinc-300"
             }`}
           >
             <input
@@ -53,7 +55,7 @@ function renderInput(
               name={question.id}
               checked={selected === i}
               onChange={() => onChange(question.id, i)}
-              className="mt-0.5"
+              className="mt-0.5 h-4 w-4 accent-brand-600"
             />
             <span className="text-zinc-800">{option}</span>
           </label>
@@ -93,7 +95,7 @@ function renderInput(
                 aria-label="Move up"
                 onClick={() => move(i, i - 1)}
                 disabled={i === 0}
-                className="rounded border border-zinc-200 px-1.5 py-0.5 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-30"
+                className="rounded border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-30"
               >
                 ↑
               </button>
@@ -102,7 +104,7 @@ function renderInput(
                 aria-label="Move down"
                 onClick={() => move(i, i + 1)}
                 disabled={i === order.length - 1}
-                className="rounded border border-zinc-200 px-1.5 py-0.5 text-xs text-zinc-600 hover:bg-zinc-50 disabled:opacity-30"
+                className="rounded border border-zinc-200 px-2.5 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50 disabled:opacity-30"
               >
                 ↓
               </button>

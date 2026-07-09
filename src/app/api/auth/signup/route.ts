@@ -26,16 +26,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const orgName = String(body.orgName ?? "").trim();
     const orgSlug = String(body.orgSlug ?? "").trim();
-    const website = String(body.website ?? "").trim();
-    const rawBrandColor = String(body.brandColor ?? "").trim();
-    // Only accept a well-formed hex color; anything else falls back to default.
-    const brandColor = /^#[0-9a-fA-F]{6}$/.test(rawBrandColor) ? rawBrandColor : "";
-    const applicationEmail = String(body.applicationEmail ?? "").trim();
     const adminName = String(body.adminName ?? "").trim();
     const adminEmail = String(body.adminEmail ?? "").trim();
     const password = String(body.password ?? "");
+    const rawType = String(body.companyType ?? "").trim().toLowerCase();
+    const companyType = ["employer", "agency", "other"].includes(rawType) ? rawType : "";
 
-    if (!orgName || !applicationEmail || !adminName || !adminEmail || !password) {
+    // Only essentials are required at signup. Resume-delivery email, branding,
+    // website, and teammates are collected later in onboarding/settings — the
+    // resume inbox defaults to the admin's email so applications still deliver.
+    if (!orgName || !adminName || !adminEmail || !password) {
       return NextResponse.json({ error: "All required fields must be filled in" }, { status: 400 });
     }
 
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicationEmail) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
@@ -54,9 +54,10 @@ export async function POST(request: Request) {
     const organization = createOrganization({
       name: orgName,
       slug: orgSlug || undefined,
-      website,
-      application_email: applicationEmail,
-      brand_color: brandColor,
+      website: "",
+      application_email: adminEmail, // default resume inbox → owner; changeable in Settings
+      brand_color: "",
+      company_type: companyType,
     });
 
     // Every new workspace gets an honest local trial window from day one.

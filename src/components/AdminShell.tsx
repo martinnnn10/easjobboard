@@ -19,6 +19,7 @@ export function AdminShell({
   userName,
   roleLabel,
   nav,
+  isDemo = false,
   children,
 }: {
   orgSlug: string;
@@ -27,6 +28,7 @@ export function AdminShell({
   userName: string;
   roleLabel: string;
   nav: NavItem[];
+  isDemo?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname() ?? "";
@@ -84,6 +86,12 @@ export function AdminShell({
           </span>
         </Link>
         <div className="ml-auto flex items-center gap-3">
+          {isDemo ? (
+            <span className="hidden items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 sm:inline-flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Demo data
+            </span>
+          ) : null}
           <div className="hidden text-right sm:block">
             <p className="text-sm font-medium leading-tight text-zinc-800">{orgName}</p>
             <p className="text-xs leading-tight text-zinc-500">

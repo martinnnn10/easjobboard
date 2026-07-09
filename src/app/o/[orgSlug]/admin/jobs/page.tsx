@@ -44,6 +44,16 @@ export default async function JobsPage({ params }: PageProps) {
         </div>
       </div>
 
+      {organization.is_demo && writable ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-900">
+            <span className="font-semibold">Demo data.</span> These jobs and candidates are samples to show how EAS
+            Recruit works. Clear them when you&apos;re ready to post real roles.
+          </p>
+          <DemoSeedButton orgSlug={orgSlug} isDemo className="btn-secondary text-sm" />
+        </div>
+      ) : null}
+
       {jobs.length === 0 ? (
         <div className="card space-y-3 py-10 text-center">
           <h3 className="text-lg font-semibold text-zinc-900">No jobs yet</h3>

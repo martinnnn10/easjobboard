@@ -372,3 +372,49 @@ export function seedDemoData(organizationId: string, companyName: string): { see
 
   return { seeded: true, jobs: 2, candidates: count };
 }
+
+/**
+ * Remove the demo dataset so an org can convert to a clean, real workspace.
+ * Scoped strictly to the two demo jobs and the rows hanging off them, inside a
+ * transaction. Candidates are deleted only when they have no non-demo
+ * application, so a real applicant is never touched.
+ */
+export function clearDemoData(organizationId: string): { removedJobs: number; removedCandidates: number } {
+  const db = getDb();
+  const demoJobs = db
+    .prepare("SELECT id FROM jobs WHERE organization_id = ? AND reference_number IN (?, ?)")
+    .all(organizationId, ELEC_REF, CONTROLS_REF) as Array<{ id: string }>;
+  if (demoJobs.length === 0) return { removedJobs: 0, removedCandidates: 0 };
+  const jobIds = demoJobs.map((j) => j.id);
+  const jobPlaceholders = jobIds.map(() => "?").join(",");
+
+  const apps = db
+    .prepare(`SELECT id, candidate_id FROM applications WHERE organization_id = ? AND job_id IN (${jobPlaceholders})`)
+    .all(organizationId, ...jobIds) as Array<{ id: string; candidate_id: string }>;
+  const appIds = apps.map((a) => a.id);
+  const candidateIds = [...new Set(apps.map((a) => a.candidate_id).filter(Boolean))];
+
+  let removedCandidates = 0;
+  const tx = db.transaction(() => {
+    if (appIds.length) {
+      const ph = appIds.map(() => "?").join(",");
+      db.prepare(`DELETE FROM screen_submissions WHERE application_id IN (${ph})`).run(...appIds);
+      db.prepare(`DELETE FROM candidate_events WHERE application_id IN (${ph})`).run(...appIds);
+      db.prepare(`DELETE FROM applications WHERE id IN (${ph})`).run(...appIds);
+    }
+    for (const cid of candidateIds) {
+      const remaining = db
+        .prepare("SELECT COUNT(*) AS c FROM applications WHERE candidate_id = ?")
+        .get(cid) as { c: number };
+      if (remaining.c === 0) {
+        db.prepare("DELETE FROM candidate_events WHERE candidate_id = ?").run(cid);
+        db.prepare("DELETE FROM candidates WHERE id = ? AND organization_id = ?").run(cid, organizationId);
+        removedCandidates += 1;
+      }
+    }
+    db.prepare(`DELETE FROM jobs WHERE id IN (${jobPlaceholders})`).run(...jobIds);
+  });
+  tx();
+
+  return { removedJobs: jobIds.length, removedCandidates };
+}

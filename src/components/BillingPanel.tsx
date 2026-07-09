@@ -15,6 +15,8 @@ type BillingState = {
   currentPeriodEnd: string;
   seatPriceUsd: number;
   monthlyTotalUsd: number;
+  planName: string;
+  planFeatures: string[];
 };
 
 const STATUS_STYLE: Record<BillingState["status"], string> = {
@@ -66,13 +68,27 @@ export function BillingPanel({
         <div>
           <h2 className="text-base font-semibold text-zinc-900">Billing &amp; plan</h2>
           <p className="text-sm text-zinc-600">
-            EAS Recruit · ${state.seatPriceUsd}/month per seat
+            EAS Recruit {state.planName} · ${state.seatPriceUsd}/month
           </p>
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[state.status]}`}>
           {state.statusLabel}
         </span>
       </div>
+
+      {state.planFeatures.length > 0 ? (
+        <div className="rounded-lg border border-zinc-200 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What&apos;s included</p>
+          <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+            {state.planFeatures.map((f) => (
+              <li key={f} className="flex items-start gap-1.5 text-sm text-zinc-700">
+                <span className="text-brand-600">✓</span>
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {/* Trial / renewal line */}
       {state.status === "trialing" && state.trialDaysLeft !== null ? (

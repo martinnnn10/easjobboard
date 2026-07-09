@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DismissOnboarding, OnboardingChoices } from "@/components/OnboardingChoices";
 import { getCallQueueCount } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { TRIAL_DAYS } from "@/lib/pricing";
+import { demoDataExists } from "@/lib/seed-demo";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam } from "@/lib/roles";
@@ -59,6 +62,12 @@ export default async function OnboardingPage({ params }: PageProps) {
   const queueCount = getCallQueueCount(organization.id);
   const teamCount = listUsersByOrganization(organization.id).length;
   const isOwner = canManageTeam(user.role);
+  const isDemo = organization.is_demo;
+  const hasDemo = demoDataExists(organization.id);
+  // Resume inbox counts as "set" once it differs from the owner's default.
+  const resumeEmailSet = Boolean(
+    organization.application_email && organization.application_email !== user.email,
+  );
 
   const steps = [
     {
@@ -87,11 +96,19 @@ export default async function OnboardingPage({ params }: PageProps) {
     },
     {
       n: 4,
-      title: "Invite your team",
+      title: "Invite a teammate",
       body: "Add recruiters so calls, notes, and follow-ups are shared across your workspace.",
       done: teamCount > 1,
       cta: isOwner ? "Invite teammates" : "View team",
       href: `${base}/team`,
+    },
+    {
+      n: 5,
+      title: "Set your resume delivery email",
+      body: "Choose where applicant resumes land. Defaults to your email — change it in Settings anytime.",
+      done: resumeEmailSet,
+      cta: "Open Settings",
+      href: `${base}/settings`,
     },
   ];
 
@@ -105,9 +122,27 @@ export default async function OnboardingPage({ params }: PageProps) {
           Let&apos;s get {organization.name} to its first ranked call
         </h1>
         <p className="mt-2 text-zinc-600">
-          Four quick steps. You can do these in any order — we&apos;ll check them off as you go.
+          Start by exploring a labelled demo, or set up your real workspace. The checklist tracks your progress either
+          way.
         </p>
       </div>
+
+      {/* First-run choice: demo vs. real. Hidden once there's a real job or demo already loaded. */}
+      {!hasJob && !hasDemo && isOwner ? (
+        <OnboardingChoices orgSlug={orgSlug} createHref={`${base}/jobs/new`} />
+      ) : null}
+
+      {isDemo ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm text-amber-900">
+            <span className="font-semibold">You&apos;re exploring demo data.</span> Sample candidates and jobs are
+            clearly labelled across the app. Clear them whenever you&apos;re ready for real applicants.
+          </p>
+          <Link href={`${base}/jobs`} className="btn-secondary text-sm">
+            Manage demo →
+          </Link>
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-4">
         <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-100">
@@ -126,15 +161,15 @@ export default async function OnboardingPage({ params }: PageProps) {
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-200 pt-4">
         <p className="text-sm text-zinc-500">
-          You&apos;re on a 14-day free trial. Manage your plan anytime in{" "}
+          You&apos;re on a {TRIAL_DAYS}-day free trial. Manage your plan anytime in{" "}
           <Link href={`${base}/settings`} className="text-brand-700 hover:underline">
             Settings → Billing
           </Link>
           .
         </p>
-        <Link href={base} className="btn-secondary text-sm">
-          Skip to dashboard →
-        </Link>
+        {isOwner ? <DismissOnboarding orgSlug={orgSlug} /> : (
+          <Link href={base} className="btn-secondary text-sm">Skip to dashboard →</Link>
+        )}
       </div>
     </div>
   );

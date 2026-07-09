@@ -1,6 +1,38 @@
 import nodemailer from "nodemailer";
-import { getPlatformName, getSmtpConfig } from "./env";
+import { getPlatformEmail, getPlatformName, getSmtpConfig } from "./env";
 import type { Job, Organization } from "./db";
+
+/** True when SMTP is fully configured (so best-effort notifications can send). */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+}
+
+/** Notify the platform team of an inbound "Book a demo" request. Best-effort. */
+export async function sendDemoRequestNotification(input: {
+  name: string;
+  email: string;
+  company: string;
+  role: string;
+  challenge: string;
+  notes: string;
+}): Promise<void> {
+  if (!isEmailConfigured()) return;
+  const { smtp, transporter } = createTransport();
+  await transporter.sendMail({
+    from: `"${getPlatformName()}" <${smtp.fromEmail}>`,
+    to: getPlatformEmail(),
+    replyTo: input.email,
+    subject: `New demo request — ${input.company || input.name}`,
+    text: [
+      `Name: ${input.name}`,
+      `Work email: ${input.email}`,
+      `Company: ${input.company || "—"}`,
+      `Role: ${input.role || "—"}`,
+      `Hiring challenge: ${input.challenge || "—"}`,
+      `Preferred time / notes: ${input.notes || "—"}`,
+    ].join("\n"),
+  });
+}
 
 type ApplicationEmailInput = {
   organization: Organization;

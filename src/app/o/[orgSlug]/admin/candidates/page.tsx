@@ -24,6 +24,7 @@ const TABS: { key: CandidateView; label: string }[] = [
   { key: "all", label: "All candidates" },
   { key: "applicants", label: "Applicants" },
   { key: "sourced", label: "Sourced" },
+  { key: "strong_fit", label: "Strong fit" },
   { key: "needs_follow_up", label: "Needs follow-up" },
   { key: "high_risk", label: "High risk" },
 ];
@@ -32,6 +33,7 @@ const TAB_HELP: Record<CandidateView, string> = {
   all: "Everyone in your pool — applicants and sourced/passive candidates, deduplicated across jobs.",
   applicants: "People who applied to one of your roles.",
   sourced: "Passive and sourced prospects you added or imported — they haven't applied yet.",
+  strong_fit: "Passed the skills screen at or above the strong-fit bar and not flagged high-risk — call these first.",
   needs_follow_up: "Candidates with a follow-up date that's now due.",
   high_risk: "Candidates flagged high-risk on a screen — pay, commute, or job-hop concerns to verify.",
 };

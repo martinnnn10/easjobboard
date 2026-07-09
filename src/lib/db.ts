@@ -26,6 +26,12 @@ export type Organization = {
   subscription_status: string;
   plan_seats: number;
   current_period_end: string;
+  /** employer | agency | other (optional, from signup). */
+  company_type: string;
+  /** True for the sample/demo workspace so the UI can label it. */
+  is_demo: boolean;
+  /** Owner dismissed the first-run onboarding checklist. */
+  onboarding_dismissed: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -439,9 +445,26 @@ function initDb(database: Database.Database): void {
     ["subscription_status", "ALTER TABLE organizations ADD COLUMN subscription_status TEXT NOT NULL DEFAULT ''"],
     ["plan_seats", "ALTER TABLE organizations ADD COLUMN plan_seats INTEGER NOT NULL DEFAULT 0"],
     ["current_period_end", "ALTER TABLE organizations ADD COLUMN current_period_end TEXT NOT NULL DEFAULT ''"],
+    ["company_type", "ALTER TABLE organizations ADD COLUMN company_type TEXT NOT NULL DEFAULT ''"],
+    ["is_demo", "ALTER TABLE organizations ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0"],
+    ["onboarding_dismissed", "ALTER TABLE organizations ADD COLUMN onboarding_dismissed INTEGER NOT NULL DEFAULT 0"],
   ] as const) {
     if (!columnExists(database, "organizations", col)) database.exec(ddl);
   }
+
+  // Inbound "Book a demo" requests from the public site.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS demo_requests (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      company TEXT NOT NULL DEFAULT '',
+      role TEXT NOT NULL DEFAULT '',
+      challenge TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+  `);
 
   migrateLegacyJobs(database);
 
@@ -782,6 +805,9 @@ export function rowToOrganization(row: Record<string, unknown>): Organization {
     subscription_status: (row.subscription_status as string | undefined) ?? "",
     plan_seats: Number(row.plan_seats ?? 0),
     current_period_end: (row.current_period_end as string | undefined) ?? "",
+    company_type: (row.company_type as string | undefined) ?? "",
+    is_demo: Number(row.is_demo ?? 0) === 1,
+    onboarding_dismissed: Number(row.onboarding_dismissed ?? 0) === 1,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
