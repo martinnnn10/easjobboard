@@ -88,6 +88,14 @@ export default async function OnboardingPage({ params }: PageProps) {
     },
     {
       n: 3,
+      title: "Publish or share the job",
+      body: "Publish to your careers page and job boards, or share the direct link so candidates can apply.",
+      done: jobs.some((j) => j.status === "published"),
+      cta: hasJob ? "Publish a job" : "Create a job first",
+      href: `${base}/jobs`,
+    },
+    {
+      n: 4,
       title: "Review your Call Queue",
       body: "Once candidates complete a screen, the strongest ones rank here — ready to call.",
       done: queueCount > 0,
@@ -95,7 +103,7 @@ export default async function OnboardingPage({ params }: PageProps) {
       href: `${base}/queue`,
     },
     {
-      n: 4,
+      n: 5,
       title: "Invite a teammate",
       body: "Add recruiters so calls, notes, and follow-ups are shared across your workspace.",
       done: teamCount > 1,
@@ -103,7 +111,7 @@ export default async function OnboardingPage({ params }: PageProps) {
       href: `${base}/team`,
     },
     {
-      n: 5,
+      n: 6,
       title: "Set your resume delivery email",
       body: "Choose where applicant resumes land. Defaults to your email — change it in Settings anytime.",
       done: resumeEmailSet,
@@ -135,8 +143,9 @@ export default async function OnboardingPage({ params }: PageProps) {
       {isDemo ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm text-amber-900">
-            <span className="font-semibold">You&apos;re exploring demo data.</span> Sample candidates and jobs are
-            clearly labelled across the app. Clear them whenever you&apos;re ready for real applicants.
+            <span className="font-semibold">You&apos;re exploring demo data.</span>{" "}
+            Sample candidates and jobs are clearly labelled across the app. Clear them whenever you&apos;re ready for
+            real applicants.
           </p>
           <Link href={`${base}/jobs`} className="btn-secondary text-sm">
             Manage demo →
