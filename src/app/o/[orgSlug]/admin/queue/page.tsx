@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CallLogPanel } from "@/components/CallLogPanel";
+import { DemoBadge } from "@/components/DemoBadge";
 import { RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
 import { listApplicationsByOrganization, REVIEW_FLOOR } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
@@ -68,9 +69,9 @@ export default async function CallQueuePage({ params }: PageProps) {
 
       {queue.length === 0 ? (
         <div className="card space-y-1 py-8 text-center">
-          <p className="font-medium text-zinc-800">Nothing to call yet.</p>
+          <p className="font-medium text-zinc-800">No candidates to call yet.</p>
           <p className="text-sm text-zinc-600">
-            Once applicants complete their skills screen, the strongest ones show up here ranked and ready to call.
+            Once candidates complete a skills screen, EAS Recruit will rank who is worth calling first.
           </p>
         </div>
       ) : (
@@ -98,6 +99,7 @@ export default async function CallQueuePage({ params }: PageProps) {
                       >
                         {a.applicant_name}
                       </Link>
+                      {a.is_demo ? <DemoBadge /> : null}
                       {risk !== "low" ? <RiskPill level={risk} /> : null}
                       {followDue ? (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">

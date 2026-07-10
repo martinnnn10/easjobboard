@@ -370,6 +370,18 @@ export function seedDemoData(organizationId: string, companyName: string): { see
     count += 1;
   });
 
+  // Flag every seeded application + its candidate as demo so the UI can badge
+  // them and they can never be mistaken for real applicants.
+  const db = getDb();
+  db.prepare(
+    `UPDATE applications SET is_demo = 1 WHERE organization_id = ? AND job_id IN (?, ?)`,
+  ).run(organizationId, elecJob.id, controlsJob.id);
+  db.prepare(
+    `UPDATE candidates SET is_demo = 1
+       WHERE organization_id = ?
+         AND id IN (SELECT candidate_id FROM applications WHERE organization_id = ? AND job_id IN (?, ?))`,
+  ).run(organizationId, organizationId, elecJob.id, controlsJob.id);
+
   return { seeded: true, jobs: 2, candidates: count };
 }
 

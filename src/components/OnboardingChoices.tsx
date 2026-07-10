@@ -39,31 +39,44 @@ export function OnboardingChoices({ orgSlug, createHref }: { orgSlug: string; cr
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <button
           type="button"
           onClick={loadDemo}
           disabled={busy}
           className="card card-hover flex flex-col items-start gap-2 text-left disabled:opacity-60"
         >
-          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
-            Recommended
+          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+            Demo Workspace
           </span>
           <span className="text-lg font-semibold text-zinc-900">Explore demo data</span>
           <span className="text-sm text-zinc-600">
-            See how the Resume Trap, skills screens, and Call Queue work with sample candidates. Clearly labelled — you
-            can clear it in one click.
+            See how the Resume Trap, skills scores, and Call Queue work with sample candidates. Clearly labelled — you
+            can exit it in one click.
           </span>
           <span className="mt-1 text-sm font-medium text-brand-700">{busy ? "Loading…" : "Load sample workspace →"}</span>
         </button>
 
         <Link href={createHref} className="card card-hover flex flex-col items-start gap-2 text-left">
-          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-600">Real setup</span>
+          <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">Recommended</span>
           <span className="text-lg font-semibold text-zinc-900">Start with my real hiring team</span>
           <span className="text-sm text-zinc-600">
-            Create your first job and start collecting real applicants. We&apos;ll guide you with the checklist below.
+            Create your first job and start collecting real applicants — no sample data. We&apos;ll guide you with the
+            checklist below.
           </span>
           <span className="mt-1 text-sm font-medium text-brand-700">Create your first job →</span>
+        </Link>
+
+        <Link
+          href={`/o/${orgSlug}/admin/candidates/import`}
+          className="card card-hover flex flex-col items-start gap-2 text-left"
+        >
+          <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-600">Import</span>
+          <span className="text-lg font-semibold text-zinc-900">Import candidates / resumes</span>
+          <span className="text-sm text-zinc-600">
+            Already have candidates or a stack of resumes? Bring them into your pool and screen them.
+          </span>
+          <span className="mt-1 text-sm font-medium text-brand-700">Import candidates →</span>
         </Link>
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

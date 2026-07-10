@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DemoWorkspaceBanner } from "@/components/DemoWorkspaceBanner";
 import { LogoutButton } from "@/components/LogoutButton";
 
 export type NavItem = { key: string; label: string; href: string };
@@ -118,7 +119,10 @@ export function AdminShell({
           </div>
         ) : null}
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1">
+          {isDemo ? <DemoWorkspaceBanner orgSlug={orgSlug} /> : null}
+          {children}
+        </main>
       </div>
     </div>
   );

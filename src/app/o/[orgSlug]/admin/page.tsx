@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DemoBadge } from "@/components/DemoBadge";
 import { ClaimVsProof } from "@/components/ScreenSignals";
 import {
   countApplicationsByOrganization,
@@ -283,7 +284,10 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
                 className="block rounded-xl border border-red-200 bg-white p-4 transition hover:border-red-300"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-zinc-900">{c.applicant_name}</span>
+                  <span className="flex items-center gap-1.5 font-semibold text-zinc-900">
+                    {c.applicant_name}
+                    {c.is_demo ? <DemoBadge /> : null}
+                  </span>
                   <span className="text-xs text-zinc-500">{c.job_title}</span>
                 </div>
                 <div className="mt-3">

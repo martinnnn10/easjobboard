@@ -192,7 +192,7 @@ export function getApplicationDetail(id: string, organizationId: string): Applic
               a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
               a.status, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
               a.screen_status, a.screen_score, a.risk_level, a.risk_flags, a.screen_summary,
-              a.created_at, j.title AS job_title, j.slug AS job_slug
+              a.is_demo, a.created_at, j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE a.id = ? AND a.organization_id = ?`,
@@ -273,7 +273,7 @@ export function listApplicationsByOrganization(
               a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
               a.status, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
               a.screen_status, a.screen_score, a.screen_outcome, a.risk_level, a.risk_flags, a.screen_summary,
-              a.created_at, j.title AS job_title, j.slug AS job_slug
+              a.is_demo, a.created_at, j.title AS job_title, j.slug AS job_slug
        FROM applications a
        JOIN jobs j ON j.id = a.job_id
        WHERE a.organization_id = ?${whereClause}

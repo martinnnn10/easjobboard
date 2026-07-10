@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DemoBadge } from "@/components/DemoBadge";
 import { ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
@@ -208,6 +209,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                     </p>
                   ) : null}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {candidate.is_demo ? <DemoBadge /> : null}
                     {candidate.source !== "applied" ? (
                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                         {isCandidateSource(candidate.source) ? CANDIDATE_SOURCE_LABELS[candidate.source] : candidate.source}

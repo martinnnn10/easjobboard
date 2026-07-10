@@ -133,6 +133,8 @@ export type Application = {
   risk_flags: RiskFlagRecord[];
   /** Denormalized snapshot for fast card/list rendering (see ScreenSummary). */
   screen_summary: ScreenSummaryRecord | null;
+  /** True for sample rows loaded by the demo workspace. */
+  is_demo: boolean;
   created_at: string;
 };
 
@@ -705,6 +707,14 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "jobs", "screen_key")) {
     database.exec("ALTER TABLE jobs ADD COLUMN screen_key TEXT NOT NULL DEFAULT ''");
   }
+  // Demo labelling: mark sample rows so they can be badged and never mistaken
+  // for real candidates in a real workspace.
+  if (!columnExists(database, "applications", "is_demo")) {
+    database.exec("ALTER TABLE applications ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!columnExists(database, "candidates", "is_demo")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
+  }
   // RBAC: existing single-user orgs become "owner"; multi-seat roles + revocation.
   if (!columnExists(database, "users", "role")) {
     database.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'");
@@ -901,6 +911,7 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     risk_level: (row.risk_level as RiskLevelValue | undefined) ?? "",
     risk_flags: parseJson<RiskFlagRecord[]>(row.risk_flags, []),
     screen_summary: parseJson<ScreenSummaryRecord | null>(row.screen_summary, null),
+    is_demo: Number(row.is_demo ?? 0) === 1,
     created_at: row.created_at as string,
   };
 }
@@ -935,6 +946,8 @@ export type CandidateRecord = {
   follow_up_at: string;
   first_applied_at: string;
   last_applied_at: string;
+  /** True for sample candidates loaded by the demo workspace. */
+  is_demo: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -961,6 +974,7 @@ export function rowToCandidate(row: Record<string, unknown>): CandidateRecord {
     follow_up_at: (row.follow_up_at as string | undefined) ?? "",
     first_applied_at: row.first_applied_at as string,
     last_applied_at: row.last_applied_at as string,
+    is_demo: Number(row.is_demo ?? 0) === 1,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
