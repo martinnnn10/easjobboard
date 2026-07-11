@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssignRecruiterSelect } from "@/components/AssignRecruiterSelect";
 import { AttachToJobForm } from "@/components/AttachToJobForm";
+import { CallLogPanel } from "@/components/CallLogPanel";
 import { CandidateCrmPanel } from "@/components/CandidateCrmPanel";
 import { CandidateNoteForm } from "@/components/CandidateNoteForm";
 import { ConfirmCareTaskPanel } from "@/components/ConfirmCareTaskPanel";
@@ -202,6 +203,35 @@ export default async function CandidateProfilePage({ params }: PageProps) {
             ) : null}
           </div>
         </div>
+
+        {/* Contact actions — call / text / email / log outcome, one tap away. */}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {writable ? (
+            <CallLogPanel
+              orgSlug={orgSlug}
+              candidateId={candidate.id}
+              applicationId={primary?.applicationId}
+              phone={candidate.phone}
+              email={candidate.email}
+              currentStatus={primary?.status}
+            />
+          ) : (
+            <div className="flex gap-2">
+              {candidate.phone ? (
+                <a href={`tel:${candidate.phone.replace(/[^0-9+]/g, "")}`} className="btn-secondary text-sm">Call</a>
+              ) : null}
+              <a href={`mailto:${candidate.email}`} className="btn-secondary text-sm">Email</a>
+            </div>
+          )}
+          {candidate.resume_filename ? (
+            <a
+              href={`/api/o/${orgSlug}/candidates/${candidate.id}/resume`}
+              className="text-sm text-brand-700 hover:underline"
+            >
+              Resume: {candidate.resume_filename} ↓
+            </a>
+          ) : null}
+        </div>
       </div>
 
       {/* Intelligence first — the decision, above the resume/applications. */}
@@ -260,7 +290,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
           </>
         ) : (
           <p className="text-sm text-zinc-600">
-            No completed skills screen yet.{" "}
+            Not enough screening data yet. Add a skills screen or phone-screen note to improve this summary.{" "}
             {candidate.applications.length === 0
               ? "Attach this candidate to a job below to screen their practical ability."
               : "Once their screen is completed, the intelligence — strengths, risks, and what to verify — appears here."}

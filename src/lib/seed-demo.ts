@@ -388,8 +388,9 @@ export function seedDemoData(organizationId: string, companyName: string): { see
 /**
  * Remove the demo dataset so an org can convert to a clean, real workspace.
  * Scoped strictly to the two demo jobs and the rows hanging off them, inside a
- * transaction. Candidates are deleted only when they have no non-demo
- * application, so a real applicant is never touched.
+ * transaction. A candidate is deleted only when it is demo-flagged (is_demo=1)
+ * AND has no remaining application — so a real candidate who happened to be
+ * attached to a demo job keeps their profile (they just lose that attachment).
  */
 export function clearDemoData(organizationId: string): { removedJobs: number; removedCandidates: number } {
   const db = getDb();
@@ -415,6 +416,11 @@ export function clearDemoData(organizationId: string): { removedJobs: number; re
       db.prepare(`DELETE FROM applications WHERE id IN (${ph})`).run(...appIds);
     }
     for (const cid of candidateIds) {
+      // Never delete a real candidate — only demo-flagged ones with nothing left.
+      const cand = db
+        .prepare("SELECT is_demo FROM candidates WHERE id = ? AND organization_id = ?")
+        .get(cid, organizationId) as { is_demo?: number } | undefined;
+      if (!cand || Number(cand.is_demo ?? 0) !== 1) continue;
       const remaining = db
         .prepare("SELECT COUNT(*) AS c FROM applications WHERE candidate_id = ?")
         .get(cid) as { c: number };

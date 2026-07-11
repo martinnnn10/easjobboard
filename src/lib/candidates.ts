@@ -501,8 +501,14 @@ export type SourcedCandidateInput = {
   crm_status?: string;
   /** Optional first note to seed the timeline. */
   notes?: string;
+  /** Assign the owning recruiter at creation. */
+  owner_user_id?: string;
+  /** Optional uploaded resume (imported candidates). */
+  resume?: { filename: string; contentType: string; data: Buffer } | null;
   created_by?: string;
   actor?: string;
+  /** When set, skip duplicate detection (recruiter chose "add anyway"). */
+  skipDuplicateCheck?: boolean;
 };
 
 export type CreateSourcedResult = {
@@ -523,15 +529,17 @@ export function createSourcedCandidate(input: SourcedCandidateInput): CreateSour
   const database = getDb();
   const email = input.email.trim().toLowerCase();
 
-  const duplicate = findDuplicateCandidate(input.organization_id, {
-    email,
-    phone: input.phone,
-    name: input.name,
-    company: input.company,
-    location: input.location,
-  });
-  if (duplicate) {
-    return { candidate: duplicate.candidate, matched: true, matchedBy: duplicate.matchedBy };
+  if (!input.skipDuplicateCheck) {
+    const duplicate = findDuplicateCandidate(input.organization_id, {
+      email,
+      phone: input.phone,
+      name: input.name,
+      company: input.company,
+      location: input.location,
+    });
+    if (duplicate) {
+      return { candidate: duplicate.candidate, matched: true, matchedBy: duplicate.matchedBy };
+    }
   }
 
   const id = randomUUID();
@@ -539,17 +547,21 @@ export function createSourcedCandidate(input: SourcedCandidateInput): CreateSour
   const source = input.source ?? "sourced";
   const cleanTags = dedupeStrings(input.tags ?? []);
   const cleanSkills = dedupeStrings(input.skills ?? []);
+  const owner = input.owner_user_id?.trim() ?? "";
+  const resume = input.resume ?? null;
 
   database
     .prepare(
       `INSERT INTO candidates (
          id, organization_id, email, name, phone, location, title, company,
          skills, tags, owner_user_id, source, source_provider, source_url, crm_status,
-         created_by, first_applied_at, last_applied_at, created_at, updated_at
+         created_by, resume_filename, resume_content_type, resume_data,
+         first_applied_at, last_applied_at, created_at, updated_at
        ) VALUES (
          @id, @organization_id, @email, @name, @phone, @location, @title, @company,
-         @skills, @tags, '', @source, @source_provider, @source_url, @crm_status,
-         @created_by, @now, @now, @now, @now
+         @skills, @tags, @owner, @source, @source_provider, @source_url, @crm_status,
+         @created_by, @resume_filename, @resume_content_type, @resume_data,
+         @now, @now, @now, @now
        )`,
     )
     .run({
@@ -563,6 +575,10 @@ export function createSourcedCandidate(input: SourcedCandidateInput): CreateSour
       company: input.company?.trim() ?? "",
       skills: JSON.stringify(cleanSkills),
       tags: JSON.stringify(cleanTags),
+      owner,
+      resume_filename: resume?.filename ?? "",
+      resume_content_type: resume?.contentType ?? "",
+      resume_data: resume?.data ?? null,
       source,
       source_provider: input.source_provider?.trim() ?? "",
       source_url: input.source_url?.trim() ?? "",
@@ -576,9 +592,30 @@ export function createSourcedCandidate(input: SourcedCandidateInput): CreateSour
     organization_id: input.organization_id,
     candidate_id: id,
     type: "sourced",
-    detail: providerLabel ? `Sourced via ${providerLabel}` : "Added to candidate pool",
+    detail: providerLabel ? `Added to candidate pool via ${providerLabel}` : "Added to candidate pool",
     actor: input.actor ?? "",
   });
+
+  if (resume) {
+    recordCandidateEvent({
+      organization_id: input.organization_id,
+      candidate_id: id,
+      type: "note",
+      detail: `Resume uploaded — ${resume.filename}`,
+      actor: input.actor ?? "",
+    });
+  }
+
+  if (owner) {
+    const ownerUser = getUserById(owner);
+    recordCandidateEvent({
+      organization_id: input.organization_id,
+      candidate_id: id,
+      type: "note",
+      detail: `Owner assigned${ownerUser ? ` — ${ownerUser.name}` : ""}`,
+      actor: input.actor ?? "",
+    });
+  }
 
   const firstNote = input.notes?.trim();
   if (firstNote) {
@@ -592,6 +629,24 @@ export function createSourcedCandidate(input: SourcedCandidateInput): CreateSour
   }
 
   return { candidate: getCandidateById(id, input.organization_id)!, matched: false };
+}
+
+/** Fetch a candidate's stored resume BLOB (imported candidates), or null. */
+export function getCandidateResume(
+  id: string,
+  organizationId: string,
+): { filename: string; contentType: string; data: Buffer } | null {
+  const row = getDb()
+    .prepare("SELECT resume_filename, resume_content_type, resume_data FROM candidates WHERE id = ? AND organization_id = ?")
+    .get(id, organizationId) as
+    | { resume_filename?: string; resume_content_type?: string; resume_data?: Buffer | null }
+    | undefined;
+  if (!row || !row.resume_data) return null;
+  return {
+    filename: row.resume_filename || "resume",
+    contentType: row.resume_content_type || "application/octet-stream",
+    data: row.resume_data as Buffer,
+  };
 }
 
 function dedupeStrings(values: string[]): string[] {

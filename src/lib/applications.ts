@@ -44,10 +44,16 @@ export function createApplication(input: {
   risk_flags?: RiskFlagRecord[];
   screen_summary?: ScreenSummaryRecord | null;
   created_at?: string;
+  /** 'applied' (public) or a manual/import source. Marks the application. */
+  source?: string;
+  /** Actor for the timeline event (recruiter name for manual attaches). */
+  actor?: string;
 }): Application {
   const database = getDb();
   const id = randomUUID();
   const appliedAt = input.created_at ?? nowIso();
+  const source = input.source?.trim() || "applied";
+  const isManual = source !== "applied";
 
   // Attach to (or create) the persistent candidate for this person, so their
   // applications, timeline, tags, and owner live on one profile across jobs.
@@ -67,12 +73,12 @@ export function createApplication(input: {
         id, organization_id, job_id, candidate_id, applicant_name, applicant_email, applicant_phone,
         cover_letter, resume_filename, resume_content_type, resume_data,
         resume_text, resume_skills, match_score, match_method, applicant_location, desired_pay,
-        screen_status, screen_score, screen_outcome, risk_level, risk_flags, screen_summary, created_at
+        screen_status, screen_score, screen_outcome, risk_level, risk_flags, screen_summary, source, created_at
       ) VALUES (
         @id, @organization_id, @job_id, @candidate_id, @applicant_name, @applicant_email, @applicant_phone,
         @cover_letter, @resume_filename, @resume_content_type, @resume_data,
         @resume_text, @resume_skills, @match_score, @match_method, @applicant_location, @desired_pay,
-        @screen_status, @screen_score, @screen_outcome, @risk_level, @risk_flags, @screen_summary, @created_at
+        @screen_status, @screen_score, @screen_outcome, @risk_level, @risk_flags, @screen_summary, @source, @created_at
       )`,
     )
     .run({
@@ -99,6 +105,7 @@ export function createApplication(input: {
       risk_level: input.risk_level ?? "",
       risk_flags: JSON.stringify(input.risk_flags ?? []),
       screen_summary: input.screen_summary ? JSON.stringify(input.screen_summary) : "",
+      source,
       created_at: input.created_at ?? nowIso(),
     });
 
@@ -110,8 +117,12 @@ export function createApplication(input: {
     application_id: id,
     candidate_id: candidateId,
     type: "applied",
-    detail: jobTitle ? `Applied to ${jobTitle}` : "Application received",
-    actor: input.applicant_name,
+    detail: isManual
+      ? `Manually added to ${jobTitle ?? "a job"}`
+      : jobTitle
+        ? `Applied to ${jobTitle}`
+        : "Application received",
+    actor: isManual ? input.actor ?? "" : input.applicant_name,
   });
 
   return getApplicationById(id)!;
@@ -144,6 +155,8 @@ export function attachCandidateToJob(input: {
   candidate_id: string;
   job_id: string;
   actor?: string;
+  /** Marks the created application as manual/import (default 'manual'). */
+  source?: string;
 }): { ok: true; application: Application } | { ok: false; error: string } {
   const database = getDb();
   const candidate = database
@@ -171,11 +184,13 @@ export function attachCandidateToJob(input: {
     applicant_email: email,
     applicant_phone: String(candidate.phone ?? ""),
     cover_letter: "",
-    resume_filename: "",
-    resume_content_type: "",
-    resume_data: Buffer.alloc(0),
+    resume_filename: String(candidate.resume_filename ?? ""),
+    resume_content_type: String(candidate.resume_content_type ?? ""),
+    resume_data: (candidate.resume_data as Buffer | null) ?? Buffer.alloc(0),
     resume_skills: parseSkillsJson(candidate.skills),
     applicant_location: String(candidate.location ?? ""),
+    source: input.source?.trim() || "manual",
+    actor: input.actor,
   });
 
   return { ok: true, application };

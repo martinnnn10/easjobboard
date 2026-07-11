@@ -135,6 +135,8 @@ export type Application = {
   screen_summary: ScreenSummaryRecord | null;
   /** True for sample rows loaded by the demo workspace. */
   is_demo: boolean;
+  /** How the application was created: 'applied' (public) or a manual/import source. */
+  source: string;
   created_at: string;
 };
 
@@ -715,6 +717,22 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "candidates", "is_demo")) {
     database.exec("ALTER TABLE candidates ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0");
   }
+  // How an application was created — 'applied' (public apply) vs a manual/import
+  // source, so imported applications can be clearly labelled.
+  if (!columnExists(database, "applications", "source")) {
+    database.exec("ALTER TABLE applications ADD COLUMN source TEXT NOT NULL DEFAULT 'applied'");
+  }
+  // Candidate-level resume for imported/sourced people who never applied through
+  // a public job page. Nullable — most sourced candidates have no resume.
+  if (!columnExists(database, "candidates", "resume_filename")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN resume_filename TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "resume_content_type")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN resume_content_type TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columnExists(database, "candidates", "resume_data")) {
+    database.exec("ALTER TABLE candidates ADD COLUMN resume_data BLOB");
+  }
   // RBAC: existing single-user orgs become "owner"; multi-seat roles + revocation.
   if (!columnExists(database, "users", "role")) {
     database.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'");
@@ -912,6 +930,7 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     risk_flags: parseJson<RiskFlagRecord[]>(row.risk_flags, []),
     screen_summary: parseJson<ScreenSummaryRecord | null>(row.screen_summary, null),
     is_demo: Number(row.is_demo ?? 0) === 1,
+    source: (row.source as string | undefined) ?? "applied",
     created_at: row.created_at as string,
   };
 }
@@ -948,6 +967,9 @@ export type CandidateRecord = {
   last_applied_at: string;
   /** True for sample candidates loaded by the demo workspace. */
   is_demo: boolean;
+  /** Candidate-level resume metadata (imported/sourced people). "" when none. */
+  resume_filename: string;
+  resume_content_type: string;
   created_at: string;
   updated_at: string;
 };
@@ -975,6 +997,8 @@ export function rowToCandidate(row: Record<string, unknown>): CandidateRecord {
     first_applied_at: row.first_applied_at as string,
     last_applied_at: row.last_applied_at as string,
     is_demo: Number(row.is_demo ?? 0) === 1,
+    resume_filename: (row.resume_filename as string | undefined) ?? "",
+    resume_content_type: (row.resume_content_type as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };

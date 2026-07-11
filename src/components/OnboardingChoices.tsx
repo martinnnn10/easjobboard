@@ -68,7 +68,7 @@ export function OnboardingChoices({ orgSlug, createHref }: { orgSlug: string; cr
         </Link>
 
         <Link
-          href={`/o/${orgSlug}/admin/candidates/import`}
+          href={`/o/${orgSlug}/admin/candidates/new`}
           className="card card-hover flex flex-col items-start gap-2 text-left"
         >
           <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-semibold text-zinc-600">Import</span>

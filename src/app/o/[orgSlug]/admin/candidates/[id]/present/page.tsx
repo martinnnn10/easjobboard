@@ -21,5 +21,7 @@ export default async function PresentationPage({ params }: PageProps) {
   const data = buildPresentation(orgSlug, organization.id, organization.name, id);
   if (!data) notFound();
 
+  // The "generated"/"copied" timeline events are logged client-side (on mount /
+  // on copy) so no side effect runs during server render.
   return <ClientPresentation orgSlug={orgSlug} data={data} />;
 }

@@ -1,20 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CANDIDATE_CRM_STATUSES,
-  CANDIDATE_CRM_STATUS_LABELS,
-  CANDIDATE_SOURCES,
-  CANDIDATE_SOURCE_LABELS,
-} from "@/lib/candidate-meta";
+import { CANDIDATE_SOURCE_LABELS, IMPORT_SOURCES } from "@/lib/candidate-meta";
 
-type CandidateResponse = {
-  candidate?: { id: string; name?: string; email?: string };
-  matched?: boolean;
-  matchedBy?: string;
-  error?: string;
-};
+type JobOption = { id: string; title: string };
+type Member = { id: string; name: string };
+type Duplicate = { id: string; name: string; matchedBy: string };
 
 const MATCH_LABEL: Record<string, string> = {
   email: "email",
@@ -23,57 +15,43 @@ const MATCH_LABEL: Record<string, string> = {
   "name+location": "name & location",
 };
 
-export function AddCandidateForm({ orgSlug }: { orgSlug: string }) {
+export function AddCandidateForm({
+  orgSlug,
+  jobs,
+  recruiters,
+}: {
+  orgSlug: string;
+  jobs: JobOption[];
+  recruiters: Member[];
+}) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [duplicate, setDuplicate] = useState<Duplicate | null>(null);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(force: boolean) {
+    const el = formRef.current;
+    if (!el) return;
     setSaving(true);
     setError("");
-    setNotice("");
-
-    const form = new FormData(event.currentTarget);
-    const splitList = (v: FormDataEntryValue | null) =>
-      String(v ?? "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-    const payload = {
-      name: String(form.get("name") ?? "").trim(),
-      email: String(form.get("email") ?? "").trim(),
-      phone: String(form.get("phone") ?? "").trim(),
-      location: String(form.get("location") ?? "").trim(),
-      title: String(form.get("title") ?? "").trim(),
-      company: String(form.get("company") ?? "").trim(),
-      source: String(form.get("source") ?? "sourced"),
-      source_provider: String(form.get("source_provider") ?? "").trim(),
-      source_url: String(form.get("source_url") ?? "").trim(),
-      crm_status: String(form.get("crm_status") ?? ""),
-      skills: splitList(form.get("skills")),
-      tags: splitList(form.get("tags")),
-      notes: String(form.get("notes") ?? "").trim(),
-    };
-
+    const data = new FormData(el);
+    if (force) data.set("force", "true");
     try {
-      const res = await fetch(`/api/o/${orgSlug}/candidates`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = (await res.json().catch(() => ({}))) as CandidateResponse;
-      if (!res.ok || !data.candidate) {
-        setError(data.error ?? "Couldn't add candidate.");
+      const res = await fetch(`/api/o/${orgSlug}/candidates/import`, { method: "POST", body: data });
+      if (res.status === 409) {
+        const d = (await res.json().catch(() => ({}))) as { duplicate?: Duplicate };
+        if (d.duplicate) {
+          setDuplicate(d.duplicate);
+          return;
+        }
+      }
+      const body = (await res.json().catch(() => ({}))) as { candidate?: { id: string }; error?: string };
+      if (!res.ok || !body.candidate) {
+        setError(body.error ?? "Couldn't import candidate.");
         return;
       }
-      if (data.matched) {
-        const how = data.matchedBy ? MATCH_LABEL[data.matchedBy] ?? data.matchedBy : "an existing record";
-        setNotice(`Already in your pool (matched by ${how}). Opening their profile…`);
-      }
-      router.push(`/o/${orgSlug}/admin/candidates/${data.candidate.id}`);
+      router.push(`/o/${orgSlug}/admin/candidates/${body.candidate.id}`);
       router.refresh();
     } catch {
       setError("Network error.");
@@ -82,12 +60,22 @@ export function AddCandidateForm({ orgSlug }: { orgSlug: string }) {
     }
   }
 
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setDuplicate(null);
+    submit(false);
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="card space-y-5">
+    <form ref={formRef} onSubmit={handleSubmit} className="card space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-1">
-          <span className="text-sm font-medium">Full name</span>
-          <input name="name" placeholder="Jordan Rivera" className="field-input" />
+          <span className="text-sm font-medium">First name</span>
+          <input name="first_name" placeholder="Jordan" className="field-input" />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Last name</span>
+          <input name="last_name" placeholder="Rivera" className="field-input" />
         </label>
         <label className="block space-y-1">
           <span className="text-sm font-medium">
@@ -111,29 +99,37 @@ export function AddCandidateForm({ orgSlug }: { orgSlug: string }) {
           <span className="text-sm font-medium">Current company</span>
           <input name="company" placeholder="Acme Controls" className="field-input" />
         </label>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
         <label className="block space-y-1">
           <span className="text-sm font-medium">Source</span>
-          <select name="source" defaultValue="sourced" className="field-input">
-            {CANDIDATE_SOURCES.filter((s) => s !== "applied").map((s) => (
+          <select name="source" defaultValue="manual" className="field-input">
+            {IMPORT_SOURCES.map((s) => (
               <option key={s} value={s}>
                 {CANDIDATE_SOURCE_LABELS[s]}
               </option>
             ))}
           </select>
         </label>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="block space-y-1">
-          <span className="text-sm font-medium">Provider</span>
-          <input name="source_provider" placeholder="Apollo, LinkedIn, referral…" className="field-input" />
+          <span className="text-sm font-medium">Attach to job (optional)</span>
+          <select name="job_id" defaultValue="" className="field-input">
+            <option value="">Don&apos;t attach yet</option>
+            {jobs.map((j) => (
+              <option key={j.id} value={j.id}>
+                {j.title}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block space-y-1">
-          <span className="text-sm font-medium">Status</span>
-          <select name="crm_status" defaultValue="needs_outreach" className="field-input">
-            {CANDIDATE_CRM_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {CANDIDATE_CRM_STATUS_LABELS[s]}
+          <span className="text-sm font-medium">Assign recruiter (optional)</span>
+          <select name="owner_user_id" defaultValue="" className="field-input">
+            <option value="">Unassigned</option>
+            {recruiters.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
               </option>
             ))}
           </select>
@@ -141,20 +137,14 @@ export function AddCandidateForm({ orgSlug }: { orgSlug: string }) {
       </div>
 
       <label className="block space-y-1">
-        <span className="text-sm font-medium">Source profile URL</span>
-        <input name="source_url" type="url" placeholder="https://…" className="field-input" />
+        <span className="text-sm font-medium">Resume (PDF, DOC, DOCX) — optional</span>
+        <input
+          name="resume"
+          type="file"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="block w-full text-sm text-zinc-700"
+        />
       </label>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Skills</span>
-          <input name="skills" placeholder="PLC, SCADA, VFD (comma separated)" className="field-input" />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Tags</span>
-          <input name="tags" placeholder="Top prospect, Passive (comma separated)" className="field-input" />
-        </label>
-      </div>
 
       <label className="block space-y-1">
         <span className="text-sm font-medium">First note (optional)</span>
@@ -165,12 +155,29 @@ export function AddCandidateForm({ orgSlug }: { orgSlug: string }) {
         />
       </label>
 
+      {duplicate ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">
+          <p className="font-semibold text-amber-900">Possible duplicate</p>
+          <p className="mt-1 text-amber-800">
+            A candidate matching this {MATCH_LABEL[duplicate.matchedBy] ?? "record"} is already in your pool
+            {duplicate.name ? ` (${duplicate.name})` : ""}.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href={`/o/${orgSlug}/admin/candidates/${duplicate.id}`} className="btn-secondary text-sm">
+              Open existing profile
+            </a>
+            <button type="button" onClick={() => submit(true)} disabled={saving} className="btn-primary text-sm">
+              {saving ? "Adding…" : "Add anyway"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
-      {notice ? <p className="text-sm text-amber-700">{notice}</p> : null}
 
       <div className="flex items-center gap-3">
         <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? "Saving…" : "Add to pool"}
+          {saving ? "Importing…" : "Add candidate"}
         </button>
         <a href={`/o/${orgSlug}/admin/candidates`} className="text-sm text-zinc-500 hover:underline">
           Cancel

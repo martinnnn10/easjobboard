@@ -9,10 +9,15 @@
 /** How a person entered the candidate pool. */
 export const CANDIDATE_SOURCES = [
   "applied",
-  "sourced",
+  "manual",
   "imported",
   "referred",
-  "manual",
+  "sourced",
+  "linkedin",
+  "indeed",
+  "ziprecruiter",
+  "100hires",
+  "other",
   "unknown",
 ] as const;
 
@@ -20,12 +25,30 @@ export type CandidateSource = (typeof CANDIDATE_SOURCES)[number];
 
 export const CANDIDATE_SOURCE_LABELS: Record<CandidateSource, string> = {
   applied: "Applied",
-  sourced: "Sourced",
-  imported: "Imported",
-  referred: "Referred",
   manual: "Manual",
+  imported: "Imported",
+  referred: "Referral",
+  sourced: "Sourced",
+  linkedin: "LinkedIn",
+  indeed: "Indeed",
+  ziprecruiter: "ZipRecruiter",
+  "100hires": "100Hires",
+  other: "Other",
   unknown: "Unknown",
 };
+
+/** Sources a recruiter can pick when manually importing a candidate. */
+export const IMPORT_SOURCES: CandidateSource[] = [
+  "manual",
+  "imported",
+  "referred",
+  "sourced",
+  "linkedin",
+  "indeed",
+  "ziprecruiter",
+  "100hires",
+  "other",
+];
 
 export function isCandidateSource(value: unknown): value is CandidateSource {
   return typeof value === "string" && (CANDIDATE_SOURCES as readonly string[]).includes(value);

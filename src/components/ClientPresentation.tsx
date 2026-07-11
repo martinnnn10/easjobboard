@@ -1,9 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PrintButton } from "@/components/PrintButton";
 import type { PresentationData } from "@/lib/presentation";
+
+function logPresentationEvent(orgSlug: string, candidateId: string, action: "generated" | "copied", role: string) {
+  void fetch(`/api/o/${orgSlug}/candidates/${candidateId}/present-event`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, role }),
+  }).catch(() => {});
+}
 
 type Redactions = {
   hideContact: boolean;
@@ -27,6 +35,8 @@ function buildText(d: PresentationData, r: Redactions): string {
   if (titleLine) lines.push(`Current: ${titleLine}`);
   if (d.location) lines.push(`Location: ${d.location}`);
   if (d.compExpectation) lines.push(`Compensation expectation: ${d.compExpectation}`);
+  if (d.shiftNote) lines.push(`Shift: ${d.shiftNote}`);
+  if (d.relocationNote) lines.push(`Relocation: ${d.relocationNote}`);
   if (d.skillsScore !== null) lines.push(`Skills screen score: ${d.skillsScore}/100`);
   if (!r.hideContact) {
     const contact = [d.email, d.phone].filter(Boolean).join(" · ");
@@ -86,10 +96,16 @@ export function ClientPresentation({ orgSlug, data }: { orgSlug: string; data: P
 
   const text = useMemo(() => buildText(data, r), [data, r]);
 
+  // Log a "generated" timeline event once when the presentation is opened.
+  useEffect(() => {
+    logPresentationEvent(orgSlug, data.candidateId, "generated", data.targetRole);
+  }, [orgSlug, data.candidateId, data.targetRole]);
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      logPresentationEvent(orgSlug, data.candidateId, "copied", data.targetRole);
       setTimeout(() => setCopied(false), 1800);
     } catch {
       setCopied(false);
@@ -140,6 +156,8 @@ export function ClientPresentation({ orgSlug, data }: { orgSlug: string; data: P
               </span>
             ) : null}
             {data.compExpectation ? <span className="text-zinc-600">Comp: {data.compExpectation}</span> : null}
+            {data.shiftNote ? <span className="text-zinc-600">Shift: {data.shiftNote}</span> : null}
+            {data.relocationNote ? <span className="text-zinc-600">Relocation: {data.relocationNote}</span> : null}
             {!r.hideContact ? (
               <span className="text-zinc-500">{[data.email, data.phone].filter(Boolean).join(" · ")}</span>
             ) : null}

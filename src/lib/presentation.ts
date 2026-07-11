@@ -2,6 +2,7 @@ import { getApplicationDetail } from "./applications";
 import { buildWhyThisCandidate, normalizeRiskLevel } from "./candidate-intel";
 import { listEventsByCandidate } from "./candidate-events";
 import { getCandidateWithApplications } from "./candidates";
+import { getJobById } from "./jobs";
 import { getScreenSubmission } from "./screen-submissions";
 
 /**
@@ -23,6 +24,7 @@ export type PresentationData = {
   targetRole: string;
   compExpectation: string;
   shiftNote: string;
+  relocationNote: string;
   summary: string;
   whyFit: string[];
   skillsScore: number | null;
@@ -92,6 +94,18 @@ export function buildPresentation(orgSlug: string, orgId: string, orgName: strin
 
   const risks = [...(why?.whyRisky ?? []), ...(why?.verifyOnPhone ?? [])];
 
+  // Shift / relocation come from the target job's requirements when available.
+  const job = detail ? getJobById(detail.job_id) : null;
+
+  // Resume: the application's if they applied, else a candidate-level upload.
+  const hasCandidateResume = Boolean(candidate.resume_filename);
+  const resumePath = primary
+    ? `/api/o/${orgSlug}/applications/${primary.applicationId}/resume`
+    : hasCandidateResume
+      ? `/api/o/${orgSlug}/candidates/${candidateId}/resume`
+      : null;
+  const resumeFilename = primary?.resumeFilename || candidate.resume_filename || "";
+
   return {
     orgName,
     candidateId,
@@ -105,7 +119,8 @@ export function buildPresentation(orgSlug: string, orgId: string, orgName: strin
     company: candidate.company,
     targetRole: primary?.jobTitle ?? "",
     compExpectation: detail?.desired_pay ?? "",
-    shiftNote: "",
+    shiftNote: job?.shift ?? "",
+    relocationNote: job?.relocation ?? "",
     summary: why?.recommendedAction ?? "",
     whyFit: why?.whyStrong ?? [],
     skillsScore: detail?.screen_score ?? candidate.bestScreenScore,
@@ -115,7 +130,7 @@ export function buildPresentation(orgSlug: string, orgId: string, orgName: strin
     interviewQuestions,
     recruiterNotes,
     skills: candidate.skills,
-    resumePath: primary ? `/api/o/${orgSlug}/applications/${primary.applicationId}/resume` : null,
-    resumeFilename: primary?.resumeFilename ?? "",
+    resumePath,
+    resumeFilename,
   };
 }
