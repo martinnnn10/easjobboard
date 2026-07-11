@@ -370,6 +370,10 @@ export type ScreeningStats = {
   needsReview: number;
   highRisk: number;
   avgScore: number | null;
+  /** Applications that arrived with a resume attached. */
+  resumesReceived: number;
+  /** Applied with a resume but no completed skills screen yet. */
+  resumeOnly: number;
 };
 
 /**
@@ -388,6 +392,8 @@ export function getScreeningStats(organizationId: string): ScreeningStats {
          SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND risk_level != 'high' THEN 1 ELSE 0 END) AS strong,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND screen_score < ? THEN 1 ELSE 0 END) AS review,
          SUM(CASE WHEN risk_level = 'high' THEN 1 ELSE 0 END) AS high_risk,
+         SUM(CASE WHEN resume_filename IS NOT NULL AND resume_filename != '' THEN 1 ELSE 0 END) AS resumes,
+         SUM(CASE WHEN screen_status != 'completed' THEN 1 ELSE 0 END) AS resume_only,
          AVG(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN screen_score END) AS avg_score
        FROM applications WHERE organization_id = ?`,
     )
@@ -396,6 +402,8 @@ export function getScreeningStats(organizationId: string): ScreeningStats {
     strong: number | null;
     review: number | null;
     high_risk: number | null;
+    resumes: number | null;
+    resume_only: number | null;
     avg_score: number | null;
   };
 
@@ -406,6 +414,8 @@ export function getScreeningStats(organizationId: string): ScreeningStats {
     needsReview: row.review ?? 0,
     highRisk: row.high_risk ?? 0,
     avgScore: row.avg_score == null ? null : Math.round(row.avg_score),
+    resumesReceived: row.resumes ?? 0,
+    resumeOnly: row.resume_only ?? 0,
   };
 }
 

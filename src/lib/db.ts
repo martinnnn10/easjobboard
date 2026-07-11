@@ -140,7 +140,10 @@ export type Application = {
   created_at: string;
 };
 
-export type ScreenStatus = "none" | "pending" | "completed";
+// none = job has no screen configured; pending = screen sent, awaiting the
+// candidate; skipped = candidate applied resume-only and skipped the optional
+// screen; completed = screen answered and scored.
+export type ScreenStatus = "none" | "pending" | "skipped" | "completed";
 export type RiskLevelValue = "low" | "medium" | "high" | "";
 
 export type RiskFlagRecord = {

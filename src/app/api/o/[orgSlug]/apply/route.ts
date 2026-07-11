@@ -17,6 +17,7 @@ import { scoreResume } from "@/lib/scoring";
 import { evaluateKnockout, scoreScreen, type ScreenAnswers } from "@/lib/screen-scoring";
 import { saveScreenSubmission } from "@/lib/screen-submissions";
 import { DIMENSION_LABELS, getScreen, type ScreenDimension } from "@/lib/screens";
+import type { ScreenStatus } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -91,7 +92,10 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     if (!(resume instanceof File) || resume.size === 0) {
-      return NextResponse.json({ error: "Resume file is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Please upload a resume before submitting your application." },
+        { status: 400 },
+      );
     }
 
     if (resume.size > MAX_FILE_SIZE) {
@@ -157,7 +161,11 @@ export async function POST(request: Request, context: RouteContext) {
       (v) => v !== "" && v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0),
     ).length;
 
-    let screenStatus: "none" | "pending" | "completed" = screen ? "pending" : "none";
+    // Skills screen is optional. No screen on the job → "none". Screen present
+    // but the candidate submitted no answers → "skipped" (resume-only). Answers
+    // present → "pending" while scoring, upgraded to "completed" on success so a
+    // scoring failure never masquerades as a deliberate skip.
+    let screenStatus: ScreenStatus = screen ? (answeredCount > 0 ? "pending" : "skipped") : "none";
     let screenScore: number | null = null;
     let screenOutcome = "";
     let screenResult = null;

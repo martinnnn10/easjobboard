@@ -187,14 +187,20 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
         </Link>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card">
-          <p className="section-label">Applicants screened</p>
+          <p className="section-label">Skills screens completed</p>
           <p className="stat-value mt-2">
             {stats.screened}
             <span className="ml-1 text-base font-medium text-zinc-400">/ {stats.totalApplicants}</span>
           </p>
+          <p className="mt-1 text-xs text-zinc-500">{stats.resumesReceived} resumes received</p>
         </div>
+        <Link href={`/o/${orgSlug}/admin/queue`} className="card card-hover">
+          <p className="section-label">Resume-only applicants</p>
+          <p className="stat-value mt-2 text-zinc-700">{stats.resumeOnly}</p>
+          <p className="mt-1 text-xs text-zinc-500">Applied without a skills screen — send one →</p>
+        </Link>
         <div className="card">
           <p className="section-label">Average skills score</p>
           <p className="stat-value mt-2">{stats.avgScore === null ? "—" : stats.avgScore}</p>

@@ -138,8 +138,9 @@ export function deriveRecommendedAction(
   screenStatus: string,
   risk: RiskLevel,
 ): string {
+  if (screenStatus === "skipped") return "Resume only — send a skills screen or verify ability on the phone screen";
   if (screenStatus === "none") return "No screen attached — review resume and phone screen";
-  if (screenStatus === "pending") return "Screen not completed — nudge the candidate or phone screen";
+  if (screenStatus === "pending") return "Screen sent — nudge the candidate or phone screen";
   if (screenScore === null) return "Phone screen to confirm ability";
 
   if (screenScore >= 70) {
@@ -256,8 +257,10 @@ export function deriveBadges(input: BadgeInput): Badge[] {
       if (dim === "electrical") badges.push({ label: "Weak electrical fundamentals", tone: "bad" });
       if (dim === "safety") badges.push({ label: "Weak safety judgment", tone: "bad" });
     }
+  } else if (screenStatus === "skipped") {
+    badges.push({ label: "Resume only", tone: "muted" });
   } else if (screenStatus === "pending") {
-    badges.push({ label: "Screen not completed", tone: "muted" });
+    badges.push({ label: "Screen sent — awaiting", tone: "muted" });
   } else if (screenStatus === "none") {
     badges.push({ label: "No screen", tone: "muted" });
   }

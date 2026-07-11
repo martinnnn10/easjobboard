@@ -24,13 +24,15 @@ export function ScreenScoreBadge({
 }) {
   const large = size === "lg";
   if (status !== "completed" || score === null) {
+    const label =
+      status === "pending" ? "Screen sent — awaiting" : status === "skipped" ? "Resume only" : "Not screened yet";
     return (
       <span
         className={`inline-flex items-center rounded-full bg-zinc-100 font-medium text-zinc-500 ${
           large ? "px-3 py-1 text-sm" : "px-2.5 py-0.5 text-xs"
         }`}
       >
-        {status === "pending" ? "Screen not completed" : "No screen"}
+        {label}
       </span>
     );
   }
@@ -44,6 +46,51 @@ export function ScreenScoreBadge({
       <span className={large ? "text-sm font-semibold opacity-70" : "text-[10px] font-semibold opacity-70"}>/100</span>
     </span>
   );
+}
+
+/**
+ * Highlight chips that make a candidate with a completed skills screen stand
+ * out from resume-only applicants. Screened candidates carry a demonstrated
+ * practical signal; strong scorers get a "Call first" nudge. Resume-only
+ * applicants get a single neutral chip — lower confidence, never rejected.
+ */
+export function ScreenSignalBadges({
+  status,
+  score,
+  size = "sm",
+}: {
+  status: ScreenStatus;
+  score: number | null;
+  size?: "sm" | "lg";
+}) {
+  const cls =
+    size === "lg" ? "px-2.5 py-0.5 text-xs" : "px-2 py-0.5 text-[11px]";
+  if (status === "completed" && score !== null) {
+    return (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className={`inline-flex items-center rounded-full bg-green-50 font-semibold text-green-700 ring-1 ring-green-200 ${cls}`}>
+          ✓ Skills screen completed
+        </span>
+        {score >= 70 ? (
+          <span className={`inline-flex items-center rounded-full bg-brand-600 font-semibold text-white ${cls}`}>
+            Call first
+          </span>
+        ) : (
+          <span className={`inline-flex items-center rounded-full bg-brand-50 font-medium text-brand-700 ring-1 ring-brand-200 ${cls}`}>
+            Demonstrated ability
+          </span>
+        )}
+      </span>
+    );
+  }
+  if (status === "skipped" || status === "pending") {
+    return (
+      <span className={`inline-flex items-center rounded-full bg-zinc-100 font-medium text-zinc-500 ${cls}`}>
+        {status === "pending" ? "Screen sent — awaiting" : "Resume only"}
+      </span>
+    );
+  }
+  return null;
 }
 
 const TONE_CLASS: Record<BadgeTone, string> = {

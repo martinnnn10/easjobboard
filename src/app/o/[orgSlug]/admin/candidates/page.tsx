@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoBadge } from "@/components/DemoBadge";
-import { ScreenScoreBadge } from "@/components/ScreenSignals";
+import { ScreenScoreBadge, ScreenSignalBadges } from "@/components/ScreenSignals";
 import { SendScreenForm } from "@/components/SendScreenForm";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
@@ -242,15 +242,28 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                     ) : null}
                   </div>
                 </div>
-                <div className="text-right">
-                  <ScreenScoreBadge
-                    score={candidate.bestScreenScore}
-                    status={candidate.bestScreenScore === null ? "none" : "completed"}
-                  />
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    {candidate.bestScore === null ? "" : `Resume kw: ${candidate.bestScore}%`}
-                  </p>
-                </div>
+                {(() => {
+                  // Candidate-level screen state: completed (has a scored screen)
+                  // → highlight; applied but not completed → resume-only; a sent
+                  // invite → pending; sourced/no apps → not screened.
+                  const screenStatus =
+                    candidate.bestScreenScore !== null
+                      ? "completed"
+                      : candidate.applications.some((a) => a.screenStatus === "pending")
+                        ? "pending"
+                        : candidate.applications.length > 0
+                          ? "skipped"
+                          : "none";
+                  return (
+                    <div className="flex flex-col items-end gap-1.5 text-right">
+                      <ScreenScoreBadge score={candidate.bestScreenScore} status={screenStatus} />
+                      <ScreenSignalBadges status={screenStatus} score={candidate.bestScreenScore} />
+                      <p className="text-[11px] text-zinc-400">
+                        {candidate.bestScore === null ? "" : `Resume kw: ${candidate.bestScore}%`}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               {candidate.applications.length === 0 ? (

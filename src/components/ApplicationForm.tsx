@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ScreenQuestions } from "@/components/ScreenQuestions";
 import { DimensionBars } from "@/components/ScreenSignals";
 import type { ScreenAnswerValue } from "@/lib/screen-scoring";
@@ -34,16 +34,10 @@ export function ApplicationForm({
   const [message, setMessage] = useState("");
   const [report, setReport] = useState<ApplyReport | null>(null);
 
-  // Ranking questions start pre-populated with the presented order so an
-  // untouched ranking still submits a (scoreable) answer.
-  const initialAnswers = useMemo(() => {
-    const seed: Record<string, ScreenAnswerValue> = {};
-    for (const q of screen?.questions ?? []) {
-      if (q.type === "ranking" && q.items) seed[q.id] = q.items.map((it) => it.id);
-    }
-    return seed;
-  }, [screen]);
-  const [answers, setAnswers] = useState<Record<string, ScreenAnswerValue>>(initialAnswers);
+  // The skills check is optional: answers start empty and only count once the
+  // candidate actually engages, so skipping submits a clean resume-only app.
+  const [answers, setAnswers] = useState<Record<string, ScreenAnswerValue>>({});
+  const [answering, setAnswering] = useState(false);
 
   function setAnswer(id: string, value: ScreenAnswerValue) {
     setAnswers((current) => ({ ...current, [id]: value }));
@@ -58,11 +52,15 @@ export function ApplicationForm({
     return false;
   }).length;
 
+  // Only submit screen answers when the candidate opted in AND actually
+  // answered something — otherwise it's a resume-only (skipped) application.
+  const submittingScreen = Boolean(screen && answering && answeredCount > 0);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     if (!resume) {
       setStatus("error");
-      setMessage("Please attach your resume.");
+      setMessage("Please upload a resume before submitting your application.");
       return;
     }
 
@@ -78,7 +76,7 @@ export function ApplicationForm({
     formData.append("desiredPay", desiredPay);
     formData.append("coverLetter", coverLetter);
     formData.append("resume", resume);
-    if (screen) {
+    if (submittingScreen && screen) {
       formData.append("screenKey", screen.key);
       formData.append("screenAnswers", JSON.stringify(answers));
     }
@@ -98,7 +96,11 @@ export function ApplicationForm({
 
     setReport(data.report ?? null);
     setStatus("success");
-    setMessage("Application sent. The hiring team will review your resume and your skills check.");
+    setMessage(
+      submittingScreen
+        ? "Application sent. The hiring team will review your resume and your skills check."
+        : "Application sent. The hiring team will review your resume.",
+    );
   }
 
   if (status === "success") {
@@ -151,7 +153,7 @@ export function ApplicationForm({
         <h2 className="text-xl font-semibold text-zinc-900">Apply for {jobTitle}</h2>
         <p className="mt-1 text-sm text-zinc-600">
           Your resume goes to the hiring team.
-          {screen ? " A short skills check below helps them see you can actually do the work." : ""}
+          {screen ? " An optional skills check below lets you show what you can actually do." : ""}
         </p>
       </div>
 
@@ -190,12 +192,15 @@ export function ApplicationForm({
       </div>
 
       <label className="block space-y-1">
-        <span className="text-sm font-medium">Resume (PDF, DOC, DOCX) *</span>
+        <span className="text-sm font-medium">Resume required</span>
+        <p className="text-xs text-zinc-500">
+          Upload your resume so the hiring team can review your experience. PDF, DOC, or DOCX.
+        </p>
         <input
           type="file"
           accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={(event) => setResume(event.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-zinc-700"
+          className="block w-full py-2 text-sm text-zinc-700 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-600 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-white"
           required
         />
       </label>
@@ -208,24 +213,47 @@ export function ApplicationForm({
       {screen ? (
         <div className="space-y-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
           <div>
-            <p className="section-label text-brand-700">Skills check · {screen.questions.length} short questions</p>
+            <p className="section-label text-brand-700">Optional skills check — answer these to stand out</p>
             <p className="mt-1 text-sm text-zinc-700">
-              This short screen helps you show what you can actually do, even if your resume doesn&apos;t tell the full
-              story. There are no trick questions — answer the way you actually would on the floor.
+              This short screen helps you show what you can actually do, even if your resume does not tell the full
+              story. You can skip it, but candidates who complete it are highlighted for the recruiter.
             </p>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
-                <div
-                  className="h-full rounded-full bg-brand-500 transition-all"
-                  style={{ width: `${screen.questions.length ? (answeredCount / screen.questions.length) * 100 : 0}%` }}
-                />
-              </div>
-              <span className="text-xs font-medium text-zinc-500">
-                {answeredCount}/{screen.questions.length} answered
-              </span>
-            </div>
           </div>
-          <ScreenQuestions questions={screen.questions} answers={answers} onChange={setAnswer} />
+
+          {!answering ? (
+            <button
+              type="button"
+              onClick={() => setAnswering(true)}
+              className="btn-secondary w-full py-2.5 text-sm sm:w-auto"
+            >
+              Answer skills questions ({screen.questions.length})
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+                  <div
+                    className="h-full rounded-full bg-brand-500 transition-all"
+                    style={{ width: `${screen.questions.length ? (answeredCount / screen.questions.length) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-zinc-500">
+                  {answeredCount}/{screen.questions.length} answered
+                </span>
+              </div>
+              <ScreenQuestions questions={screen.questions} answers={answers} onChange={setAnswer} />
+              <button
+                type="button"
+                onClick={() => {
+                  setAnswering(false);
+                  setAnswers({});
+                }}
+                className="text-xs font-medium text-zinc-500 hover:text-zinc-700 hover:underline"
+              >
+                Skip the skills check instead
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
 
@@ -234,7 +262,11 @@ export function ApplicationForm({
       {/* Sticky on small screens so the submit is always within thumb reach. */}
       <div className="sticky bottom-0 -mx-6 -mb-5 border-t border-zinc-100 bg-white/95 px-6 py-3 backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
         <button type="submit" disabled={status === "loading"} className="btn-primary w-full py-3 text-base">
-          {status === "loading" ? "Submitting…" : "Submit application"}
+          {status === "loading"
+            ? "Submitting…"
+            : screen && !submittingScreen
+              ? "Skip & submit application"
+              : "Submit application"}
         </button>
       </div>
     </form>

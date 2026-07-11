@@ -347,7 +347,9 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
             <section className="card text-sm text-zinc-600">
               {application.screen_status === "pending"
                 ? "This candidate has not completed the skills screen yet."
-                : "No skills screen was attached to this job. Attach one when posting to qualify future applicants."}
+                : application.screen_status === "skipped"
+                  ? "This candidate applied with a resume only — they skipped the optional skills screen. Send them one or verify ability during the phone screen."
+                  : "No skills screen was attached to this job. Attach one when posting to qualify future applicants."}
             </section>
           )}
 

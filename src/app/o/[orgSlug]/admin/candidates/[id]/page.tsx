@@ -337,8 +337,9 @@ export default async function CandidateProfilePage({ params }: PageProps) {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-zinc-600">
-              No skills screen yet. Send a role-specific screen to rank this candidate by demonstrated ability — not just
-              what their resume claims.
+              {detail
+                ? "No skills screen completed yet. This candidate applied with a resume only. Send a skills screen or verify ability during the phone screen."
+                : "No skills screen yet. Send a role-specific screen to rank this candidate by demonstrated ability — not just what their resume claims."}
             </p>
             {writable ? (
               <SendScreenForm
