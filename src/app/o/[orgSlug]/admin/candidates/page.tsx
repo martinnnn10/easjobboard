@@ -2,9 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoBadge } from "@/components/DemoBadge";
 import { ScreenScoreBadge } from "@/components/ScreenSignals";
+import { SendScreenForm } from "@/components/SendScreenForm";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { getPoolSkills, listCandidates, type CandidateView } from "@/lib/candidates";
+import { listJobsByOrganization } from "@/lib/jobs";
+import { SCREEN_OPTIONS } from "@/lib/screens";
 import {
   CANDIDATE_CRM_STATUS_LABELS,
   CANDIDATE_CRM_STATUSES,
@@ -66,6 +69,12 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
   const candidates = listCandidates(organization.id, { query, skill, stage, source, crmStatus, view });
   const poolSkills = getPoolSkills(organization.id);
   const hasFilters = Boolean(query || skill || stage || source || crmStatus);
+
+  // Jobs + screen templates for the per-row "Send skills screen" action.
+  const jobs = writable
+    ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
+    : [];
+  const screenOptions = SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label }));
 
   // Preserve the active tab when the filter form submits.
   const tabQuery = (v: CandidateView) => (v === "all" ? "" : `?view=${v}`);
@@ -290,6 +299,18 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
                 </table>
               </div>
               )}
+
+              {writable && jobs.length > 0 ? (
+                <div className="flex justify-end border-t border-zinc-100 pt-3">
+                  <SendScreenForm
+                    orgSlug={orgSlug}
+                    candidateId={candidate.id}
+                    jobs={jobs}
+                    screenOptions={screenOptions}
+                    triggerClassName="btn-secondary text-xs"
+                  />
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

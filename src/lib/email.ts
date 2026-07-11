@@ -120,6 +120,43 @@ export async function sendCandidateEmail(input: {
 }
 
 /**
+ * Skills-screen invitation to a candidate: a short, respectful ask with the
+ * secure link. Sent from the org; replies route to the org's hiring inbox.
+ */
+export async function sendScreenInviteEmail(input: {
+  organization: Organization;
+  to: string;
+  candidateName: string;
+  jobTitle: string;
+  link: string;
+  message?: string;
+}): Promise<void> {
+  const { smtp, transporter } = createTransport();
+  const firstName = input.candidateName.split(/\s+/)[0] || "there";
+  const roleSuffix = input.jobTitle ? ` for ${input.jobTitle}` : "";
+
+  await transporter.sendMail({
+    from: `"${input.organization.name}" <${smtp.fromEmail}>`,
+    to: input.to,
+    replyTo: input.organization.application_email,
+    subject: `Complete your ${getPlatformName()} skills screen${input.jobTitle ? ` for ${input.jobTitle}` : ""}`,
+    text: [
+      `Hi ${firstName},`,
+      "",
+      `This short screen helps show your real-world skills${roleSuffix}. It should only take a few minutes.`,
+      input.message ? "" : null,
+      input.message || null,
+      "",
+      `Complete it here: ${input.link}`,
+      "",
+      `— ${input.organization.name}`,
+    ]
+      .filter((line) => line !== null)
+      .join("\n"),
+  });
+}
+
+/**
  * Invite email for a newly added teammate: their sign-in link + temporary
  * password. Sent from the org; replies route to the org's hiring inbox.
  */

@@ -470,6 +470,31 @@ function initDb(database: Database.Database): void {
     );
   `);
 
+  // Token-based skills-screen invites — lets a recruiter send a role-specific
+  // screen to an imported/sourced candidate who completes it on a public page.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS screen_invites (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      candidate_id TEXT NOT NULL,
+      job_id TEXT NOT NULL DEFAULT '',
+      application_id TEXT NOT NULL DEFAULT '',
+      screen_key TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      source TEXT NOT NULL DEFAULT 'manual',
+      message TEXT NOT NULL DEFAULT '',
+      sent_by TEXT NOT NULL DEFAULT '',
+      sent_at TEXT NOT NULL,
+      completed_at TEXT NOT NULL DEFAULT '',
+      expires_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_screen_invites_candidate ON screen_invites(candidate_id);
+    CREATE INDEX IF NOT EXISTS idx_screen_invites_token ON screen_invites(token);
+  `);
+
   migrateLegacyJobs(database);
 
   if (!tableExists(database, "jobs")) {

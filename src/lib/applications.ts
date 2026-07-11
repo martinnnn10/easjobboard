@@ -133,6 +133,18 @@ export function getApplicationById(id: string): Application | null {
   return row ? rowToApplication(row as Record<string, unknown>) : null;
 }
 
+/** The existing application for a (candidate, job) pair, if one is open. */
+export function getApplicationByCandidateAndJob(
+  candidateId: string,
+  jobId: string,
+  organizationId: string,
+): Application | null {
+  const row = getDb()
+    .prepare("SELECT * FROM applications WHERE candidate_id = ? AND job_id = ? AND organization_id = ?")
+    .get(candidateId, jobId, organizationId);
+  return row ? rowToApplication(row as Record<string, unknown>) : null;
+}
+
 function parseSkillsJson(value: unknown): string[] {
   if (typeof value !== "string" || value.length === 0) return [];
   try {
@@ -469,6 +481,60 @@ export function getJobScreeningSummaries(organizationId: string): Record<string,
  * org can never mutate another's records. Returns the updated row, or null if
  * no matching application exists for that organization.
  */
+/** Set only the screen status (e.g. "pending" when a screen invite is sent). */
+export function setApplicationScreenStatus(
+  id: string,
+  organizationId: string,
+  status: ScreenStatus,
+): boolean {
+  const result = getDb()
+    .prepare("UPDATE applications SET screen_status = ? WHERE id = ? AND organization_id = ?")
+    .run(status, id, organizationId);
+  return result.changes > 0;
+}
+
+/**
+ * Write a completed screen's results onto an existing application — the update
+ * path the public apply flow never needed (it always creates fresh). Used when
+ * an imported candidate completes a token-based skills screen, so the same
+ * application powers the profile intelligence, Call Queue, and presentation.
+ */
+export function updateApplicationScreen(
+  id: string,
+  organizationId: string,
+  input: {
+    screen_status: ScreenStatus;
+    screen_score: number | null;
+    screen_outcome: string;
+    risk_level: RiskLevelValue;
+    risk_flags: RiskFlagRecord[];
+    screen_summary: ScreenSummaryRecord | null;
+  },
+): boolean {
+  const result = getDb()
+    .prepare(
+      `UPDATE applications SET
+         screen_status = @screen_status,
+         screen_score = @screen_score,
+         screen_outcome = @screen_outcome,
+         risk_level = @risk_level,
+         risk_flags = @risk_flags,
+         screen_summary = @screen_summary
+       WHERE id = @id AND organization_id = @org`,
+    )
+    .run({
+      id,
+      org: organizationId,
+      screen_status: input.screen_status,
+      screen_score: input.screen_score,
+      screen_outcome: input.screen_outcome,
+      risk_level: input.risk_level,
+      risk_flags: JSON.stringify(input.risk_flags),
+      screen_summary: input.screen_summary ? JSON.stringify(input.screen_summary) : "",
+    });
+  return result.changes > 0;
+}
+
 export function updateApplicationStatus(
   id: string,
   organizationId: string,

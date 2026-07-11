@@ -37,7 +37,11 @@ function buildText(d: PresentationData, r: Redactions): string {
   if (d.compExpectation) lines.push(`Compensation expectation: ${d.compExpectation}`);
   if (d.shiftNote) lines.push(`Shift: ${d.shiftNote}`);
   if (d.relocationNote) lines.push(`Relocation: ${d.relocationNote}`);
-  if (d.skillsScore !== null) lines.push(`Skills screen score: ${d.skillsScore}/100`);
+  if (d.skillsScore !== null) {
+    lines.push(`Skills screen score: ${d.skillsScore}/100`);
+  } else {
+    lines.push("Skills screen: not completed yet — summary based on resume and recruiter notes only.");
+  }
   if (!r.hideContact) {
     const contact = [d.email, d.phone].filter(Boolean).join(" · ");
     if (contact) lines.push(`Contact: ${contact}`);
@@ -154,7 +158,11 @@ export function ClientPresentation({ orgSlug, data }: { orgSlug: string; data: P
               <span className="rounded-full bg-brand-50 px-2.5 py-0.5 font-semibold text-brand-800">
                 Skills screen {data.skillsScore}/100
               </span>
-            ) : null}
+            ) : (
+              <span className="rounded-full bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-500">
+                Skills screen not completed yet
+              </span>
+            )}
             {data.compExpectation ? <span className="text-zinc-600">Comp: {data.compExpectation}</span> : null}
             {data.shiftNote ? <span className="text-zinc-600">Shift: {data.shiftNote}</span> : null}
             {data.relocationNote ? <span className="text-zinc-600">Relocation: {data.relocationNote}</span> : null}

@@ -7,7 +7,8 @@ import { CandidateCrmPanel } from "@/components/CandidateCrmPanel";
 import { CandidateNoteForm } from "@/components/CandidateNoteForm";
 import { ConfirmCareTaskPanel } from "@/components/ConfirmCareTaskPanel";
 import { ScheduleInterviewForm } from "@/components/ScheduleInterviewForm";
-import { ConfidencePill, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
+import { SendScreenForm } from "@/components/SendScreenForm";
+import { ConfidencePill, DimensionBars, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
@@ -20,7 +21,9 @@ import { listEventsByCandidate, type CandidateEventType } from "@/lib/candidate-
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam, canWrite } from "@/lib/roles";
+import { getInvitesForCandidate } from "@/lib/screen-invites";
 import { getScreenSubmission } from "@/lib/screen-submissions";
+import { DIMENSION_LABELS, SCREEN_OPTIONS, getScreenLabel, type ScreenDimension } from "@/lib/screens";
 import { listUsersByOrganization } from "@/lib/users";
 
 type PageProps = { params: Promise<{ orgSlug: string; id: string }> };
@@ -93,8 +96,9 @@ export default async function CandidateProfilePage({ params }: PageProps) {
   const members = orgUsers.map((u) => ({ id: u.id, name: u.name }));
   const recruiters = orgUsers.filter((u) => u.role !== "viewer").map((u) => ({ id: u.id, name: u.name }));
   const jobs = writable
-    ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title }))
+    ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
     : [];
+  const screenOptions = SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label }));
 
   // Candidate Care: assignments, interviews, and the follow-up tasks that keep
   // this candidate warm around each interview.
@@ -140,6 +144,18 @@ export default async function CandidateProfilePage({ params }: PageProps) {
   })();
 
   const risk = detail ? normalizeRiskLevel(detail.risk_level) : "low";
+
+  // Skills-screen invitations — drive the "sent / waiting / none" states below.
+  const invites = getInvitesForCandidate(candidate.id, organization.id);
+  const pendingInvite = invites.find((i) => i.status === "pending") ?? null;
+  const hasCompletedScreen = detail?.screen_status === "completed" && detail.screen_score !== null;
+
+  // Category breakdown of the completed screen — the six competency dimensions.
+  const dimensionBars = submission
+    ? (Object.entries(submission.dimensionScores) as [ScreenDimension, number][])
+        .map(([dim, score]) => ({ label: DIMENSION_LABELS[dim], score }))
+        .sort((a, b) => b.score - a.score)
+    : [];
 
   return (
     <div className="page-shell space-y-6">
@@ -192,12 +208,21 @@ export default async function CandidateProfilePage({ params }: PageProps) {
               </div>
             ) : null}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start justify-end gap-2">
             {candidate.bestScreenScore !== null ? (
               <ScreenScoreBadge score={candidate.bestScreenScore} status="completed" size="lg" />
             ) : null}
             {writable ? (
-              <Link href={`/o/${orgSlug}/admin/candidates/${candidate.id}/present`} className="btn-primary text-sm">
+              <SendScreenForm
+                orgSlug={orgSlug}
+                candidateId={candidate.id}
+                jobs={jobs}
+                screenOptions={screenOptions}
+                triggerClassName="btn-primary text-sm"
+              />
+            ) : null}
+            {writable ? (
+              <Link href={`/o/${orgSlug}/admin/candidates/${candidate.id}/present`} className="btn-secondary text-sm">
                 Generate client presentation
               </Link>
             ) : null}
@@ -245,7 +270,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
           </div>
         </div>
 
-        {why ? (
+        {hasCompletedScreen && why ? (
           <>
             <p className="rounded-lg bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-800">
               Recommended: {why.recommendedAction}
@@ -256,6 +281,15 @@ export default async function CandidateProfilePage({ params }: PageProps) {
               <WhyColumn title="Verify on the phone screen" tone="amber" items={why.verifyOnPhone} empty="Nothing specific to verify." />
               <WhyColumn title="Ask the hiring manager" tone="blue" items={why.askHiringManager} empty="—" />
             </div>
+
+            {dimensionBars.length > 0 ? (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Category breakdown</p>
+                <div className="mt-2 max-w-md">
+                  <DimensionBars dimensions={dimensionBars} />
+                </div>
+              </div>
+            ) : null}
 
             {suggestedQuestions.length > 0 ? (
               <div>
@@ -288,13 +322,34 @@ export default async function CandidateProfilePage({ params }: PageProps) {
               ) : null}
             </div>
           </>
+        ) : pendingInvite ? (
+          <div className="space-y-1">
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+              Skills screen sent — waiting for candidate completion.
+            </p>
+            <p className="text-xs text-zinc-500">
+              Sent {new Date(pendingInvite.sent_at).toLocaleDateString()}
+              {pendingInvite.sent_by ? ` by ${pendingInvite.sent_by}` : ""}
+              {getScreenLabel(pendingInvite.screen_key) ? ` · ${getScreenLabel(pendingInvite.screen_key)}` : ""}. Their
+              demonstrated-ability score and the intelligence below light up the moment they finish.
+            </p>
+          </div>
         ) : (
-          <p className="text-sm text-zinc-600">
-            Not enough screening data yet. Add a skills screen or phone-screen note to improve this summary.{" "}
-            {candidate.applications.length === 0
-              ? "Attach this candidate to a job below to screen their practical ability."
-              : "Once their screen is completed, the intelligence — strengths, risks, and what to verify — appears here."}
-          </p>
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-600">
+              No skills screen yet. Send a role-specific screen to rank this candidate by demonstrated ability — not just
+              what their resume claims.
+            </p>
+            {writable ? (
+              <SendScreenForm
+                orgSlug={orgSlug}
+                candidateId={candidate.id}
+                jobs={jobs}
+                screenOptions={screenOptions}
+                triggerClassName="btn-primary text-sm"
+              />
+            ) : null}
+          </div>
         )}
       </section>
 
