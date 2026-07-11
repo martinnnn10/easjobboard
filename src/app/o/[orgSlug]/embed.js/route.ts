@@ -1,4 +1,4 @@
-import { getBaseUrl } from "@/lib/env";
+import { getPublicBaseUrl } from "@/lib/env";
 import { getOrganizationBySlug } from "@/lib/organizations";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function GET(_request: Request, context: RouteContext) {
     });
   }
 
-  const embedUrl = `${getBaseUrl()}/o/${orgSlug}/embed`;
+  const embedUrl = `${getPublicBaseUrl()}/o/${orgSlug}/embed`;
   const slugJson = JSON.stringify(orgSlug);
 
   const js = `(function () {

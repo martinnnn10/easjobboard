@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Script from "next/script";
 import Link from "next/link";
 import { ApplicationForm } from "@/components/ApplicationForm";
 import { getOrgJobUrl } from "@/lib/env";
@@ -60,17 +59,19 @@ export default async function OrgJobPage({ params }: PageProps) {
 
   return (
     <div className="page-shell space-y-4">
+      {/* JobPosting structured data — a real, server-rendered <script> so it is
+          present in view-source and reliably parsed by Google, not deferred
+          client-side. serializeJsonLd escapes <, >, & to prevent breakout. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+
       <Link href={`/o/${orgSlug}`} className="text-sm text-blue-600 hover:underline">
         ← Back to {organization.name} careers
       </Link>
 
       <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-        <Script
-          id="google-job-posting"
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-        />
-
         <article className="card space-y-4">
           <div>
             <h1 className="text-3xl font-bold text-zinc-900">{job.title}</h1>

@@ -9,8 +9,16 @@ const EMPLOYMENT_TYPE_MAP: Record<string, string> = {
   INTERN: "INTERN",
 };
 
-/** Google drops postings with no validThrough after a while; give published jobs a rolling 60-day window. */
+/**
+ * Google drops postings with no validThrough after a while. Prefer the job's
+ * real application deadline when set; otherwise give published jobs a rolling
+ * 60-day window from the post date.
+ */
 function computeValidThrough(job: Job): string {
+  if (job.application_deadline) {
+    const deadline = new Date(`${job.application_deadline}T23:59:59`);
+    if (!Number.isNaN(deadline.getTime())) return deadline.toISOString().slice(0, 10);
+  }
   const base = new Date(job.published_at ?? job.created_at);
   if (Number.isNaN(base.getTime())) return "";
   base.setDate(base.getDate() + 60);

@@ -47,6 +47,17 @@ export function getOrganizationBySlug(slug: string): Organization | null {
   return row ? rowToOrganization(row as Record<string, unknown>) : null;
 }
 
+/**
+ * Real (non-demo) organizations, for public surfaces like the root sitemap.
+ * Demo/sample workspaces are excluded so private demo pages never get indexed.
+ */
+export function listPublicOrganizations(): Organization[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM organizations WHERE COALESCE(is_demo, 0) = 0 ORDER BY created_at ASC")
+    .all() as Array<Record<string, unknown>>;
+  return rows.map(rowToOrganization);
+}
+
 export function createOrganization(input: {
   name: string;
   slug?: string;

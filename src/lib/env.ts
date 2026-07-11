@@ -38,14 +38,33 @@ export function getSmtpConfig() {
 }
 
 /**
- * The origin we're willing to SHOW users (feeds, careers links, syndication).
- * Prefers an explicitly configured public domain; falls back to BASE_URL only
- * for generating functional feed URLs — display code should gate on
- * hasConfiguredPublicDomain() so a raw IP / localhost is never shown.
+ * The live, shareable canonical origin used for everything the public and
+ * search engines see — job page canonical/OG URLs, JobPosting JSON-LD, the
+ * sitemap, robots, careers links, feeds, flyers, and QR codes.
+ *
+ * Guarantees a real HTTPS domain: a configured PUBLIC_BASE_URL / NEXT_PUBLIC_APP_URL
+ * is used only when it's a genuine shareable domain; anything else (unset, a
+ * localhost/dev URL, a bare IP, or a value with no dot) falls back to the
+ * production domain so a public page can never emit localhost, a raw IP, or a
+ * port number.
  */
+const CANONICAL_BASE_URL = "https://easrecruit.ai";
+
 export function getPublicBaseUrl(): string {
   const configured = process.env.PUBLIC_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
-  return (configured ?? getBaseUrl()).replace(/\/$/, "");
+  if (configured) {
+    try {
+      const host = new URL(configured).hostname;
+      const isLocal = !host || host === "localhost" || host.endsWith(".local");
+      const isBareIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+      if (!isLocal && !isBareIp && host.includes(".")) {
+        return configured.replace(/\/$/, "");
+      }
+    } catch {
+      // fall through to the canonical default
+    }
+  }
+  return CANONICAL_BASE_URL;
 }
 
 /**
@@ -87,12 +106,15 @@ export function isStripeConfigured(): boolean {
   return Boolean(secretKey && priceId);
 }
 
+// Public/shareable URLs use the canonical origin so search engines, printed
+// flyers, QR codes, and syndication feeds never emit localhost, a raw IP, or a
+// port. Only the admin URL stays on BASE_URL (internal navigation).
 export function getOrgUrl(orgSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}`;
 }
 
 export function getOrgJobUrl(orgSlug: string, jobSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/jobs/${jobSlug}`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/jobs/${jobSlug}`;
 }
 
 export function getOrgAdminUrl(orgSlug: string): string {
@@ -100,25 +122,25 @@ export function getOrgAdminUrl(orgSlug: string): string {
 }
 
 export function getOrgIndeedFeedUrl(orgSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/feed/indeed.xml`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/feed/indeed.xml`;
 }
 
 export function getOrgXmlFeedUrl(orgSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/feed/jobs.xml`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/feed/jobs.xml`;
 }
 
 export function getOrgJsonFeedUrl(orgSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/feed/jobs.json`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/feed/jobs.json`;
 }
 
 export function getOrgSitemapUrl(orgSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/sitemap.xml`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/sitemap.xml`;
 }
 
 export function getOrgEmbedScriptUrl(orgSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/embed.js`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/embed.js`;
 }
 
 export function getJobQrUrl(orgSlug: string, jobSlug: string): string {
-  return `${getBaseUrl()}/o/${orgSlug}/jobs/${jobSlug}/qr.svg`;
+  return `${getPublicBaseUrl()}/o/${orgSlug}/jobs/${jobSlug}/qr.svg`;
 }

@@ -1,5 +1,5 @@
 import type { Job, Organization } from "../db";
-import { getBaseUrl, getOrgJobUrl } from "../env";
+import { getOrgJobUrl, getPublicBaseUrl } from "../env";
 
 /**
  * A clean, structured JSON representation of an organization's open jobs.
@@ -9,7 +9,7 @@ import { getBaseUrl, getOrgJobUrl } from "../env";
  * feed so the two stay in sync.
  */
 export function buildJobsJsonFeed(organization: Organization, jobs: Job[]): Record<string, unknown> {
-  const baseUrl = getBaseUrl();
+  const baseUrl = getPublicBaseUrl();
 
   return {
     version: "1.0",
