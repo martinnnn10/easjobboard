@@ -4,6 +4,7 @@ import { PrintButton } from "@/components/PrintButton";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { normalizeRiskLevel } from "@/lib/candidate-intel";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { evaluateIdealPoints } from "@/lib/screen-scoring";
 import { getScreenSubmission } from "@/lib/screen-submissions";
@@ -31,9 +32,9 @@ export default async function InterviewKitPage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
 
-  const application = getApplicationDetail(id, organization.id);
+  const application = getApplicationDetail(id, organization.id, getJobAccess(organization.id, user));
   if (!application) notFound();
 
   const submission = getScreenSubmission(id, organization.id);

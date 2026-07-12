@@ -9,6 +9,7 @@ import {
 import { requireOrgSession } from "@/lib/auth";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { badgesForApplication } from "@/lib/candidate-intel";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canViewResumes, canWrite } from "@/lib/roles";
 
@@ -31,11 +32,14 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   const sp = await searchParams;
   const filter = sp.screen === "qualified" || sp.screen === "knockout" ? sp.screen : undefined;
 
-  const allCount = countApplicationsByOrganization(organization.id);
-  const qualifiedCount = countApplicationsByOrganization(organization.id, "qualified");
-  const knockoutCount = countApplicationsByOrganization(organization.id, "knockout");
+  // Per-job visibility: restrict counts + rows to jobs this user may see.
+  const access = getJobAccess(organization.id, user);
 
-  const total = filter ? countApplicationsByOrganization(organization.id, filter) : allCount;
+  const allCount = countApplicationsByOrganization(organization.id, undefined, access);
+  const qualifiedCount = countApplicationsByOrganization(organization.id, "qualified", access);
+  const knockoutCount = countApplicationsByOrganization(organization.id, "knockout", access);
+
+  const total = filter ? countApplicationsByOrganization(organization.id, filter, access) : allCount;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const requestedPage = Number.parseInt(sp.page ?? "1", 10);
   const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, requestedPage), pageCount) : 1;
@@ -45,6 +49,7 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
     screenOutcome: filter,
+    access,
   });
 
   const tabs = [

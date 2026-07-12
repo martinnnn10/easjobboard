@@ -283,26 +283,32 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
 
-    // Fire-and-forget the notification email: the application is already saved,
-    // so the applicant shouldn't wait on (or be failed by) a slow/unreachable
-    // SMTP server. Safe because this runs as a long-lived Node process.
-    void sendApplicationEmail({
-      organization,
-      job,
-      applicantName: name,
-      applicantEmail: email,
-      applicantPhone: phone,
-      coverLetter,
-      resume: {
-        filename: resume.name,
-        content: buffer,
-        contentType,
-      },
-    }).catch((emailError) => {
-      console.error("SMTP delivery failed (application still saved):", emailError);
-    });
+    // Fire-and-forget the recruiter/org notification email: the application is
+    // already saved, so the applicant shouldn't wait on (or be failed by) a
+    // slow/unreachable SMTP server. Gated on the job's notify_on_apply flag —
+    // when off, we skip the org-inbox notification for this job only. The
+    // application, candidate, and timeline events are already persisted above.
+    if (job.notify_on_apply) {
+      void sendApplicationEmail({
+        organization,
+        job,
+        applicantName: name,
+        applicantEmail: email,
+        applicantPhone: phone,
+        coverLetter,
+        resume: {
+          filename: resume.name,
+          content: buffer,
+          contentType,
+        },
+      }).catch((emailError) => {
+        console.error("SMTP delivery failed (application still saved):", emailError);
+      });
+    } else {
+      console.info("Application email notification skipped because job notifications are disabled.");
+    }
 
-    // Confirmation to the candidate — also fire-and-forget.
+    // Confirmation to the candidate — always sent (their own receipt), ungated.
     void sendApplicantConfirmationEmail({
       organization,
       job,

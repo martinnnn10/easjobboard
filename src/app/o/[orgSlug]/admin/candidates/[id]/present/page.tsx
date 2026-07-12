@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { ClientPresentation } from "@/components/ClientPresentation";
 import { requireOrgSession } from "@/lib/auth";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { buildPresentation } from "@/lib/presentation";
 import { canWrite } from "@/lib/roles";
@@ -18,7 +19,13 @@ export default async function PresentationPage({ params }: PageProps) {
     redirect(`/o/${orgSlug}/admin/candidates/${id}`);
   }
 
-  const data = buildPresentation(orgSlug, organization.id, organization.name, id);
+  const data = buildPresentation(
+    orgSlug,
+    organization.id,
+    organization.name,
+    id,
+    getJobAccess(organization.id, user),
+  );
   if (!data) notFound();
 
   // The "generated"/"copied" timeline events are logged client-side (on mount /

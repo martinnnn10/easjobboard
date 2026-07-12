@@ -5,6 +5,7 @@ import { DuplicateJobButton } from "@/components/DuplicateJobButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getJobScreeningSummaries } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
@@ -20,7 +21,9 @@ export default async function JobsPage({ params }: PageProps) {
   const { user } = await requireOrgSession(orgSlug);
   const writable = canWrite(user.role);
 
-  const jobs = listJobsByOrganization(organization.id);
+  // Hide restricted jobs (and their applicant counts) from users not on the list.
+  const access = getJobAccess(organization.id, user);
+  const jobs = listJobsByOrganization(organization.id).filter((j) => canSeeJob(access, j.id));
   const jobSummaries = getJobScreeningSummaries(organization.id);
 
   return (

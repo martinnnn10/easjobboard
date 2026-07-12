@@ -5,8 +5,9 @@ import { canWrite } from "@/lib/roles";
 import { getCandidateById } from "@/lib/candidates";
 import { logCall } from "@/lib/calls";
 import { isCallChannel, isCallOutcome } from "@/lib/call-outcomes";
-import { updateApplicationStatus } from "@/lib/applications";
+import { getApplicationDetail, updateApplicationStatus } from "@/lib/applications";
 import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/application-status";
+import { getJobAccess } from "@/lib/job-visibility";
 
 export const runtime = "nodejs";
 
@@ -56,7 +57,10 @@ export async function POST(request: Request, context: RouteContext) {
       if (!(APPLICATION_STATUSES as string[]).includes(status)) {
         return NextResponse.json({ error: "Invalid stage." }, { status: 400 });
       }
-      updateApplicationStatus(applicationId, organization.id, status as ApplicationStatus, user.name);
+      // Only advance the stage if this user can see the application's job.
+      if (getApplicationDetail(applicationId, organization.id, getJobAccess(organization.id, user))) {
+        updateApplicationStatus(applicationId, organization.id, status as ApplicationStatus, user.name);
+      }
     }
 
     return NextResponse.json({ ok: true, candidate: getCandidateById(id, organization.id) });

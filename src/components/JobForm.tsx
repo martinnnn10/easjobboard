@@ -443,19 +443,47 @@ function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
   };
 }
 
+type TeamMember = { id: string; name: string; email: string; role: string };
+
 export function JobForm({
   orgSlug,
   job,
   defaultCompanyName,
+  members = [],
+  currentUserId = "",
+  initialVisibleUserIds = [],
 }: {
   orgSlug: string;
   job?: Job;
   defaultCompanyName?: string;
+  members?: TeamMember[];
+  currentUserId?: string;
+  initialVisibleUserIds?: string[];
 }) {
   const router = useRouter();
   const [values, setValues] = useState<JobFormValues>(() => jobToValues(job, defaultCompanyName));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Feature 2 — application-notification toggle (default on).
+  const [notifyOnApply, setNotifyOnApply] = useState<boolean>(job?.notify_on_apply ?? true);
+
+  // Feature 1 — per-job visibility. The creator (job.created_by on edit, else the
+  // current user on create) and owners are always included and can't be removed.
+  const creatorId = job?.created_by || currentUserId;
+  const isForced = (m: TeamMember) => m.role === "owner" || m.id === creatorId;
+  const [visibleIds, setVisibleIds] = useState<Set<string>>(() => {
+    const base = initialVisibleUserIds.length > 0 ? new Set(initialVisibleUserIds) : new Set(members.map((m) => m.id));
+    for (const m of members) if (isForced(m)) base.add(m.id);
+    return base;
+  });
+  const toggleVisible = (id: string) =>
+    setVisibleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   // Location autocomplete state
   const [citySuggestions, setCitySuggestions] = useState<CityEntry[]>([]);
@@ -680,6 +708,8 @@ export function JobForm({
     const payload = {
       ...values,
       location: values.location.trim() || deriveLocation(values.city, values.state),
+      notify_on_apply: notifyOnApply,
+      visible_user_ids: [...visibleIds],
     };
 
     const url = job ? `/api/o/${orgSlug}/jobs/${job.id}` : `/api/o/${orgSlug}/jobs`;
@@ -1237,6 +1267,100 @@ export function JobForm({
             </select>
           </label>
         </div>
+      </fieldset>
+
+      {/* Feature 1 — Who can see this job? */}
+      <fieldset className="space-y-3 rounded-xl border border-zinc-200 p-4">
+        <div>
+          <legend className="text-base font-semibold text-zinc-900">Who can see this job?</legend>
+          <p className="mt-1 text-sm text-zinc-600">
+            Choose which team members can view applications and resumes for this role. Owners can always see every job.
+          </p>
+        </div>
+
+        {members.length <= 1 ? (
+          <p className="text-sm text-zinc-500">
+            You&apos;re the only member of this workspace, so this job is visible to you. Add teammates to share access.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setVisibleIds(new Set(members.map((m) => m.id)))}
+                className="rounded-full border border-zinc-300 px-2.5 py-1 font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={() => setVisibleIds(new Set(members.filter(isForced).map((m) => m.id)))}
+                className="rounded-full border border-zinc-300 px-2.5 py-1 font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Only me
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setVisibleIds(new Set(members.filter((m) => m.role !== "viewer" || isForced(m)).map((m) => m.id)))
+                }
+                className="rounded-full border border-zinc-300 px-2.5 py-1 font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                Recruiters only
+              </button>
+            </div>
+
+            <ul className="divide-y divide-zinc-100 rounded-lg border border-zinc-200">
+              {members.map((m) => {
+                const forced = isForced(m);
+                const checked = forced || visibleIds.has(m.id);
+                return (
+                  <li key={m.id} className="flex items-center gap-3 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={forced}
+                      onChange={() => toggleVisible(m.id)}
+                      className="h-4 w-4 rounded border-zinc-300 disabled:opacity-60"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-zinc-800">
+                        {m.name || m.email}
+                        {m.id === creatorId ? <span className="ml-1 text-xs text-zinc-400">(creator)</span> : null}
+                      </p>
+                      <p className="truncate text-xs text-zinc-500">{m.email}</p>
+                    </div>
+                    <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium capitalize text-zinc-600">
+                      {m.role}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-xs text-zinc-400">
+              Leaving everyone checked keeps the job visible to all current and future team members. Uncheck people to
+              restrict it — owners and the creator always keep access.
+            </p>
+          </>
+        )}
+      </fieldset>
+
+      {/* Feature 2 — application notifications */}
+      <fieldset className="rounded-xl border border-zinc-200 p-4">
+        <label className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={notifyOnApply}
+            onChange={(event) => setNotifyOnApply(event.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-zinc-300"
+          />
+          <span>
+            <span className="text-sm font-medium text-zinc-900">Send email notifications for new applications</span>
+            <span className="mt-0.5 block text-sm text-zinc-600">
+              When enabled, EAS Recruit will email the job owner or configured recipients when someone applies.
+            </span>
+          </span>
+        </label>
       </fieldset>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

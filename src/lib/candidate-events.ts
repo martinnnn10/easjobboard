@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { getDb } from "./db";
+import type { JobAccess } from "./job-visibility";
 
 /**
  * Per-candidate activity timeline: application received, stage changes, notes,
@@ -80,12 +81,28 @@ export function listCandidateEvents(applicationId: string, organizationId: strin
 }
 
 /** Unified timeline for a candidate across all their applications. */
-export function listEventsByCandidate(candidateId: string, organizationId: string): CandidateEvent[] {
+export function listEventsByCandidate(
+  candidateId: string,
+  organizationId: string,
+  access?: JobAccess,
+): CandidateEvent[] {
+  const params: Array<string> = [candidateId, organizationId];
+  let visClause = "";
+  if (access && !access.unrestricted && access.hiddenJobIds.size > 0) {
+    const ids = [...access.hiddenJobIds];
+    // Hide events tied to an application on a restricted job; person-level
+    // events (no application_id) always remain visible.
+    visClause =
+      ` AND (application_id IS NULL OR application_id = ''` +
+      ` OR NOT EXISTS (SELECT 1 FROM applications a WHERE a.id = candidate_events.application_id` +
+      ` AND a.job_id IN (${ids.map(() => "?").join(", ")})))`;
+    params.push(...ids);
+  }
   return getDb()
     .prepare(
       `SELECT * FROM candidate_events
-       WHERE candidate_id = ? AND organization_id = ?
+       WHERE candidate_id = ? AND organization_id = ?${visClause}
        ORDER BY created_at DESC, rowid DESC`,
     )
-    .all(candidateId, organizationId) as CandidateEvent[];
+    .all(...params) as CandidateEvent[];
 }

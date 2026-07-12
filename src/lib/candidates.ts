@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { recordCandidateEvent } from "./candidate-events";
 import { normalizePhone, type CandidateSource } from "./candidate-meta";
 import { getDb, rowToCandidate, type ApplicationStatus, type CandidateRecord, type ScreenStatus } from "./db";
+import { hiddenJobsSql, visibleCandidateSql, type JobAccess } from "./job-visibility";
 import { getUserById } from "./users";
 
 function nowIso(): string {
@@ -265,15 +266,30 @@ export function getCandidateById(id: string, organizationId: string): CandidateR
   return row ? rowToCandidate(row as Record<string, unknown>) : null;
 }
 
-function applicationsForCandidate(candidateId: string): CandidateApplication[] {
+function applicationsForCandidate(
+  candidateId: string,
+  organizationId?: string,
+  access?: JobAccess,
+): CandidateApplication[] {
+  const params: Array<string> = [candidateId];
+  let where = "WHERE a.candidate_id = ?";
+  if (organizationId) {
+    where += " AND a.organization_id = ?";
+    params.push(organizationId);
+  }
+  if (access) {
+    const vis = hiddenJobsSql(access, "a.job_id");
+    where += vis.clause;
+    params.push(...vis.params);
+  }
   const rows = getDb()
     .prepare(
       `SELECT a.id, a.status, a.match_score, a.screen_score, a.screen_status, a.resume_filename, a.created_at,
               j.title AS job_title, j.slug AS job_slug
        FROM applications a JOIN jobs j ON j.id = a.job_id
-       WHERE a.candidate_id = ? ORDER BY a.created_at DESC`,
+       ${where} ORDER BY a.created_at DESC`,
     )
-    .all(candidateId) as Array<{
+    .all(...params) as Array<{
     id: string;
     status: ApplicationStatus;
     match_score: number | null;
@@ -298,8 +314,8 @@ function applicationsForCandidate(candidateId: string): CandidateApplication[] {
   }));
 }
 
-function enrich(candidate: CandidateRecord): CandidateWithApps {
-  const applications = applicationsForCandidate(candidate.id);
+function enrich(candidate: CandidateRecord, access?: JobAccess): CandidateWithApps {
+  const applications = applicationsForCandidate(candidate.id, candidate.organization_id, access);
   const bestScore = applications.reduce<number | null>(
     (best, a) => (a.matchScore != null && (best == null || a.matchScore > best) ? a.matchScore : best),
     null,
@@ -312,15 +328,47 @@ function enrich(candidate: CandidateRecord): CandidateWithApps {
   return { ...candidate, applications, bestScore, bestScreenScore, ownerName: owner?.name ?? "" };
 }
 
-export function getCandidateWithApplications(id: string, organizationId: string): CandidateWithApps | null {
+export function getCandidateWithApplications(
+  id: string,
+  organizationId: string,
+  access?: JobAccess,
+): CandidateWithApps | null {
   const candidate = getCandidateById(id, organizationId);
-  return candidate ? enrich(candidate) : null;
+  if (!candidate) return null;
+  const enriched = enrich(candidate, access);
+  // A candidate the caller can only reach through restricted jobs is hidden:
+  // they have applications, but none the caller may see, and no sourced record.
+  if (access && enriched.applications.length === 0 && candidateHasApplications(id, organizationId)) {
+    return null;
+  }
+  return enriched;
+}
+
+/** Whether a candidate has ANY application (regardless of visibility). */
+function candidateHasApplications(candidateId: string, organizationId: string): boolean {
+  const row = getDb()
+    .prepare("SELECT 1 FROM applications WHERE candidate_id = ? AND organization_id = ? LIMIT 1")
+    .get(candidateId, organizationId);
+  return Boolean(row);
 }
 
 /** Table-backed candidate listing with the same filters as the in-memory search. */
-export function listCandidates(organizationId: string, filters: CandidateFilters = {}): CandidateWithApps[] {
+export function listCandidates(
+  organizationId: string,
+  filters: CandidateFilters = {},
+  access?: JobAccess,
+): CandidateWithApps[] {
   const clauses = ["c.organization_id = ?"];
   const params: Array<string> = [organizationId];
+
+  // Exclude candidates the caller can only reach through restricted jobs.
+  if (access) {
+    const vis = visibleCandidateSql(access, "c.id");
+    if (vis.clause) {
+      clauses.push(vis.clause.replace(/^ AND /, ""));
+      params.push(...vis.params);
+    }
+  }
 
   if (filters.query) {
     clauses.push(
@@ -377,7 +425,7 @@ export function listCandidates(organizationId: string, filters: CandidateFilters
     .all(...params) as Array<Record<string, unknown>>;
 
   return rows
-    .map((row) => enrich(rowToCandidate(row)))
+    .map((row) => enrich(rowToCandidate(row), access))
     .sort((a, b) => {
       const screenDiff = (b.bestScreenScore ?? -1) - (a.bestScreenScore ?? -1);
       if (screenDiff !== 0) return screenDiff;
@@ -635,7 +683,12 @@ export function createSourcedCandidate(input: SourcedCandidateInput): CreateSour
 export function getCandidateResume(
   id: string,
   organizationId: string,
+  access?: JobAccess,
 ): { filename: string; contentType: string; data: Buffer } | null {
+  // The candidate-level resume isn't tied to a job. Gate it on candidate
+  // visibility: block when the caller can only reach this person through
+  // restricted jobs (they have applications, but none the caller may see).
+  if (access && !getCandidateWithApplications(id, organizationId, access)) return null;
   const row = getDb()
     .prepare("SELECT resume_filename, resume_content_type, resume_data FROM candidates WHERE id = ? AND organization_id = ?")
     .get(id, organizationId) as

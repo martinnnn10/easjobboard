@@ -11,6 +11,7 @@ import {
   type ScreenStatus,
   type ScreenSummaryRecord,
 } from "./db";
+import { canSeeJob, hiddenJobsSql, type JobAccess } from "./job-visibility";
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -212,7 +213,11 @@ export function attachCandidateToJob(input: {
  * Single application with its job, org-scoped and without loading the resume
  * BLOB — the shape the candidate detail page needs.
  */
-export function getApplicationDetail(id: string, organizationId: string): ApplicationWithJob | null {
+export function getApplicationDetail(
+  id: string,
+  organizationId: string,
+  access?: JobAccess,
+): ApplicationWithJob | null {
   const row = getDb()
     .prepare(
       `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
@@ -227,6 +232,8 @@ export function getApplicationDetail(id: string, organizationId: string): Applic
     .get(id, organizationId) as Record<string, unknown> | undefined;
 
   if (!row) return null;
+  // Deny when the caller may not see this application's job.
+  if (access && !canSeeJob(access, row.job_id as string)) return null;
   return {
     ...rowToApplication(row),
     job_title: row.job_title as string,
@@ -234,21 +241,27 @@ export function getApplicationDetail(id: string, organizationId: string): Applic
   };
 }
 
-export function getApplicationResume(id: string, organizationId: string): {
+export function getApplicationResume(
+  id: string,
+  organizationId: string,
+  access?: JobAccess,
+): {
   filename: string;
   contentType: string;
   data: Buffer;
 } | null {
   const row = getDb()
     .prepare(
-      `SELECT resume_filename, resume_content_type, resume_data
+      `SELECT job_id, resume_filename, resume_content_type, resume_data
        FROM applications WHERE id = ? AND organization_id = ?`,
     )
     .get(id, organizationId) as
-    | { resume_filename: string; resume_content_type: string; resume_data: Buffer }
+    | { job_id: string; resume_filename: string; resume_content_type: string; resume_data: Buffer }
     | undefined;
 
   if (!row) return null;
+  // Never hand a restricted job's resume to an unauthorized user.
+  if (access && !canSeeJob(access, row.job_id)) return null;
 
   return {
     filename: row.resume_filename,
@@ -265,13 +278,15 @@ export type ListApplicationsOptions = {
   offset?: number;
   /** Filter by knockout verdict: "qualified" | "knockout". Omit for all. */
   screenOutcome?: string;
+  /** Per-job visibility; omit to return all org applications (internal callers). */
+  access?: JobAccess;
 };
 
 export function listApplicationsByOrganization(
   organizationId: string,
   options: ListApplicationsOptions = {},
 ): ApplicationWithJob[] {
-  const { orderBy = "recent", limit, offset = 0, screenOutcome } = options;
+  const { orderBy = "recent", limit, offset = 0, screenOutcome, access } = options;
 
   // "score" ranks by practical skills-screen score first (nulls last), then
   // resume keyword match, then recency; "recent" is reverse-chronological.
@@ -285,6 +300,11 @@ export function listApplicationsByOrganization(
   if (screenOutcome) {
     whereClause = " AND a.screen_outcome = ?";
     params.push(screenOutcome);
+  }
+  if (access) {
+    const vis = hiddenJobsSql(access, "a.job_id");
+    whereClause += vis.clause;
+    params.push(...vis.params);
   }
   let limitClause = "";
   if (limit != null) {
@@ -317,16 +337,21 @@ export function listApplicationsByOrganization(
     });
 }
 
-export function countApplicationsByOrganization(organizationId: string, screenOutcome?: string): number {
+export function countApplicationsByOrganization(
+  organizationId: string,
+  screenOutcome?: string,
+  access?: JobAccess,
+): number {
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
+  const params: Array<string> = [organizationId];
+  let sql = "SELECT COUNT(*) AS count FROM applications WHERE organization_id = ?";
   if (screenOutcome) {
-    const row = getDb()
-      .prepare("SELECT COUNT(*) AS count FROM applications WHERE organization_id = ? AND screen_outcome = ?")
-      .get(organizationId, screenOutcome) as { count: number };
-    return row.count;
+    sql += " AND screen_outcome = ?";
+    params.push(screenOutcome);
   }
-  const row = getDb()
-    .prepare("SELECT COUNT(*) AS count FROM applications WHERE organization_id = ?")
-    .get(organizationId) as { count: number };
+  sql += vis.clause;
+  params.push(...vis.params);
+  const row = getDb().prepare(sql).get(...params) as { count: number };
   return row.count;
 }
 

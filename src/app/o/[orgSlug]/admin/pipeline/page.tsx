@@ -4,6 +4,7 @@ import { PipelineBoard, type PipelineCard } from "@/components/PipelineBoard";
 import { listApplicationsByOrganization } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { badgesForApplication } from "@/lib/candidate-intel";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 
@@ -24,6 +25,7 @@ export default async function PipelinePage({ params }: PageProps) {
   const applications = listApplicationsByOrganization(organization.id, {
     orderBy: "score",
     limit: BOARD_LIMIT,
+    access: getJobAccess(organization.id, user),
   });
 
   const cards: PipelineCard[] = applications.map((application) => ({

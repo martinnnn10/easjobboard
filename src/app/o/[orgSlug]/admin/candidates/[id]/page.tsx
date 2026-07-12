@@ -17,6 +17,7 @@ import { CANDIDATE_SOURCE_LABELS, isCandidateSource } from "@/lib/candidate-meta
 import { buildWhyThisCandidate, normalizeRiskLevel } from "@/lib/candidate-intel";
 import { CARE_STATUS_LABELS, careTaskTypeLabel, interviewTypeLabel, type CareTaskStatus } from "@/lib/care-meta";
 import { getCandidateWithApplications } from "@/lib/candidates";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listEventsByCandidate, type CandidateEventType } from "@/lib/candidate-events";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -88,21 +89,33 @@ export default async function CandidateProfilePage({ params }: PageProps) {
   const writable = canWrite(user.role);
   const isOwner = canManageTeam(user.role);
 
-  const candidate = getCandidateWithApplications(id, organization.id);
+  // Per-job visibility: a candidate reachable only through restricted jobs 404s,
+  // and their applications array shows only jobs this user may see.
+  const access = getJobAccess(organization.id, user);
+  const candidate = getCandidateWithApplications(id, organization.id, access);
   if (!candidate) notFound();
 
-  const events = listEventsByCandidate(candidate.id, organization.id);
+  const events = listEventsByCandidate(candidate.id, organization.id, access);
   const orgUsers = listUsersByOrganization(organization.id);
   const members = orgUsers.map((u) => ({ id: u.id, name: u.name }));
   const recruiters = orgUsers.filter((u) => u.role !== "viewer").map((u) => ({ id: u.id, name: u.name }));
   const jobs = writable
-    ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
+    ? listJobsByOrganization(organization.id)
+        .filter((j) => canSeeJob(access, j.id))
+        .map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
     : [];
   const screenOptions = SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label }));
 
   // Candidate Care: assignments, interviews, and the follow-up tasks that keep
   // this candidate warm around each interview.
-  const care = careForCandidate(organization.id, candidate.id);
+  const careRaw = careForCandidate(organization.id, candidate.id);
+  // Drop any care records tied to a restricted job the viewer can't see.
+  const care = {
+    ...careRaw,
+    assignments: careRaw.assignments.filter((a) => canSeeJob(access, a.job_id)),
+    interviews: careRaw.interviews.filter((iv) => canSeeJob(access, iv.job_id)),
+    tasks: careRaw.tasks.filter((t) => !t.job_id || canSeeJob(access, t.job_id)),
+  };
   const nowIso = new Date().toISOString();
   const upcomingInterviews = care.interviews.filter((iv) => iv.interview_datetime >= nowIso);
   const pastInterviews = care.interviews.filter((iv) => iv.interview_datetime < nowIso);
@@ -122,7 +135,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
       return best;
     }, candidate.applications[0] ?? null) ?? candidate.applications[0] ?? null;
 
-  const detail = primary ? getApplicationDetail(primary.applicationId, organization.id) : null;
+  const detail = primary ? getApplicationDetail(primary.applicationId, organization.id, access) : null;
   const submission = primary ? getScreenSubmission(primary.applicationId, organization.id) : null;
   const why = detail
     ? buildWhyThisCandidate({

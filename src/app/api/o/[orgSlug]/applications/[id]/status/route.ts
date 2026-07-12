@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { updateApplicationStatus } from "@/lib/applications";
+import { getApplicationDetail, updateApplicationStatus } from "@/lib/applications";
 import { requireOrgCapability } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
+import { getJobAccess } from "@/lib/job-visibility";
 import { canWrite } from "@/lib/roles";
 import { APPLICATION_STATUSES, type ApplicationStatus } from "@/lib/application-status";
 
@@ -33,6 +34,11 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (!isApplicationStatus(body.status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+  }
+
+  // Don't let a user re-stage an application on a job they can't see.
+  if (!getApplicationDetail(id, organization.id, getJobAccess(organization.id, user))) {
+    return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }
 
   const updated = updateApplicationStatus(id, organization.id, body.status, user.name);

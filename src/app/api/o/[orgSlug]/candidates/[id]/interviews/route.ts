@@ -5,6 +5,7 @@ import { canWrite } from "@/lib/roles";
 import { scheduleInterview } from "@/lib/candidate-care";
 import { getCandidateById } from "@/lib/candidates";
 import { getJobById } from "@/lib/jobs";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { isInterviewType } from "@/lib/care-meta";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!datetime) return NextResponse.json({ error: "Interview date & time is required." }, { status: 400 });
 
     const job = getJobById(jobId);
-    if (!job || job.organization_id !== organization.id) {
+    if (!job || job.organization_id !== organization.id || !canSeeJob(getJobAccess(organization.id, user), job.id)) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 

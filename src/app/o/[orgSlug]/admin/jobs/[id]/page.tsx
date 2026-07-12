@@ -8,6 +8,7 @@ import { APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/applica
 import { requireOrgSession } from "@/lib/auth";
 import { assignedCandidatesForJob, jobApplicants } from "@/lib/candidate-care";
 import { careTaskTypeLabel } from "@/lib/care-meta";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam, canWrite } from "@/lib/roles";
@@ -31,6 +32,8 @@ export default async function JobDetailPage({ params }: PageProps) {
 
   const job = getJobById(id);
   if (!job || job.organization_id !== organization.id) notFound();
+  // Restricted job: hide from users who aren't on its visibility list.
+  if (!canSeeJob(getJobAccess(organization.id, user), job.id)) notFound();
 
   const assigned = assignedCandidatesForJob(organization.id, id);
   const assignedIds = new Set(assigned.map((a) => a.candidateId));

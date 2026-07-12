@@ -97,6 +97,10 @@ export type Job = {
   travel: string;
   /** Application deadline (YYYY-MM-DD) ("" = none). */
   application_deadline: string;
+  /** Email the org resume inbox when a new application arrives (default on). */
+  notify_on_apply: boolean;
+  /** User id of the teammate who created the job ("" = unknown/legacy). */
+  created_by: string;
   created_at: string;
   updated_at: string;
   published_at: string | null;
@@ -522,6 +526,8 @@ function initDb(database: Database.Database): void {
         reference_number TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'draft',
         screen_key TEXT NOT NULL DEFAULT '',
+        notify_on_apply INTEGER NOT NULL DEFAULT 1,
+        created_by TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         published_at TEXT,
@@ -535,6 +541,24 @@ function initDb(database: Database.Database): void {
       CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
     `);
   }
+
+  // Per-job visibility allowlist. Presence of ANY row for a job restricts it to
+  // those users (plus owners + the job creator); no rows ⇒ visible to all org
+  // members (backward-compatible for pre-existing jobs).
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS job_visible_users (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      UNIQUE(job_id, user_id),
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (job_id) REFERENCES jobs(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_job_visible_users_job ON job_visible_users(job_id);
+    CREATE INDEX IF NOT EXISTS idx_job_visible_users_user ON job_visible_users(organization_id, user_id);
+  `);
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS applications (
@@ -833,6 +857,14 @@ function initDb(database: Database.Database): void {
       database.exec(`ALTER TABLE jobs ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
     }
   }
+  // Per-job application-notification toggle (default on = preserve behavior).
+  if (!columnExists(database, "jobs", "notify_on_apply")) {
+    database.exec("ALTER TABLE jobs ADD COLUMN notify_on_apply INTEGER NOT NULL DEFAULT 1");
+  }
+  // Job creator (for the always-visible-to-creator rule). Legacy rows get ''.
+  if (!columnExists(database, "jobs", "created_by")) {
+    database.exec("ALTER TABLE jobs ADD COLUMN created_by TEXT NOT NULL DEFAULT ''");
+  }
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status)");
   database.exec("CREATE INDEX IF NOT EXISTS idx_applications_screen_score ON applications(screen_score)");
 }
@@ -926,6 +958,8 @@ export function rowToJob(row: Record<string, unknown>): Job {
     industry: (row.industry as string | undefined) ?? "",
     travel: (row.travel as string | undefined) ?? "",
     application_deadline: (row.application_deadline as string | undefined) ?? "",
+    notify_on_apply: Number(row.notify_on_apply ?? 1) !== 0,
+    created_by: (row.created_by as string | undefined) ?? "",
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
     published_at: row.published_at as string | null,

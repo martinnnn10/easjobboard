@@ -7,6 +7,7 @@ import { listApplicationsByOrganization, REVIEW_FLOOR, type ApplicationWithJob }
 import { requireOrgSession } from "@/lib/auth";
 import { deriveRecommendedAction, normalizeRiskLevel } from "@/lib/candidate-intel";
 import { getCandidateContactStates, type CandidateContactState } from "@/lib/candidates";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 
@@ -143,7 +144,10 @@ export default async function CallQueuePage({ params }: PageProps) {
   const { user } = await requireOrgSession(orgSlug);
   const writable = canWrite(user.role);
 
-  const all = listApplicationsByOrganization(organization.id, { orderBy: "score" });
+  const all = listApplicationsByOrganization(organization.id, {
+    orderBy: "score",
+    access: getJobAccess(organization.id, user),
+  });
   const active = all.filter((a) => a.status === "new" || a.status === "screening");
 
   // Screened: a completed screen that cleared the review floor — the practical

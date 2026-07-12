@@ -14,6 +14,7 @@ import {
 } from "@/components/ScreenSignals";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
+import { getJobAccess } from "@/lib/job-visibility";
 import { canViewResumes, canWrite } from "@/lib/roles";
 import { benchmarkLabel, getScoreBenchmark } from "@/lib/benchmarks";
 import { badgesForApplication, normalizeRiskLevel } from "@/lib/candidate-intel";
@@ -59,7 +60,11 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   const writable = canWrite(sessionContext.user.role);
   const resumesOk = canViewResumes(sessionContext.user.role);
 
-  const application = getApplicationDetail(id, organization.id);
+  const application = getApplicationDetail(
+    id,
+    organization.id,
+    getJobAccess(organization.id, sessionContext.user),
+  );
   if (!application) notFound();
 
   const events = listCandidateEvents(id, organization.id);

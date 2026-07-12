@@ -5,6 +5,7 @@ import { requireOrgCapability } from "@/lib/auth";
 import { createSourcedCandidate, findDuplicateCandidate } from "@/lib/candidates";
 import { isCandidateSource, type CandidateSource } from "@/lib/candidate-meta";
 import { detectResumeKind } from "@/lib/file-validation";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { canWrite } from "@/lib/roles";
 import { getUserById } from "@/lib/users";
@@ -107,7 +108,7 @@ export async function POST(request: Request, context: RouteContext) {
     let attachedJob: string | null = null;
     if (jobId) {
       const job = getJobById(jobId);
-      if (job && job.organization_id === organization.id) {
+      if (job && job.organization_id === organization.id && canSeeJob(getJobAccess(organization.id, user), job.id)) {
         const attach = attachCandidateToJob({
           organization_id: organization.id,
           candidate_id: result.candidate.id,

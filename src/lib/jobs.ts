@@ -88,6 +88,7 @@ export function createJob(
   organizationId: string,
   companyName: string,
   input: Partial<JobInput> & Pick<JobInput, "title" | "description" | "location">,
+  createdBy = "",
 ): Job {
   const database = getDb();
   const id = randomUUID();
@@ -102,14 +103,14 @@ export function createJob(
         employment_type, salary_min, salary_max, salary_currency, salary_period,
         company_name, reference_number, status, screen_key, shift, certifications,
         schedule, overtime, union_status, relocation, plc_platforms, vfd_experience,
-        refrigeration, industry, travel, application_deadline,
+        refrigeration, industry, travel, application_deadline, notify_on_apply, created_by,
         created_at, updated_at, published_at, closed_at
       ) VALUES (
         @id, @organization_id, @slug, @title, @description, @location, @city, @state, @country, @zip,
         @employment_type, @salary_min, @salary_max, @salary_currency, @salary_period,
         @company_name, @reference_number, @status, @screen_key, @shift, @certifications,
         @schedule, @overtime, @union_status, @relocation, @plc_platforms, @vfd_experience,
-        @refrigeration, @industry, @travel, @application_deadline,
+        @refrigeration, @industry, @travel, @application_deadline, @notify_on_apply, @created_by,
         @created_at, @updated_at, @published_at, @closed_at
       )`,
     )
@@ -145,6 +146,9 @@ export function createJob(
       industry: input.industry?.trim() ?? "",
       travel: input.travel?.trim() ?? "",
       application_deadline: input.application_deadline?.trim() ?? "",
+      // Default notifications on unless explicitly disabled.
+      notify_on_apply: input.notify_on_apply === false ? 0 : 1,
+      created_by: createdBy,
       created_at: timestamp,
       updated_at: timestamp,
       published_at: input.status === "published" ? timestamp : null,
@@ -205,6 +209,7 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
         industry = @industry,
         travel = @travel,
         application_deadline = @application_deadline,
+        notify_on_apply = @notify_on_apply,
         updated_at = @updated_at,
         published_at = @published_at,
         closed_at = @closed_at
@@ -246,6 +251,8 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
       travel: input.travel !== undefined ? input.travel.trim() : existing.travel,
       application_deadline:
         input.application_deadline !== undefined ? input.application_deadline.trim() : existing.application_deadline,
+      notify_on_apply:
+        input.notify_on_apply !== undefined ? (input.notify_on_apply ? 1 : 0) : existing.notify_on_apply ? 1 : 0,
       updated_at: timestamp,
       published_at: publishedAt,
       closed_at: closedAt,
@@ -255,7 +262,11 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
 }
 
 export function deleteJob(id: string, organizationId: string): boolean {
-  const result = getDb()
+  const database = getDb();
+  // FKs aren't enforced (no PRAGMA foreign_keys); clean up visibility rows so a
+  // reused job id can't inherit stale grants.
+  database.prepare("DELETE FROM job_visible_users WHERE job_id = ? AND organization_id = ?").run(id, organizationId);
+  const result = database
     .prepare("DELETE FROM jobs WHERE id = ? AND organization_id = ?")
     .run(id, organizationId);
   return result.changes > 0;
@@ -267,11 +278,14 @@ export function deleteJob(id: string, organizationId: string): boolean {
  * doesn't belong to the organization. Handy for reposting the same role in a
  * different city.
  */
-export function duplicateJob(id: string, organizationId: string): Job | null {
+export function duplicateJob(id: string, organizationId: string, createdBy = ""): Job | null {
   const source = getJobById(id);
   if (!source || source.organization_id !== organizationId) return null;
 
-  return createJob(organizationId, source.company_name, {
+  return createJob(
+    organizationId,
+    source.company_name,
+    {
     title: `${source.title} (Copy)`.slice(0, 200),
     description: source.description,
     location: source.location,
@@ -285,12 +299,14 @@ export function duplicateJob(id: string, organizationId: string): Job | null {
     salary_currency: source.salary_currency,
     salary_period: source.salary_period,
     company_name: source.company_name,
-    screen_key: source.screen_key,
-    shift: source.shift,
-    certifications: source.certifications,
-    // New reference number + slug are generated; always starts as a draft.
-    status: "draft",
-  });
+      screen_key: source.screen_key,
+      shift: source.shift,
+      certifications: source.certifications,
+      // New reference number + slug are generated; always starts as a draft.
+      status: "draft",
+    },
+    createdBy,
+  );
 }
 
 export function getJobPublicUrl(orgSlug: string, jobSlug: string): string {

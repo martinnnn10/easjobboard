@@ -10,6 +10,7 @@ import { recordCandidateEvent } from "@/lib/candidate-events";
 import { getCandidateById } from "@/lib/candidates";
 import { sendScreenInviteEmail, isEmailConfigured } from "@/lib/email";
 import { getPublicBaseUrl } from "@/lib/env";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { canWrite } from "@/lib/roles";
 import { createScreenInvite } from "@/lib/screen-invites";
@@ -55,7 +56,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const job = getJobById(jobId);
-    if (!job || job.organization_id !== organization.id) {
+    if (!job || job.organization_id !== organization.id || !canSeeJob(getJobAccess(organization.id, user), job.id)) {
       return NextResponse.json({ error: "Job not found." }, { status: 404 });
     }
 

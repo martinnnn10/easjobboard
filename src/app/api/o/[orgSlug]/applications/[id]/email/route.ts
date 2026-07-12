@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApplicationDetail } from "@/lib/applications";
 import { requireOrgCapability } from "@/lib/auth";
+import { getJobAccess } from "@/lib/job-visibility";
 import { authErrorResponse } from "@/lib/api";
 import { canWrite } from "@/lib/roles";
 import { recordCandidateEvent } from "@/lib/candidate-events";
@@ -34,7 +35,7 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
-  const application = getApplicationDetail(id, organization.id);
+  const application = getApplicationDetail(id, organization.id, getJobAccess(organization.id, user));
   if (!application) {
     return NextResponse.json({ error: "Application not found" }, { status: 404 });
   }

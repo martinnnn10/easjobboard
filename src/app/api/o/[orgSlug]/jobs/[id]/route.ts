@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireOrgCapability, requireOrgSessionApi } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
+import { canSeeJob, getJobAccess, setJobVisibleUsers } from "@/lib/job-visibility";
 import { canWrite } from "@/lib/roles";
 import { deleteJob, getJobById, updateJob } from "@/lib/jobs";
+import { listUsersByOrganization } from "@/lib/users";
 import type { JobStatus } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -28,8 +30,17 @@ export async function PUT(request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgCapability(orgSlug, canWrite);
+    const { organization, user } = await requireOrgCapability(orgSlug, canWrite);
     const body = await request.json();
+
+    // Can't edit a restricted job you can't see.
+    const existing = getJobById(id);
+    if (!existing || existing.organization_id !== organization.id) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (!canSeeJob(getJobAccess(organization.id, user), existing.id)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
 
     const job = updateJob(id, organization.id, {
       title: body.title,
@@ -60,10 +71,25 @@ export async function PUT(request: Request, context: RouteContext) {
       industry: body.industry,
       travel: body.travel,
       application_deadline: body.application_deadline,
+      notify_on_apply: body.notify_on_apply !== false,
     });
 
     if (!job) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Update the visibility allowlist; always keep the original creator so they
+    // can't be locked out (owners retain access via role regardless).
+    if (Array.isArray(body.visible_user_ids)) {
+      setJobVisibleUsers({
+        organizationId: organization.id,
+        jobId: job.id,
+        selectedUserIds: [
+          ...body.visible_user_ids.filter((x: unknown) => typeof x === "string"),
+          ...(existing.created_by ? [existing.created_by] : []),
+        ],
+        allOrgUserIds: listUsersByOrganization(organization.id).map((u) => u.id),
+      });
     }
 
     return NextResponse.json({ job });

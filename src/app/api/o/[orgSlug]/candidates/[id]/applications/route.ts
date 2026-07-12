@@ -4,6 +4,7 @@ import { authErrorResponse } from "@/lib/api";
 import { canWrite } from "@/lib/roles";
 import { attachCandidateToJob } from "@/lib/applications";
 import { getCandidateById } from "@/lib/candidates";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,10 @@ export async function POST(request: Request, context: RouteContext) {
     const jobId = typeof body.job_id === "string" ? body.job_id.trim() : "";
     if (!jobId) {
       return NextResponse.json({ error: "Choose a job to attach this candidate to." }, { status: 400 });
+    }
+    // Can't attach to a restricted job you aren't allowed to see.
+    if (!canSeeJob(getJobAccess(organization.id, user), jobId)) {
+      return NextResponse.json({ error: "Job not found." }, { status: 404 });
     }
 
     const result = attachCandidateToJob({

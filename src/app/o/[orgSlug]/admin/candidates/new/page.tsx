@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AddCandidateForm } from "@/components/AddCandidateForm";
 import { requireOrgSession } from "@/lib/auth";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
@@ -20,7 +21,10 @@ export default async function NewCandidatePage({ params }: PageProps) {
     redirect(`/o/${orgSlug}/admin/candidates`);
   }
 
-  const jobs = listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title }));
+  const access = getJobAccess(organization.id, user);
+  const jobs = listJobsByOrganization(organization.id)
+    .filter((j) => canSeeJob(access, j.id))
+    .map((j) => ({ id: j.id, title: j.title }));
   const recruiters = listUsersByOrganization(organization.id)
     .filter((u) => u.role !== "viewer")
     .map((u) => ({ id: u.id, name: u.name }));

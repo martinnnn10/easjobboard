@@ -6,6 +6,7 @@ import { SendScreenForm } from "@/components/SendScreenForm";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { getPoolSkills, listCandidates, type CandidateView } from "@/lib/candidates";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { SCREEN_OPTIONS } from "@/lib/screens";
 import {
@@ -66,13 +67,17 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
   const crmStatus = isCandidateCrmStatus(sp.cstatus) ? sp.cstatus : undefined;
   const view: CandidateView = isView(sp.view) ? sp.view : "all";
 
-  const candidates = listCandidates(organization.id, { query, skill, stage, source, crmStatus, view });
+  const access = getJobAccess(organization.id, user);
+  const candidates = listCandidates(organization.id, { query, skill, stage, source, crmStatus, view }, access);
   const poolSkills = getPoolSkills(organization.id);
   const hasFilters = Boolean(query || skill || stage || source || crmStatus);
 
-  // Jobs + screen templates for the per-row "Send skills screen" action.
+  // Jobs + screen templates for the per-row "Send skills screen" action —
+  // limited to jobs this user may see so restricted job titles don't leak.
   const jobs = writable
-    ? listJobsByOrganization(organization.id).map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
+    ? listJobsByOrganization(organization.id)
+        .filter((j) => canSeeJob(access, j.id))
+        .map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
     : [];
   const screenOptions = SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label }));
 

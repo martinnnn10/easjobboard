@@ -2,6 +2,7 @@ import { getApplicationDetail } from "./applications";
 import { buildWhyThisCandidate, normalizeRiskLevel } from "./candidate-intel";
 import { listEventsByCandidate } from "./candidate-events";
 import { getCandidateWithApplications } from "./candidates";
+import type { JobAccess } from "./job-visibility";
 import { getJobById } from "./jobs";
 import { getScreenSubmission } from "./screen-submissions";
 
@@ -38,8 +39,14 @@ export type PresentationData = {
   resumeFilename: string;
 };
 
-export function buildPresentation(orgSlug: string, orgId: string, orgName: string, candidateId: string): PresentationData | null {
-  const candidate = getCandidateWithApplications(candidateId, orgId);
+export function buildPresentation(
+  orgSlug: string,
+  orgId: string,
+  orgName: string,
+  candidateId: string,
+  access?: JobAccess,
+): PresentationData | null {
+  const candidate = getCandidateWithApplications(candidateId, orgId, access);
   if (!candidate) return null;
 
   const primary =
@@ -49,7 +56,7 @@ export function buildPresentation(orgSlug: string, orgId: string, orgName: strin
       return best;
     }, candidate.applications[0] ?? null) ?? candidate.applications[0] ?? null;
 
-  const detail = primary ? getApplicationDetail(primary.applicationId, orgId) : null;
+  const detail = primary ? getApplicationDetail(primary.applicationId, orgId, access) : null;
   const submission = primary ? getScreenSubmission(primary.applicationId, orgId) : null;
 
   const why = detail

@@ -3,6 +3,7 @@ import { authErrorResponse } from "@/lib/api";
 import { requireOrgCapability } from "@/lib/auth";
 import { getCandidateResume } from "@/lib/candidates";
 import { sanitizeFilename } from "@/lib/file-validation";
+import { getJobAccess } from "@/lib/job-visibility";
 import { canViewResumes } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -14,8 +15,8 @@ export async function GET(_request: Request, context: RouteContext) {
   const { orgSlug, id } = await context.params;
 
   try {
-    const { organization } = await requireOrgCapability(orgSlug, canViewResumes);
-    const resume = getCandidateResume(id, organization.id);
+    const { organization, user } = await requireOrgCapability(orgSlug, canViewResumes);
+    const resume = getCandidateResume(id, organization.id, getJobAccess(organization.id, user));
     if (!resume) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const safeName = sanitizeFilename(resume.filename);
