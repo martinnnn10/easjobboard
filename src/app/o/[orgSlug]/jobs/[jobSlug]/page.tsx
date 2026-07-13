@@ -67,7 +67,7 @@ export default async function OrgJobPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
 
-      <Link href={`/o/${orgSlug}`} className="text-sm text-blue-600 hover:underline">
+      <Link href={`/o/${orgSlug}`} className="text-sm text-zinc-600 hover:text-zinc-900 hover:underline">
         ← Back to {organization.name} careers
       </Link>
 

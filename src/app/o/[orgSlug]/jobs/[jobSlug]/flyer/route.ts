@@ -81,7 +81,7 @@ export async function GET(_request: Request, context: RouteContext) {
   .qr svg { display: block; width: 220px; height: 220px; }
   .scan { margin-top: 16px; font-size: 22px; font-weight: 800; color: ${brand}; }
   .scan-sub { margin-top: 6px; font-size: 14px; color: #52525b; }
-  .url { margin-top: 10px; font-size: 12px; color: #a1a1aa; word-break: break-all; }
+  .url { display: block; margin-top: 10px; font-size: 12px; color: #71717a; text-decoration: none; word-break: break-all; }
   .foot { padding: 18px 48px; border-top: 1px solid #e4e4e7; display: flex; justify-content: space-between; font-size: 13px; color: #71717a; }
   @media print {
     body { background: #fff; }
@@ -116,7 +116,7 @@ export async function GET(_request: Request, context: RouteContext) {
       <div class="qr">${qrSvg}</div>
       <div class="scan">Scan to apply</div>
       <div class="scan-sub">Takes under a minute — just your name, email, and resume.</div>
-      <div class="url">${escapeHtml(applyUrl)}</div>
+      <a class="url" href="${escapeHtml(applyUrl)}">${escapeHtml(applyUrl)}</a>
     </div>
   </div>
   <div class="foot">

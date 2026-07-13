@@ -62,7 +62,7 @@ export default async function InterviewKitPage({ params }: PageProps) {
     <div className="mx-auto w-full max-w-3xl px-4 py-8 print:py-2">
       <div className="mb-4 flex items-center justify-between print:hidden">
         <Link href={`/o/${orgSlug}/admin/applications/${id}`} className="text-sm text-blue-600 hover:underline">
-          ← Back to candidate
+          ← Back to application
         </Link>
         <PrintButton label="Print / Save PDF" />
       </div>

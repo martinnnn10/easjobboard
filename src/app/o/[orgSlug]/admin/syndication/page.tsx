@@ -11,7 +11,7 @@ const FEEDS = [
   {
     label: "Indeed feed",
     path: "/feed/indeed.xml",
-    description: "Register this link with Indeed once — your jobs then appear on Indeed automatically.",
+    description: "Register this feed URL with Indeed's XML feed program once; after that Indeed pulls updates on its own schedule.",
   },
   {
     label: "Job boards feed",
@@ -175,7 +175,7 @@ export default async function SyndicationPage({ params }: PageProps) {
           <h2 className="text-lg font-semibold text-zinc-900">Manual share required</h2>
           <p className="text-sm text-zinc-600">
             These boards don&apos;t accept an open job feed — they need their own paid program or API. Post to them
-            directly for now; native integrations may come later.
+            directly.
           </p>
           <div className="flex flex-wrap gap-2">
             {manualBoards.map((board) => (

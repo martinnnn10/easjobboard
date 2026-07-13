@@ -65,7 +65,7 @@ export default async function JobsPage({ params }: PageProps) {
           <h3 className="text-lg font-semibold text-zinc-900">No {labels.jobsLower} yet</h3>
           <p className="mx-auto max-w-md text-sm text-zinc-600">
             Post a {labels.jobSingular} with a skills screen and start seeing who can actually do the work — live on your
-            careers page and Google for Jobs in minutes.
+            careers page in minutes, and eligible for Google for Jobs as soon as Google crawls it.
           </p>
           {writable ? (
             <div className="flex flex-wrap items-center justify-center gap-3">

@@ -101,8 +101,8 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
         <section className="rounded-xl border border-brand-200 bg-brand-50 p-5">
           <h2 className="text-base font-semibold text-brand-800">Your {labels.jobSingular} is live</h2>
           <p className="mt-1 text-sm text-brand-800/80">
-            <span className="font-medium">{publishedJob.title}</span> is on your careers page and discoverable via
-            Google for Jobs.
+            <span className="font-medium">{publishedJob.title}</span> is live on your careers page, with structured
+            data that makes it eligible to appear in Google for Jobs once Google crawls it.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <a href={`/o/${orgSlug}/jobs/${publishedJob.slug}`} target="_blank" rel="noreferrer" className="font-medium text-brand-700 underline">
@@ -200,7 +200,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           </p>
           <p className="mt-1 text-xs text-zinc-500">{stats.resumesReceived} resumes received</p>
         </div>
-        <Link href={`/o/${orgSlug}/admin/queue`} className="card card-hover">
+        <Link href={`/o/${orgSlug}/admin/candidates?view=applicants`} className="card card-hover">
           <p className="section-label">Resume-only applicants</p>
           <p className="stat-value mt-2 text-zinc-700">{stats.resumeOnly}</p>
           <p className="mt-1 text-xs text-zinc-500">Applied without a skills screen — send one →</p>
@@ -335,7 +335,8 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <h3 className="text-lg font-semibold text-zinc-900">Post your first {labels.jobSingular} in under a minute</h3>
           <p className="mx-auto max-w-md text-sm text-zinc-600">
             Pick a role template and a skills screen, publish, and start seeing who can actually do the work. It goes
-            live on your careers page and Google for Jobs immediately.
+            live on your careers page immediately, with structured data that makes it eligible for Google for Jobs once
+            Google crawls the page.
           </p>
           {writable ? (
             <div>
