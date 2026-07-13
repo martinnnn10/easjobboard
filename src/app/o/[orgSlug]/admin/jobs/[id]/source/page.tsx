@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { SourcingPanel } from "@/components/SourcingPanel";
+import { SourcingUnavailable } from "@/components/SourcingUnavailable";
 import { extractSkills } from "@/lib/skills";
 import { requireOrgSession } from "@/lib/auth";
-import { canWrite } from "@/lib/roles";
+import { canManageTeam, canWrite } from "@/lib/roles";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { isSourcingConfigured } from "@/lib/sourcing";
 
 type PageProps = { params: Promise<{ orgSlug: string; id: string }> };
 
@@ -17,10 +19,17 @@ export default async function SourceCandidatesPage({ params }: PageProps) {
   const { user } = await requireOrgSession(orgSlug);
   if (!canWrite(user.role)) redirect(`/o/${orgSlug}/admin`);
 
+  // No sourcing provider connected → clean, buyer-facing unavailable state
+  // instead of exposing an unconfigured feature.
+  if (!isSourcingConfigured()) {
+    return <SourcingUnavailable orgSlug={orgSlug} canManage={canManageTeam(user.role)} title="Source candidates" />;
+  }
+
   const job = getJobById(id);
   if (!job || job.organization_id !== organization.id) notFound();
 
   const jobSkills = extractSkills(`${job.title} ${job.description}`);
+  const roleTitle = job.title;
 
   return (
     <div className="page-shell space-y-6">
@@ -30,8 +39,9 @@ export default async function SourceCandidatesPage({ params }: PageProps) {
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-zinc-900">Source candidates</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Search the passive candidate market for <span className="font-medium">{job.title}</span> and rank matches by
-          the job&apos;s skills. Complements inbound applications with outbound reach.
+          Search the passive candidate market for{" "}
+          <span className="font-medium">{roleTitle}</span>, then rank matches by the job&apos;s required skills. This
+          complements inbound applications with outbound reach.
         </p>
       </div>
 

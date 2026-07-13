@@ -28,6 +28,11 @@ export type Organization = {
   current_period_end: string;
   /** employer | agency | other (optional, from signup). */
   company_type: string;
+  /**
+   * in_house | agency — drives nav labels and buyer-facing copy only (not
+   * permissions). Seeded from company_type; changeable in Settings.
+   */
+  organization_type: string;
   /** True for the sample/demo workspace so the UI can label it. */
   is_demo: boolean;
   /** Owner dismissed the first-run onboarding checklist. */
@@ -423,6 +428,7 @@ function initDb(database: Database.Database): void {
       website TEXT NOT NULL DEFAULT '',
       application_email TEXT NOT NULL,
       brand_color TEXT NOT NULL DEFAULT '',
+      organization_type TEXT NOT NULL DEFAULT 'in_house',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -461,6 +467,15 @@ function initDb(database: Database.Database): void {
     ["onboarding_dismissed", "ALTER TABLE organizations ADD COLUMN onboarding_dismissed INTEGER NOT NULL DEFAULT 0"],
   ] as const) {
     if (!columnExists(database, "organizations", col)) database.exec(ddl);
+  }
+
+  // Migration: organization_type drives nav labels and buyer-facing copy
+  // (in_house vs agency). Seed it once, on first add, from the company_type
+  // captured at signup so existing agencies land in agency mode; owners can
+  // change it later in Settings without this backfill clobbering their choice.
+  if (!columnExists(database, "organizations", "organization_type")) {
+    database.exec("ALTER TABLE organizations ADD COLUMN organization_type TEXT NOT NULL DEFAULT 'in_house'");
+    database.exec("UPDATE organizations SET organization_type = 'agency' WHERE LOWER(company_type) = 'agency'");
   }
 
   // Inbound "Book a demo" requests from the public site.
@@ -894,6 +909,7 @@ export function rowToOrganization(row: Record<string, unknown>): Organization {
     plan_seats: Number(row.plan_seats ?? 0),
     current_period_end: (row.current_period_end as string | undefined) ?? "",
     company_type: (row.company_type as string | undefined) ?? "",
+    organization_type: (row.organization_type as string | undefined) ?? "in_house",
     is_demo: Number(row.is_demo ?? 0) === 1,
     onboarding_dismissed: Number(row.onboarding_dismissed ?? 0) === 1,
     created_at: row.created_at as string,

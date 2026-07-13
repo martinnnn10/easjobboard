@@ -10,6 +10,7 @@ import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 import { getScreenLabel } from "@/lib/screens";
+import { isSourcingConfigured } from "@/lib/sourcing";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
 
@@ -20,6 +21,7 @@ export default async function JobsPage({ params }: PageProps) {
 
   const { user } = await requireOrgSession(orgSlug);
   const writable = canWrite(user.role);
+  const sourcingOn = isSourcingConfigured();
 
   // Hide restricted jobs (and their applicant counts) from users not on the list.
   const access = getJobAccess(organization.id, user);
@@ -152,9 +154,11 @@ export default async function JobsPage({ params }: PageProps) {
                             <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="text-brand-700 hover:underline">
                               Edit
                             </Link>
-                            <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-brand-700 hover:underline">
-                              Source
-                            </Link>
+                            {sourcingOn ? (
+                              <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-brand-700 hover:underline">
+                                Source
+                              </Link>
+                            ) : null}
                             <DuplicateJobButton orgSlug={orgSlug} jobId={job.id} />
                           </>
                         ) : null}

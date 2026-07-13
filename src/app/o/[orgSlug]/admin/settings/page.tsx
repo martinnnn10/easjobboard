@@ -7,6 +7,7 @@ import { getBillingState } from "@/lib/billing";
 import { getPlatformEmail, getPublicBaseUrl, hasConfiguredPublicDomain } from "@/lib/env";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam } from "@/lib/roles";
+import { isSourcingConfigured } from "@/lib/sourcing";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
 
@@ -49,6 +50,7 @@ export default async function SettingsPage({ params }: PageProps) {
   }
 
   const domainConfigured = hasConfiguredPublicDomain();
+  const sourcingConnected = isSourcingConfigured();
   const billing = getBillingState(organization);
 
   return (
@@ -66,6 +68,7 @@ export default async function SettingsPage({ params }: PageProps) {
           name: organization.name,
           application_email: organization.application_email,
           website: organization.website,
+          organization_type: organization.organization_type,
         }}
       />
 
@@ -112,6 +115,33 @@ export default async function SettingsPage({ params }: PageProps) {
               : "Email delivery can be enabled in your deployment configuration to send applicant confirmations and teammate invites."
           }
         />
+      </section>
+
+      <section className="card space-y-1">
+        <h2 className="text-base font-semibold text-zinc-900">Integrations</h2>
+        <p className="mb-2 text-sm text-zinc-600">
+          Optional add-ons that extend your workspace. These appear in the app only once connected.
+        </p>
+        <div className="flex items-start justify-between gap-4 border-b border-zinc-100 py-3 last:border-0">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-zinc-800">Outbound sourcing</p>
+            <p className="text-xs text-zinc-500">
+              Search for passive candidates that match a job&apos;s required skills. Provider: Apollo.
+            </p>
+            {sourcingConnected ? (
+              <p className="mt-1 text-xs text-zinc-500">Sourcing tools are available from Jobs and the Outreach worklist.</p>
+            ) : (
+              <p className="mt-1 text-xs text-zinc-500">Contact your admin to enable outbound sourcing.</p>
+            )}
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+              sourcingConnected ? "bg-brand-50 text-brand-700" : "bg-zinc-100 text-zinc-500"
+            }`}
+          >
+            {sourcingConnected ? "Connected" : "Not connected"}
+          </span>
+        </div>
       </section>
     </div>
   );

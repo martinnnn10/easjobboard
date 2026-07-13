@@ -6,8 +6,8 @@ import type { Job, Organization } from "./db";
  *
  * Sourcing search returns masked contacts; enrichment reveals the email for a
  * specific person. The outreach draft is an offline personalized template — a
- * clear seam where an LLM could later write a bespoke message. Gated on
- * APOLLO_API_KEY for the enrichment call.
+ * clear seam where an LLM could later write a bespoke message. Enrichment runs
+ * only when a sourcing provider is connected.
  */
 
 const APOLLO_BASE_URL = process.env.APOLLO_BASE_URL ?? "https://api.apollo.io";
@@ -65,7 +65,7 @@ export async function enrichCandidate(input: EnrichInput): Promise<EnrichResult>
     if (!response.ok) {
       return {
         status: "error",
-        message: `Apollo enrichment failed (${response.status}). Check the key and enrichment credits.`,
+        message: "Couldn't reveal contact details right now. Please try again later.",
       };
     }
 

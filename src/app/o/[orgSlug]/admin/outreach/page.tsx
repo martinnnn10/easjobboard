@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SourcingUnavailable } from "@/components/SourcingUnavailable";
 import { requireOrgSession } from "@/lib/auth";
 import {
   CANDIDATE_CRM_STATUS_LABELS,
@@ -9,6 +10,8 @@ import {
 } from "@/lib/candidate-meta";
 import { getOutreachCounts, listCandidates, type CandidateWithApps } from "@/lib/candidates";
 import { getOrganizationBySlug } from "@/lib/organizations";
+import { canManageTeam } from "@/lib/roles";
+import { isSourcingConfigured } from "@/lib/sourcing";
 
 type PageProps = { params: Promise<{ orgSlug: string }> };
 
@@ -77,7 +80,13 @@ export default async function OutreachPage({ params }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
+
+  // Outreach is the outbound-sourcing worklist; hide it entirely until a
+  // sourcing provider is connected so buyers never hit an unconfigured feature.
+  if (!isSourcingConfigured()) {
+    return <SourcingUnavailable orgSlug={orgSlug} canManage={canManageTeam(user.role)} title="Outreach" />;
+  }
 
   const counts = getOutreachCounts(organization.id);
   const buckets = ACTIVE_STATUSES.map((status) => ({

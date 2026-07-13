@@ -5,16 +5,26 @@ import { extractSkills } from "./skills";
  * Outbound candidate sourcing via Apollo's People Search API.
  *
  * Inbound applications only reach the ~5% who are actively job-hunting; this
- * lets a recruiter search the passive market from a job posting. Gated behind
- * APOLLO_API_KEY so the app degrades gracefully (a configure-me notice) when
- * no key is present. Apollo search does not return emails — those require a
- * separate enrichment call — so we surface the email *status* and LinkedIn URL.
+ * lets a recruiter search the passive market from a job posting. Sourcing is an
+ * optional add-on: it stays hidden from the app until a sourcing provider is
+ * connected, so buyers never see an unconfigured feature. Apollo search does
+ * not return emails — those require a separate enrichment call — so we surface
+ * the email *status* and LinkedIn URL.
  */
 
 // Overridable so regional Apollo endpoints (or a test double) can be targeted.
 const APOLLO_BASE_URL = process.env.APOLLO_BASE_URL ?? "https://api.apollo.io";
 const APOLLO_SEARCH_PATH = "/api/v1/mixed_people/search";
 const REQUEST_TIMEOUT_MS = 12_000;
+
+/**
+ * Whether outbound sourcing is connected for this deployment. Drives whether
+ * the feature appears in the nav and per-job actions at all; the setup itself
+ * lives in Settings → Integrations (owner-only).
+ */
+export function isSourcingConfigured(): boolean {
+  return Boolean(process.env.APOLLO_API_KEY);
+}
 
 export type SourcedCandidate = {
   apolloId: string | null;
@@ -131,7 +141,7 @@ export async function sourceCandidates(job: Job): Promise<SourcingResult> {
     if (!response.ok) {
       return {
         status: "error",
-        message: `Apollo search failed (${response.status}). Check APOLLO_API_KEY and plan limits.`,
+        message: "Outbound sourcing is temporarily unavailable. Please try again later.",
       };
     }
 

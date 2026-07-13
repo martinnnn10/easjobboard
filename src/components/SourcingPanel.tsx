@@ -97,7 +97,7 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
           outreach: data.outreach,
           message:
             e.status === "not_configured"
-              ? "Set APOLLO_API_KEY to reveal contact details. Draft is ready below."
+              ? "Contact reveal is available once a sourcing provider is connected. Draft is ready below."
               : e.status === "error"
                 ? e.message
                 : e.email
@@ -117,9 +117,8 @@ export function SourcingPanel({ orgSlug, jobId }: { orgSlug: string; jobId: stri
       </button>
 
       {result?.status === "not_configured" ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Outbound sourcing isn&apos;t configured yet. Set an <code className="rounded bg-amber-100 px-1">APOLLO_API_KEY</code>{" "}
-          environment variable to search the passive candidate market from this job.
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-700">
+          Outbound sourcing is available when your team connects a sourcing provider. Contact your admin to enable it.
         </div>
       ) : null}
 

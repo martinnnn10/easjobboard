@@ -8,7 +8,7 @@ export function OrgSettingsForm({
   initial,
 }: {
   orgSlug: string;
-  initial: { name: string; application_email: string; website: string };
+  initial: { name: string; application_email: string; website: string; organization_type: string };
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -29,6 +29,7 @@ export function OrgSettingsForm({
           name: form.get("name"),
           application_email: form.get("application_email"),
           website: form.get("website"),
+          organization_type: form.get("organization_type"),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
@@ -60,6 +61,16 @@ export function OrgSettingsForm({
       <label className="block space-y-1">
         <span className="text-sm font-medium">Website</span>
         <input name="website" type="url" defaultValue={initial.website} placeholder="https://…" className="field-input" />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Workspace type</span>
+        <select name="organization_type" defaultValue={initial.organization_type} className="field-input">
+          <option value="in_house">In-house hiring team</option>
+          <option value="agency">Staffing / recruiting agency</option>
+        </select>
+        <span className="text-xs text-zinc-500">
+          Tailors labels across the app — “Jobs / Applicants” for in-house teams, “Job Orders / Candidates” for agencies.
+        </span>
       </label>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
       {saved ? <p className="text-sm text-brand-700">Saved.</p> : null}

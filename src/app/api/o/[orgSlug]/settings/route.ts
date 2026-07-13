@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOrgCapability } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
 import { canManageTeam } from "@/lib/roles";
-import { updateOrganization } from "@/lib/organizations";
+import { isOrgType, setOrganizationType, updateOrganization } from "@/lib/organizations";
 
 export const runtime = "nodejs";
 
@@ -31,6 +31,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Enter a valid careers inbox email." }, { status: 400 });
     }
 
+    // Workspace type is a labels/copy switch; accept only the known values.
+    if (isOrgType(body.organization_type)) {
+      setOrganizationType(organization.id, body.organization_type);
+    }
     const updated = updateOrganization(organization.id, { name, application_email, website });
     return NextResponse.json({ organization: updated });
   } catch (error) {
