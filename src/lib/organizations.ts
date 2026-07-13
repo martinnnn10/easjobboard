@@ -58,6 +58,30 @@ export function getOrgType(organization: Organization): OrgType {
   return isOrgType(organization.organization_type) ? organization.organization_type : "in_house";
 }
 
+/**
+ * The two nouns that differ by workspace type. In-house teams post "Jobs" and
+ * review "Applicants"; agencies work "Job Orders" and "Candidates". Everything
+ * else (Pipeline, Call Queue, Candidate Care, Reports, Team, Settings) reads
+ * the same for both, so it isn't in here.
+ */
+export type OrgLabels = {
+  jobs: string;
+  jobsLower: string;
+  jobSingular: string;
+  applicants: string;
+  applicantSingular: string;
+};
+
+const ORG_LABELS: Record<OrgType, OrgLabels> = {
+  in_house: { jobs: "Jobs", jobsLower: "jobs", jobSingular: "job", applicants: "Applicants", applicantSingular: "applicant" },
+  agency: { jobs: "Job Orders", jobsLower: "job orders", jobSingular: "job order", applicants: "Candidates", applicantSingular: "candidate" },
+};
+
+/** Workspace-appropriate labels for the two nouns that change by org type. */
+export function getOrgLabels(organization: Organization): OrgLabels {
+  return ORG_LABELS[getOrgType(organization)];
+}
+
 /** Update the workspace type (owner-only at the call site). */
 export function setOrganizationType(id: string, type: OrgType): Organization | null {
   const existing = getOrganizationById(id);

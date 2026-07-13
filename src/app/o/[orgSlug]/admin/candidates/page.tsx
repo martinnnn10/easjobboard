@@ -17,7 +17,7 @@ import {
   isCandidateCrmStatus,
   isCandidateSource,
 } from "@/lib/candidate-meta";
-import { getOrganizationBySlug } from "@/lib/organizations";
+import { getOrganizationBySlug, getOrgLabels } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 
 type PageProps = {
@@ -58,6 +58,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
 
   const { user } = await requireOrgSession(orgSlug);
   const writable = canWrite(user.role);
+  const labels = getOrgLabels(organization);
 
   const sp = await searchParams;
   const query = sp.q?.trim() || undefined;
@@ -89,7 +90,7 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
       <div>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-zinc-900">Candidates</h1>
+            <h1 className="text-3xl font-bold text-zinc-900">{labels.applicants}</h1>
             <p className="mt-1 text-sm text-zinc-600">
               One home for everyone you&apos;re recruiting — applicants and sourced/passive candidates, deduplicated
               across jobs. Use the tabs to narrow the pool.

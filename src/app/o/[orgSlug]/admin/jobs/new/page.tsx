@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { JobForm } from "@/components/JobForm";
 import { requireOrgSession } from "@/lib/auth";
-import { getOrganizationBySlug } from "@/lib/organizations";
+import { getOrganizationBySlug, getOrgLabels } from "@/lib/organizations";
 import { canWrite } from "@/lib/roles";
 import { listUsersByOrganization } from "@/lib/users";
 
@@ -16,6 +16,7 @@ export default async function NewOrgJobPage({ params }: PageProps) {
   const { user } = await requireOrgSession(orgSlug);
   if (!canWrite(user.role)) redirect(`/o/${orgSlug}/admin`);
 
+  const labels = getOrgLabels(organization);
   const members = listUsersByOrganization(organization.id).map((u) => ({
     id: u.id,
     name: u.name,
@@ -29,7 +30,7 @@ export default async function NewOrgJobPage({ params }: PageProps) {
         <Link href={`/o/${orgSlug}/admin`} className="text-sm text-blue-600 hover:underline">
           ← Back to admin
         </Link>
-        <h1 className="mt-2 text-3xl font-bold text-zinc-900">Create job</h1>
+        <h1 className="mt-2 text-3xl font-bold text-zinc-900">Create {labels.jobSingular}</h1>
       </div>
 
       <div className="card">

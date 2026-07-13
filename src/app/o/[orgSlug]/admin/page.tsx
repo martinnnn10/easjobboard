@@ -15,7 +15,7 @@ import { careAlertsForOwner, sweepEscalations } from "@/lib/candidate-care";
 import { resumeTrapCandidates } from "@/lib/gap-analysis";
 import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listJobsByOrganization } from "@/lib/jobs";
-import { getOrganizationBySlug } from "@/lib/organizations";
+import { getOrganizationBySlug, getOrgLabels } from "@/lib/organizations";
 import { getRoiStats } from "@/lib/roi";
 import { canManageTeam, canWrite } from "@/lib/roles";
 
@@ -32,6 +32,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   const sessionContext = await requireOrgSession(orgSlug);
   const writable = canWrite(sessionContext.user.role);
   const isOwner = canManageTeam(sessionContext.user.role);
+  const labels = getOrgLabels(organization);
 
   // Owners drive the Candidate Care SLA — sweep lapsed follow-ups on load, then
   // surface what needs attention.
@@ -98,7 +99,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
 
       {publishedJob ? (
         <section className="rounded-xl border border-brand-200 bg-brand-50 p-5">
-          <h2 className="text-base font-semibold text-brand-800">Your job is live</h2>
+          <h2 className="text-base font-semibold text-brand-800">Your {labels.jobSingular} is live</h2>
           <p className="mt-1 text-sm text-brand-800/80">
             <span className="font-medium">{publishedJob.title}</span> is on your careers page and discoverable via
             Google for Jobs.
@@ -121,13 +122,13 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           <p className="mt-1 text-sm text-zinc-600">
             {applicantCount === 0
               ? "Your intelligence layer for maintenance, controls, and skilled-trades hiring."
-              : `${applicantCount} applicant${applicantCount === 1 ? "" : "s"} · ranked by demonstrated ability, not resume keywords.`}
+              : `${applicantCount} ${applicantCount === 1 ? labels.applicantSingular : labels.applicantSingular + "s"} · ranked by demonstrated ability, not resume keywords.`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {writable ? (
             <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary">
-              + New job
+              + New {labels.jobSingular}
             </Link>
           ) : null}
           <a href={`/o/${orgSlug}`} target="_blank" rel="noreferrer" className="btn-secondary">
@@ -281,7 +282,8 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
         <section className="rounded-2xl border border-red-200 bg-red-50 p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-red-700">The resume trap</p>
           <h2 className="mt-1 text-lg font-bold text-red-900">
-            {trapCandidates.length} {trapCandidates.length === 1 ? "applicant looks" : "applicants look"} great on paper
+            {trapCandidates.length}{" "}
+            {trapCandidates.length === 1 ? `${labels.applicantSingular} looks` : `${labels.applicantSingular}s look`} great on paper
             but can&apos;t do the work
           </h2>
           <p className="mt-1 text-sm text-red-800">Exactly who a keyword job board would have shortlisted first.</p>
@@ -311,26 +313,26 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
       {/* Quick links */}
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link href={`/o/${orgSlug}/admin/jobs`} className="card card-hover">
-          <p className="font-semibold text-zinc-900">Jobs</p>
-          <p className="mt-1 text-xs text-zinc-500">{jobs.length} posted · screening funnel per role</p>
+          <p className="font-semibold text-zinc-900">{labels.jobs}</p>
+          <p className="mt-1 text-xs text-zinc-500">{jobs.length} posted · screening funnel per {labels.jobSingular}</p>
         </Link>
         <Link href={`/o/${orgSlug}/admin/queue`} className="card card-hover">
           <p className="font-semibold text-zinc-900">Call queue</p>
           <p className="mt-1 text-xs text-zinc-500">{callQueueCount} to call, ranked by ability</p>
         </Link>
         <Link href={`/o/${orgSlug}/admin/candidates?view=applicants`} className="card card-hover">
-          <p className="font-semibold text-zinc-900">Applicants</p>
-          <p className="mt-1 text-xs text-zinc-500">Every applicant with signals & risk</p>
+          <p className="font-semibold text-zinc-900">{labels.applicants}</p>
+          <p className="mt-1 text-xs text-zinc-500">Every {labels.applicantSingular} with signals & risk</p>
         </Link>
         <Link href={`/o/${orgSlug}/admin/candidates`} className="card card-hover">
-          <p className="font-semibold text-zinc-900">Candidates</p>
-          <p className="mt-1 text-xs text-zinc-500">Applicants + sourced candidates in one pool</p>
+          <p className="font-semibold text-zinc-900">Candidate pool</p>
+          <p className="mt-1 text-xs text-zinc-500">{labels.applicants} + sourced candidates in one pool</p>
         </Link>
       </section>
 
       {jobs.length === 0 ? (
         <section className="card space-y-3 py-8 text-center">
-          <h3 className="text-lg font-semibold text-zinc-900">Post your first job in under a minute</h3>
+          <h3 className="text-lg font-semibold text-zinc-900">Post your first {labels.jobSingular} in under a minute</h3>
           <p className="mx-auto max-w-md text-sm text-zinc-600">
             Pick a role template and a skills screen, publish, and start seeing who can actually do the work. It goes
             live on your careers page and Google for Jobs immediately.
@@ -338,7 +340,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
           {writable ? (
             <div>
               <Link href={`/o/${orgSlug}/admin/jobs/new`} className="btn-primary inline-block">
-                Post your first job →
+                Post your first {labels.jobSingular} →
               </Link>
             </div>
           ) : null}

@@ -10,7 +10,7 @@ import { requireOrgSession } from "@/lib/auth";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
 import { badgesForApplication } from "@/lib/candidate-intel";
 import { getJobAccess } from "@/lib/job-visibility";
-import { getOrganizationBySlug } from "@/lib/organizations";
+import { getOrganizationBySlug, getOrgLabels } from "@/lib/organizations";
 import { canViewResumes, canWrite } from "@/lib/roles";
 
 const PAGE_SIZE = 25;
@@ -28,6 +28,7 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   const { user } = await requireOrgSession(orgSlug);
   const writable = canWrite(user.role);
   const resumesOk = canViewResumes(user.role);
+  const labels = getOrgLabels(organization);
 
   const sp = await searchParams;
   const filter = sp.screen === "qualified" || sp.screen === "knockout" ? sp.screen : undefined;
@@ -69,7 +70,7 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
         <Link href={`/o/${orgSlug}/admin`} className="text-sm text-blue-600 hover:underline">
           ← Back to admin
         </Link>
-        <h1 className="mt-2 text-3xl font-bold text-zinc-900">Applicants</h1>
+        <h1 className="mt-2 text-3xl font-bold text-zinc-900">{labels.applicants}</h1>
         <p className="mt-1 text-sm text-zinc-600">
           Ranked by practical skills-screen score — who can actually do the work — not resume keywords. Resumes are
           also emailed to {organization.application_email} when candidates apply.
@@ -98,9 +99,9 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
       {applicants.length === 0 ? (
         <div className="card text-zinc-600">
           {filter === "knockout"
-            ? "No auto-screened-out applicants."
+            ? `No auto-screened-out ${labels.applicantSingular}s.`
             : filter === "qualified"
-              ? "No qualified applicants yet."
+              ? `No qualified ${labels.applicantSingular}s yet.`
               : "No applications yet."}
         </div>
       ) : (
