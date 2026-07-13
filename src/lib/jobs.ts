@@ -10,6 +10,24 @@ function slugify(text: string): string {
     .slice(0, 80);
 }
 
+/** Trim, drop empties, de-duplicate (case-insensitive), and cap the cert list. */
+function normalizeCertifications(input: string[] | undefined): string[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of input) {
+    if (typeof raw !== "string") continue;
+    const value = raw.trim().slice(0, 80);
+    if (!value) continue;
+    const key = value.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+    if (out.length >= 20) break;
+  }
+  return out;
+}
+
 function uniqueSlug(organizationId: string, base: string): string {
   const database = getDb();
   let slug = slugify(base);
@@ -70,6 +88,7 @@ export function createJob(
   organizationId: string,
   companyName: string,
   input: Partial<JobInput> & Pick<JobInput, "title" | "description" | "location">,
+  createdBy = "",
 ): Job {
   const database = getDb();
   const id = randomUUID();
@@ -82,11 +101,17 @@ export function createJob(
       `INSERT INTO jobs (
         id, organization_id, slug, title, description, location, city, state, country, zip,
         employment_type, salary_min, salary_max, salary_currency, salary_period,
-        company_name, reference_number, status, created_at, updated_at, published_at, closed_at
+        company_name, reference_number, status, screen_key, shift, certifications,
+        schedule, overtime, union_status, relocation, plc_platforms, vfd_experience,
+        refrigeration, industry, travel, application_deadline, notify_on_apply, created_by,
+        created_at, updated_at, published_at, closed_at
       ) VALUES (
         @id, @organization_id, @slug, @title, @description, @location, @city, @state, @country, @zip,
         @employment_type, @salary_min, @salary_max, @salary_currency, @salary_period,
-        @company_name, @reference_number, @status, @created_at, @updated_at, @published_at, @closed_at
+        @company_name, @reference_number, @status, @screen_key, @shift, @certifications,
+        @schedule, @overtime, @union_status, @relocation, @plc_platforms, @vfd_experience,
+        @refrigeration, @industry, @travel, @application_deadline, @notify_on_apply, @created_by,
+        @created_at, @updated_at, @published_at, @closed_at
       )`,
     )
     .run({
@@ -108,6 +133,22 @@ export function createJob(
       company_name: (input.company_name?.trim() || companyName).trim(),
       reference_number: referenceNumber,
       status: input.status ?? "draft",
+      screen_key: input.screen_key?.trim() ?? "",
+      shift: input.shift?.trim() ?? "",
+      certifications: JSON.stringify(normalizeCertifications(input.certifications)),
+      schedule: input.schedule?.trim() ?? "",
+      overtime: input.overtime?.trim() ?? "",
+      union_status: input.union_status?.trim() ?? "",
+      relocation: input.relocation?.trim() ?? "",
+      plc_platforms: input.plc_platforms?.trim() ?? "",
+      vfd_experience: input.vfd_experience?.trim() ?? "",
+      refrigeration: input.refrigeration?.trim() ?? "",
+      industry: input.industry?.trim() ?? "",
+      travel: input.travel?.trim() ?? "",
+      application_deadline: input.application_deadline?.trim() ?? "",
+      // Default notifications on unless explicitly disabled.
+      notify_on_apply: input.notify_on_apply === false ? 0 : 1,
+      created_by: createdBy,
       created_at: timestamp,
       updated_at: timestamp,
       published_at: input.status === "published" ? timestamp : null,
@@ -155,6 +196,20 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
         company_name = @company_name,
         reference_number = @reference_number,
         status = @status,
+        screen_key = @screen_key,
+        shift = @shift,
+        certifications = @certifications,
+        schedule = @schedule,
+        overtime = @overtime,
+        union_status = @union_status,
+        relocation = @relocation,
+        plc_platforms = @plc_platforms,
+        vfd_experience = @vfd_experience,
+        refrigeration = @refrigeration,
+        industry = @industry,
+        travel = @travel,
+        application_deadline = @application_deadline,
+        notify_on_apply = @notify_on_apply,
         updated_at = @updated_at,
         published_at = @published_at,
         closed_at = @closed_at
@@ -178,6 +233,26 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
       company_name: (input.company_name ?? existing.company_name).trim(),
       reference_number: (input.reference_number ?? existing.reference_number).trim(),
       status: nextStatus,
+      screen_key: input.screen_key !== undefined ? input.screen_key.trim() : existing.screen_key,
+      shift: input.shift !== undefined ? input.shift.trim() : existing.shift,
+      certifications: JSON.stringify(
+        input.certifications !== undefined
+          ? normalizeCertifications(input.certifications)
+          : existing.certifications,
+      ),
+      schedule: input.schedule !== undefined ? input.schedule.trim() : existing.schedule,
+      overtime: input.overtime !== undefined ? input.overtime.trim() : existing.overtime,
+      union_status: input.union_status !== undefined ? input.union_status.trim() : existing.union_status,
+      relocation: input.relocation !== undefined ? input.relocation.trim() : existing.relocation,
+      plc_platforms: input.plc_platforms !== undefined ? input.plc_platforms.trim() : existing.plc_platforms,
+      vfd_experience: input.vfd_experience !== undefined ? input.vfd_experience.trim() : existing.vfd_experience,
+      refrigeration: input.refrigeration !== undefined ? input.refrigeration.trim() : existing.refrigeration,
+      industry: input.industry !== undefined ? input.industry.trim() : existing.industry,
+      travel: input.travel !== undefined ? input.travel.trim() : existing.travel,
+      application_deadline:
+        input.application_deadline !== undefined ? input.application_deadline.trim() : existing.application_deadline,
+      notify_on_apply:
+        input.notify_on_apply !== undefined ? (input.notify_on_apply ? 1 : 0) : existing.notify_on_apply ? 1 : 0,
       updated_at: timestamp,
       published_at: publishedAt,
       closed_at: closedAt,
@@ -187,10 +262,51 @@ export function updateJob(id: string, organizationId: string, input: Partial<Job
 }
 
 export function deleteJob(id: string, organizationId: string): boolean {
-  const result = getDb()
+  const database = getDb();
+  // FKs aren't enforced (no PRAGMA foreign_keys); clean up visibility rows so a
+  // reused job id can't inherit stale grants.
+  database.prepare("DELETE FROM job_visible_users WHERE job_id = ? AND organization_id = ?").run(id, organizationId);
+  const result = database
     .prepare("DELETE FROM jobs WHERE id = ? AND organization_id = ?")
     .run(id, organizationId);
   return result.changes > 0;
+}
+
+/**
+ * Clone an existing job into a new draft (fresh id/slug/reference number),
+ * copying every posting field. Returns the new job, or null if the source
+ * doesn't belong to the organization. Handy for reposting the same role in a
+ * different city.
+ */
+export function duplicateJob(id: string, organizationId: string, createdBy = ""): Job | null {
+  const source = getJobById(id);
+  if (!source || source.organization_id !== organizationId) return null;
+
+  return createJob(
+    organizationId,
+    source.company_name,
+    {
+    title: `${source.title} (Copy)`.slice(0, 200),
+    description: source.description,
+    location: source.location,
+    city: source.city,
+    state: source.state,
+    country: source.country,
+    zip: source.zip,
+    employment_type: source.employment_type,
+    salary_min: source.salary_min,
+    salary_max: source.salary_max,
+    salary_currency: source.salary_currency,
+    salary_period: source.salary_period,
+    company_name: source.company_name,
+      screen_key: source.screen_key,
+      shift: source.shift,
+      certifications: source.certifications,
+      // New reference number + slug are generated; always starts as a draft.
+      status: "draft",
+    },
+    createdBy,
+  );
 }
 
 export function getJobPublicUrl(orgSlug: string, jobSlug: string): string {

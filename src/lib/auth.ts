@@ -23,6 +23,19 @@ export async function getSession(): Promise<SessionData | null> {
 }
 
 /**
+ * True when the token was issued before the user's revocation cutoff — i.e. an
+ * admin (or the user) has since "signed out all sessions".
+ */
+function isSessionRevoked(
+  user: NonNullable<Awaited<ReturnType<typeof getUserById>>>,
+  session: SessionData,
+): boolean {
+  if (!user.sessions_valid_after) return false;
+  const cutoff = Date.parse(user.sessions_valid_after);
+  return Number.isFinite(cutoff) && session.issuedAt < cutoff;
+}
+
+/**
  * For use in Server Components (pages). Redirects to login if unauthorized.
  */
 export async function requireOrgSession(orgSlug: string): Promise<OrgSessionResult> {
@@ -37,7 +50,7 @@ export async function requireOrgSession(orgSlug: string): Promise<OrgSessionResu
   const user = getUserById(session.userId);
   const organization = getOrganizationById(session.orgId);
 
-  if (!user || !organization || organization.slug !== orgSlug) {
+  if (!user || !organization || organization.slug !== orgSlug || isSessionRevoked(user, session)) {
     redirect(`/o/${orgSlug}/admin/login`);
   }
 
@@ -59,11 +72,26 @@ export async function requireOrgSessionApi(orgSlug: string): Promise<OrgSessionR
   const user = getUserById(session.userId);
   const organization = getOrganizationById(session.orgId);
 
-  if (!user || !organization || organization.slug !== orgSlug) {
+  if (!user || !organization || organization.slug !== orgSlug || isSessionRevoked(user, session)) {
     throw new Error("UNAUTHORIZED");
   }
 
   return { session, user, organization };
+}
+
+/**
+ * API guard: require the caller to belong to the org AND satisfy a capability
+ * predicate (from lib/roles). Throws "UNAUTHORIZED" (401) or "FORBIDDEN" (403).
+ */
+export async function requireOrgCapability(
+  orgSlug: string,
+  can: (role: string) => boolean,
+): Promise<OrgSessionResult> {
+  const result = await requireOrgSessionApi(orgSlug);
+  if (!can(result.user.role)) {
+    throw new Error("FORBIDDEN");
+  }
+  return result;
 }
 
 export async function setSessionCookie(token: string): Promise<void> {

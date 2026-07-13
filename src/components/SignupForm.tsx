@@ -2,20 +2,29 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { SEAT_PRICE_USD, TRIAL_DAYS } from "@/lib/pricing";
+
+const COMPANY_TYPES = [
+  { value: "employer", label: "Employer" },
+  { value: "agency", label: "Recruiting agency" },
+  { value: "other", label: "Other" },
+];
 
 export function SignupForm() {
   const router = useRouter();
   const [values, setValues] = useState({
     orgName: "",
-    orgSlug: "",
-    website: "",
-    applicationEmail: "",
+    companyType: "employer",
     adminName: "",
     adminEmail: "",
     password: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function set<K extends keyof typeof values>(key: K, value: string) {
+    setValues((current) => ({ ...current, [key]: value }));
+  }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -36,103 +45,89 @@ export function SignupForm() {
       return;
     }
 
-    router.push(`/o/${data.organization!.slug}/admin`);
+    router.push(`/o/${data.organization!.slug}/admin/onboarding`);
     router.refresh();
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mx-auto w-full max-w-2xl space-y-6">
+    <form onSubmit={handleSubmit} className="card mx-auto w-full max-w-lg space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Create your organization</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">Start your {TRIAL_DAYS}-day free trial</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Each organization gets its own careers portal, job board feed, and applicant inbox.
+          Create your workspace in under a minute. You can add branding, your resume inbox, and teammates later.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block space-y-1 md:col-span-2">
-          <span className="text-sm font-medium">Organization name *</span>
-          <input
-            value={values.orgName}
-            onChange={(event) => setValues((current) => ({ ...current, orgName: event.target.value }))}
-            className="field-input"
-            placeholder="Electrical Automation Services Inc"
-            required
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Portal URL slug</span>
-          <input
-            value={values.orgSlug}
-            onChange={(event) => setValues((current) => ({ ...current, orgSlug: event.target.value }))}
-            className="field-input"
-            placeholder="electrical-automation-services"
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Website</span>
-          <input
-            value={values.website}
-            onChange={(event) => setValues((current) => ({ ...current, website: event.target.value }))}
-            className="field-input"
-            placeholder="https://example.com"
-          />
-        </label>
-
-        <label className="block space-y-1 md:col-span-2">
-          <span className="text-sm font-medium">Resume delivery email *</span>
-          <input
-            type="email"
-            value={values.applicationEmail}
-            onChange={(event) => setValues((current) => ({ ...current, applicationEmail: event.target.value }))}
-            className="field-input"
-            placeholder="hiring@yourcompany.com"
-            required
-          />
-          <p className="text-xs text-zinc-500">Applications with resume attachments are sent here.</p>
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Your name *</span>
-          <input
-            value={values.adminName}
-            onChange={(event) => setValues((current) => ({ ...current, adminName: event.target.value }))}
-            className="field-input"
-            required
-          />
-        </label>
-
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Your email *</span>
-          <input
-            type="email"
-            value={values.adminEmail}
-            onChange={(event) => setValues((current) => ({ ...current, adminEmail: event.target.value }))}
-            className="field-input"
-            required
-          />
-        </label>
-
-        <label className="block space-y-1 md:col-span-2">
-          <span className="text-sm font-medium">Password *</span>
-          <input
-            type="password"
-            value={values.password}
-            onChange={(event) => setValues((current) => ({ ...current, password: event.target.value }))}
-            className="field-input"
-            minLength={8}
-            required
-          />
-        </label>
+      <div className="rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800">
+        <ul className="grid gap-1.5 sm:grid-cols-2">
+          <li>· {TRIAL_DAYS}-day free trial</li>
+          <li>· No credit card required</li>
+          <li>· From ${SEAT_PRICE_USD}/month per seat after the trial</li>
+          <li>· Cancel anytime</li>
+        </ul>
       </div>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Your name *</span>
+        <input value={values.adminName} onChange={(e) => set("adminName", e.target.value)} className="field-input" required />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Work email *</span>
+        <input
+          type="email"
+          value={values.adminEmail}
+          onChange={(e) => set("adminEmail", e.target.value)}
+          className="field-input"
+          required
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Password *</span>
+        <input
+          type="password"
+          value={values.password}
+          onChange={(e) => set("password", e.target.value)}
+          className="field-input"
+          minLength={8}
+          required
+        />
+        <span className="text-xs text-zinc-500">At least 8 characters.</span>
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Organization name *</span>
+        <input
+          value={values.orgName}
+          onChange={(e) => set("orgName", e.target.value)}
+          className="field-input"
+          placeholder="Your company or agency"
+          required
+        />
+      </label>
+
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">What best describes you?</span>
+        <select value={values.companyType} onChange={(e) => set("companyType", e.target.value)} className="field-input">
+          {COMPANY_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "Creating..." : "Create organization"}
-      </button>
+      <div className="space-y-2">
+        <button type="submit" disabled={loading} className="btn-primary w-full py-3">
+          {loading ? "Creating your workspace…" : "Start free trial"}
+        </button>
+        <p className="text-center text-xs text-zinc-500">
+          No credit card required. Your {TRIAL_DAYS}-day trial starts as soon as your workspace is created.
+        </p>
+      </div>
     </form>
   );
 }

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EAS Recruit">
+  <defs>
+    <linearGradient id="easGreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8fc63f" />
+      <stop offset="0.55" stop-color="#5c9022" />
+      <stop offset="1" stop-color="#3d5917" />
+    </linearGradient>
+    <linearGradient id="easSilver" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" />
+      <stop offset="0.5" stop-color="#e6e9ec" />
+      <stop offset="1" stop-color="#c2c7cd" />
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="url(#easGreen)" />
+  <path
+    d="M35 8 L15 35 H27 L22 56 L49 27 H36 Z"
+    fill="url(#easSilver)"
+    stroke="#2f4b16"
+    stroke-width="1"
+    stroke-linejoin="round"
+  />
+</svg>
