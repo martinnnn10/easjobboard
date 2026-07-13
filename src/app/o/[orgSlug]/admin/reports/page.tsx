@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOrgSession } from "@/lib/auth";
 import { CANDIDATE_SOURCE_LABELS, isCandidateSource } from "@/lib/candidate-meta";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getReportData, isRangePreset, RANGE_PRESETS, resolveRange, type RangePreset } from "@/lib/reports";
 
@@ -25,12 +26,12 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
-  await requireOrgSession(orgSlug);
+  const { user } = await requireOrgSession(orgSlug);
 
   const sp = await searchParams;
   const preset: RangePreset = isRangePreset(sp.range) ? sp.range : "all";
   const { range, label } = resolveRange(preset, sp.from, sp.to, new Date());
-  const r = getReportData(organization.id, range);
+  const r = getReportData(organization.id, range, getJobAccess(organization.id, user));
 
   const noData = r.totalApplicants === 0 && r.callsLogged === 0 && r.interviewsScheduled === 0;
 

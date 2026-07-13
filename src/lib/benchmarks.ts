@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { hiddenJobsSql, type JobAccess } from "./job-visibility";
 
 /**
  * Role percentile benchmarking. A raw 0–100 screen score means little without a
@@ -31,9 +32,11 @@ export function getScoreBenchmark(
   organizationId: string,
   screenKey: string,
   score: number | null,
+  access?: JobAccess,
 ): ScoreBenchmark {
   if (score === null || !screenKey) return { pool: 0, topPercent: null, early: true };
 
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const row = getDb()
     .prepare(
       `SELECT
@@ -41,9 +44,9 @@ export function getScoreBenchmark(
          SUM(CASE WHEN overall_score < ? THEN 1 ELSE 0 END) AS below,
          SUM(CASE WHEN overall_score = ? THEN 1 ELSE 0 END) AS tied
        FROM screen_submissions
-       WHERE organization_id = ? AND screen_key = ? AND overall_score IS NOT NULL`,
+       WHERE organization_id = ? AND screen_key = ? AND overall_score IS NOT NULL${vis.clause}`,
     )
-    .get(score, score, organizationId, screenKey) as {
+    .get(score, score, organizationId, screenKey, ...vis.params) as {
     pool: number;
     below: number | null;
     tied: number | null;

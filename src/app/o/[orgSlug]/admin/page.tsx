@@ -13,6 +13,7 @@ import { requireOrgSession } from "@/lib/auth";
 import { getBillingState } from "@/lib/billing";
 import { careAlertsForOwner, sweepEscalations } from "@/lib/candidate-care";
 import { resumeTrapCandidates } from "@/lib/gap-analysis";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getRoiStats } from "@/lib/roi";
@@ -37,18 +38,20 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
   if (isOwner) await sweepEscalations(organization.id);
   const careAlerts = isOwner ? careAlertsForOwner(organization.id) : null;
 
-  const jobs = listJobsByOrganization(organization.id);
-  const allApplicants = listApplicationsByOrganization(organization.id, { orderBy: "score" });
-  const applicantCount = countApplicationsByOrganization(organization.id);
+  // Scope every rollup to the jobs this user may see (owners → unrestricted).
+  const access = getJobAccess(organization.id, sessionContext.user);
+  const jobs = listJobsByOrganization(organization.id).filter((job) => canSeeJob(access, job.id));
+  const allApplicants = listApplicationsByOrganization(organization.id, { orderBy: "score", access });
+  const applicantCount = countApplicationsByOrganization(organization.id, undefined, access);
 
-  const stats = getScreeningStats(organization.id);
-  const jobSummaries = getJobScreeningSummaries(organization.id);
+  const stats = getScreeningStats(organization.id, access);
+  const jobSummaries = getJobScreeningSummaries(organization.id, access);
   const publishedJobs = jobs.filter((job) => job.status === "published");
   const openRolesNoStrong = publishedJobs.filter((job) => (jobSummaries[job.id]?.strongFit ?? 0) === 0).length;
 
   const trapCandidates = resumeTrapCandidates(allApplicants).slice(0, 4);
-  const roi = getRoiStats(organization.id);
-  const callQueueCount = getCallQueueCount(organization.id);
+  const roi = getRoiStats(organization.id, access);
+  const callQueueCount = getCallQueueCount(organization.id, access);
 
   const publishedSlug = (await searchParams).published;
   const publishedJob = publishedSlug ? jobs.find((job) => job.slug === publishedSlug) : undefined;

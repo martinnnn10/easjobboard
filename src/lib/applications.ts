@@ -361,6 +361,7 @@ export function countApplicationsByOrganization(
  */
 export function getApplicationStatusCounts(
   organizationId: string,
+  access?: JobAccess,
 ): Record<ApplicationStatus, number> {
   const counts: Record<ApplicationStatus, number> = {
     new: 0,
@@ -371,11 +372,12 @@ export function getApplicationStatusCounts(
     rejected: 0,
   };
 
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const rows = getDb()
     .prepare(
-      "SELECT status, COUNT(*) AS count FROM applications WHERE organization_id = ? GROUP BY status",
+      `SELECT status, COUNT(*) AS count FROM applications WHERE organization_id = ?${vis.clause} GROUP BY status`,
     )
-    .all(organizationId) as Array<{ status: ApplicationStatus; count: number }>;
+    .all(organizationId, ...vis.params) as Array<{ status: ApplicationStatus; count: number }>;
 
   for (const row of rows) {
     if (row.status in counts) counts[row.status] = row.count;
@@ -406,9 +408,10 @@ export type ScreeningStats = {
  * applicants were actually screened, how many are strong-fit, how many need a
  * look, how many are high-risk, and the average practical score.
  */
-export function getScreeningStats(organizationId: string): ScreeningStats {
+export function getScreeningStats(organizationId: string, access?: JobAccess): ScreeningStats {
   const db = getDb();
-  const total = countApplicationsByOrganization(organizationId);
+  const total = countApplicationsByOrganization(organizationId, undefined, access);
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
 
   const row = db
     .prepare(
@@ -420,9 +423,9 @@ export function getScreeningStats(organizationId: string): ScreeningStats {
          SUM(CASE WHEN resume_filename IS NOT NULL AND resume_filename != '' THEN 1 ELSE 0 END) AS resumes,
          SUM(CASE WHEN screen_status != 'completed' THEN 1 ELSE 0 END) AS resume_only,
          AVG(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN screen_score END) AS avg_score
-       FROM applications WHERE organization_id = ?`,
+       FROM applications WHERE organization_id = ?${vis.clause}`,
     )
-    .get(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId) as {
+    .get(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId, ...vis.params) as {
     screened: number | null;
     strong: number | null;
     review: number | null;
@@ -449,15 +452,16 @@ export function getScreeningStats(organizationId: string): ScreeningStats {
  * dashboard's "N to work" card so the count and the list can never disagree:
  * a completed screen still in new/screening that cleared the review floor.
  */
-export function getCallQueueCount(organizationId: string): number {
+export function getCallQueueCount(organizationId: string, access?: JobAccess): number {
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const row = getDb()
     .prepare(
       `SELECT COUNT(*) AS count FROM applications
        WHERE organization_id = ? AND screen_status = 'completed'
          AND screen_score IS NOT NULL AND screen_score >= ?
-         AND status IN ('new','screening')`,
+         AND status IN ('new','screening')${vis.clause}`,
     )
-    .get(organizationId, REVIEW_FLOOR) as { count: number };
+    .get(organizationId, REVIEW_FLOOR, ...vis.params) as { count: number };
   return row.count;
 }
 
@@ -475,7 +479,11 @@ export type JobScreeningSummary = {
  * Per-job screening rollup keyed by job id: applicants, completed screens,
  * strong-fit, and needs-review counts. One grouped query for the whole org.
  */
-export function getJobScreeningSummaries(organizationId: string): Record<string, JobScreeningSummary> {
+export function getJobScreeningSummaries(
+  organizationId: string,
+  access?: JobAccess,
+): Record<string, JobScreeningSummary> {
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const rows = getDb()
     .prepare(
       `SELECT job_id,
@@ -485,9 +493,9 @@ export function getJobScreeningSummaries(organizationId: string): Record<string,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND screen_score < ? THEN 1 ELSE 0 END) AS review,
          SUM(CASE WHEN risk_level = 'high' THEN 1 ELSE 0 END) AS high_risk,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND status IN ('new','screening') THEN 1 ELSE 0 END) AS calls_due
-       FROM applications WHERE organization_id = ? GROUP BY job_id`,
+       FROM applications WHERE organization_id = ?${vis.clause} GROUP BY job_id`,
     )
-    .all(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, REVIEW_FLOOR, organizationId) as Array<{
+    .all(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, REVIEW_FLOOR, organizationId, ...vis.params) as Array<{
     job_id: string;
     applicants: number;
     completed: number;

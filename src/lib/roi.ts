@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { hiddenJobsSql, type JobAccess } from "./job-visibility";
 
 /**
  * The renewal number. Converts screening data already stored into hours and
@@ -26,16 +27,17 @@ export type RoiStats = {
   filterRatePercent: number;
 };
 
-export function getRoiStats(organizationId: string): RoiStats {
+export function getRoiStats(organizationId: string, access?: JobAccess): RoiStats {
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const row = getDb()
     .prepare(
       `SELECT
          SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN 1 ELSE 0 END) AS completed,
          SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL
                    AND screen_score < ? THEN 1 ELSE 0 END) AS avoided
-       FROM applications WHERE organization_id = ?`,
+       FROM applications WHERE organization_id = ?${vis.clause}`,
     )
-    .get(WASTE_THRESHOLD, organizationId) as { completed: number | null; avoided: number | null };
+    .get(WASTE_THRESHOLD, organizationId, ...vis.params) as { completed: number | null; avoided: number | null };
 
   const screensCompleted = row.completed ?? 0;
   const interviewsAvoided = row.avoided ?? 0;

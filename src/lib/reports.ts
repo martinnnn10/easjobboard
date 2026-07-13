@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { getJobScreeningSummaries, REVIEW_FLOOR, STRONG_FIT } from "./applications";
+import { canSeeJob, hiddenJobsSql, type JobAccess } from "./job-visibility";
 import { listJobsByOrganization } from "./jobs";
 
 /**
@@ -115,11 +116,13 @@ function rangeClause(column: string, range: DateRange): { sql: string; params: s
   return { sql: parts.length ? ` AND ${parts.join(" AND ")}` : "", params };
 }
 
-export function getReportData(organizationId: string, range: DateRange = {}): ReportData {
+export function getReportData(organizationId: string, range: DateRange = {}, access?: JobAccess): ReportData {
   const db = getDb();
 
   const appRange = rangeClause("created_at", range);
   const evtRange = rangeClause("created_at", range);
+  // Exclude restricted jobs the viewer can't see from every job-tied rollup.
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
 
   // Funnel + quality, computed straight from applications so the date window
   // applies uniformly. Mirrors getScreeningStats' definitions of strong/review.
@@ -133,9 +136,9 @@ export function getReportData(organizationId: string, range: DateRange = {}): Re
          SUM(CASE WHEN risk_level = 'high' THEN 1 ELSE 0 END) AS high_risk,
          AVG(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN screen_score END) AS avg_score
        FROM applications
-       WHERE organization_id = ?${appRange.sql}`,
+       WHERE organization_id = ?${appRange.sql}${vis.clause}`,
     )
-    .get(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId, ...appRange.params) as {
+    .get(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId, ...appRange.params, ...vis.params) as {
     total: number | null;
     screened: number | null;
     strong: number | null;
@@ -158,7 +161,7 @@ export function getReportData(organizationId: string, range: DateRange = {}): Re
                 CASE WHEN EXISTS (
                   SELECT 1 FROM applications a
                   WHERE a.candidate_id = c.id AND a.screen_status = 'completed'
-                    AND a.screen_score >= ? AND a.risk_level != 'high'
+                    AND a.screen_score >= ? AND a.risk_level != 'high'${hiddenJobsSql(access ?? { unrestricted: true }, "a.job_id").clause}
                 ) THEN 1 ELSE 0 END
               ) AS strong
        FROM candidates c
@@ -166,7 +169,12 @@ export function getReportData(organizationId: string, range: DateRange = {}): Re
        GROUP BY c.source
        ORDER BY applicants DESC`,
     )
-    .all(STRONG_FIT, organizationId, ...srcRange.params) as Array<{
+    .all(
+      STRONG_FIT,
+      ...hiddenJobsSql(access ?? { unrestricted: true }, "a.job_id").params,
+      organizationId,
+      ...srcRange.params,
+    ) as Array<{
     source: string;
     applicants: number;
     strong: number | null;
@@ -177,16 +185,17 @@ export function getReportData(organizationId: string, range: DateRange = {}): Re
     strongFit: r.strong ?? 0,
   }));
 
-  // Average completed skills score per role (screens in the window).
-  const jobs = listJobsByOrganization(organizationId);
+  // Average completed skills score per role (screens in the window). Restrict to
+  // jobs the viewer may see so restricted job titles never surface here.
+  const jobs = listJobsByOrganization(organizationId).filter((j) => !access || canSeeJob(access, j.id));
   const roleRows = db
     .prepare(
       `SELECT job_id, AVG(screen_score) AS avg, COUNT(*) AS n
        FROM applications
-       WHERE organization_id = ? AND screen_status = 'completed' AND screen_score IS NOT NULL${appRange.sql}
+       WHERE organization_id = ? AND screen_status = 'completed' AND screen_score IS NOT NULL${appRange.sql}${vis.clause}
        GROUP BY job_id`,
     )
-    .all(organizationId, ...appRange.params) as Array<{ job_id: string; avg: number; n: number }>;
+    .all(organizationId, ...appRange.params, ...vis.params) as Array<{ job_id: string; avg: number; n: number }>;
   const jobTitle = new Map(jobs.map((j) => [j.id, j.title]));
   const avgScoreByRole: RoleScoreRow[] = roleRows
     .map((r) => ({ job: jobTitle.get(r.job_id) ?? "—", avgScore: Math.round(r.avg), screened: r.n }))
@@ -262,7 +271,7 @@ export function getReportData(organizationId: string, range: DateRange = {}): Re
       .get(organizationId, ...evtRange.params) as { c: number }
   ).c;
 
-  const jobSummaries = getJobScreeningSummaries(organizationId);
+  const jobSummaries = getJobScreeningSummaries(organizationId, access);
   const publishedJobs = jobs.filter((j) => j.status === "published");
   const openRolesNoStrong = publishedJobs.filter((j) => (jobSummaries[j.id]?.strongFit ?? 0) === 0).length;
 

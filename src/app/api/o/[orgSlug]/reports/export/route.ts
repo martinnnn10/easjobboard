@@ -1,5 +1,6 @@
 import { authErrorResponse } from "@/lib/api";
 import { requireOrgSession } from "@/lib/auth";
+import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import {
   getReportData,
@@ -24,7 +25,7 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const organization = getOrganizationBySlug(orgSlug);
     if (!organization) return new Response("Not found", { status: 404 });
-    await requireOrgSession(orgSlug);
+    const { user } = await requireOrgSession(orgSlug);
 
     const url = new URL(request.url);
     const preset: RangePreset = isRangePreset(url.searchParams.get("range") ?? undefined)
@@ -37,7 +38,7 @@ export async function GET(request: Request, context: RouteContext) {
       new Date(),
     );
 
-    const data = getReportData(organization.id, range);
+    const data = getReportData(organization.id, range, getJobAccess(organization.id, user));
     const rows = reportToCsvRows(data);
     rows.splice(1, 0, ["Date range", label]);
     const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");

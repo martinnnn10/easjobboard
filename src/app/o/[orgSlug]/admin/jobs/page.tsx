@@ -24,7 +24,7 @@ export default async function JobsPage({ params }: PageProps) {
   // Hide restricted jobs (and their applicant counts) from users not on the list.
   const access = getJobAccess(organization.id, user);
   const jobs = listJobsByOrganization(organization.id).filter((j) => canSeeJob(access, j.id));
-  const jobSummaries = getJobScreeningSummaries(organization.id);
+  const jobSummaries = getJobScreeningSummaries(organization.id, access);
 
   return (
     <div className="page-shell space-y-5">

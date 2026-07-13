@@ -60,11 +60,8 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   const writable = canWrite(sessionContext.user.role);
   const resumesOk = canViewResumes(sessionContext.user.role);
 
-  const application = getApplicationDetail(
-    id,
-    organization.id,
-    getJobAccess(organization.id, sessionContext.user),
-  );
+  const access = getJobAccess(organization.id, sessionContext.user);
+  const application = getApplicationDetail(id, organization.id, access);
   if (!application) notFound();
 
   const events = listCandidateEvents(id, organization.id);
@@ -87,7 +84,7 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   // Trust signals: percentile vs the role's pool, and the resume-vs-reality gap.
   const benchmark =
     application.screen_status === "completed"
-      ? getScoreBenchmark(organization.id, screenKey, application.screen_score)
+      ? getScoreBenchmark(organization.id, screenKey, application.screen_score, access)
       : null;
   const gap = candidateGap(application, screenKey, submission);
   const confidence = summary?.confidence ?? null;
