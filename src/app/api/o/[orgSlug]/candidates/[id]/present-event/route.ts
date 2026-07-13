@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { authErrorResponse } from "@/lib/api";
 import { requireOrgCapability } from "@/lib/auth";
 import { listEventsByCandidate, recordCandidateEvent } from "@/lib/candidate-events";
-import { getCandidateById } from "@/lib/candidates";
+import { getCandidateWithApplications } from "@/lib/candidates";
+import { getJobAccess } from "@/lib/job-visibility";
 import { canWrite } from "@/lib/roles";
 
 export const runtime = "nodejs";
@@ -16,7 +17,9 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const { organization, user } = await requireOrgCapability(orgSlug, canWrite);
-    const candidate = getCandidateById(id, organization.id);
+    // Per-job visibility: deny when the caller can only reach this candidate
+    // through a restricted job (returns null), matching the present page's gate.
+    const candidate = getCandidateWithApplications(id, organization.id, getJobAccess(organization.id, user));
     if (!candidate) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const body = (await request.json().catch(() => ({}))) as { action?: string; role?: string };
