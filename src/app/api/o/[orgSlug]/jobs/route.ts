@@ -3,7 +3,7 @@ import { requireOrgCapability, requireOrgSessionApi } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
 import { setJobVisibleUsers } from "@/lib/job-visibility";
 import { canWrite } from "@/lib/roles";
-import { createJob, listJobsByOrganization } from "@/lib/jobs";
+import { createJob, listJobsByOrganization, validateJobBody } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { listUsersByOrganization } from "@/lib/users";
 import type { JobStatus } from "@/lib/db";
@@ -28,7 +28,12 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const { organization, user } = await requireOrgCapability(orgSlug, canWrite);
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
+
+    const invalid = validateJobBody(body as Record<string, unknown>);
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
+    }
 
     const job = createJob(
       organization.id,

@@ -14,7 +14,10 @@ export async function extractResumeText(buffer: Buffer, kind: ResumeKind): Promi
     // Legacy binary .doc is not supported by our extractors.
     return "";
   } catch (error) {
-    console.error("Resume text extraction failed:", error);
+    // Expected for scanned, image-only, or malformed files. The application
+    // still submits and the resume file is still stored — only text-based
+    // scoring is skipped — so this is a warning, not a system error.
+    console.warn("Resume text extraction skipped: resume text could not be parsed. Resume file was still stored.", error);
     return "";
   }
 }

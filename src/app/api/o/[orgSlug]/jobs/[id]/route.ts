@@ -3,7 +3,7 @@ import { requireOrgCapability, requireOrgSessionApi } from "@/lib/auth";
 import { authErrorResponse } from "@/lib/api";
 import { canSeeJob, getJobAccess, setJobVisibleUsers } from "@/lib/job-visibility";
 import { canWrite } from "@/lib/roles";
-import { deleteJob, getJobById, updateJob } from "@/lib/jobs";
+import { deleteJob, getJobById, updateJob, validateJobBody } from "@/lib/jobs";
 import { listUsersByOrganization } from "@/lib/users";
 import type { JobStatus } from "@/lib/db";
 
@@ -31,7 +31,7 @@ export async function PUT(request: Request, context: RouteContext) {
 
   try {
     const { organization, user } = await requireOrgCapability(orgSlug, canWrite);
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
 
     // Can't edit a restricted job you can't see.
     const existing = getJobById(id);
@@ -40,6 +40,11 @@ export async function PUT(request: Request, context: RouteContext) {
     }
     if (!canSeeJob(getJobAccess(organization.id, user), existing.id)) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const invalid = validateJobBody(body as Record<string, unknown>);
+    if (invalid) {
+      return NextResponse.json({ error: invalid }, { status: 400 });
     }
 
     const job = updateJob(id, organization.id, {

@@ -2,6 +2,24 @@ import { randomUUID } from "crypto";
 import { getOrgJobUrl } from "./env";
 import { getDb, rowToJob, type Job, type JobInput, type JobStatus } from "./db";
 
+export const JOB_STATUSES: JobStatus[] = ["draft", "published", "closed"];
+
+/**
+ * Validate a client-supplied job body before create/update so a malformed
+ * direct API call returns a clean 400 instead of throwing a 500 downstream.
+ * Returns an error message, or null when the body is acceptable.
+ */
+export function validateJobBody(body: Record<string, unknown>): string | null {
+  const filled = (v: unknown) => typeof v === "string" && v.trim().length > 0;
+  if (!filled(body.title) || !filled(body.description) || !filled(body.location)) {
+    return "Missing required job fields.";
+  }
+  if (body.status !== undefined && !JOB_STATUSES.includes(body.status as JobStatus)) {
+    return "Invalid job status.";
+  }
+  return null;
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
