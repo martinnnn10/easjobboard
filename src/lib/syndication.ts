@@ -30,7 +30,7 @@ export const SYNDICATION_BOARDS: SyndicationBoard[] = [
     tier: "automatic",
     feed: "Google for Jobs JSON-LD",
     url: "https://developers.google.com/search/docs/appearance/structured-data/job-posting",
-    note: "No registration — each job page embeds valid JobPosting structured data, so listings appear in Google's job results once the site is publicly crawlable over HTTPS.",
+    note: "No registration — each job page embeds valid JobPosting structured data, so listings become eligible to appear in Google's job results once Google crawls the site over HTTPS. Placement isn't guaranteed.",
   },
   {
     name: "Jooble",

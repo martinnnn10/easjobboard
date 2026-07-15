@@ -48,7 +48,7 @@ export async function POST(request: Request, context: RouteContext) {
         salary_period: body.salary_period,
         company_name: body.company_name,
         reference_number: body.reference_number,
-        status: (body.status as JobStatus) ?? "draft",
+        status: (body.status as JobStatus) ?? "published",
         screen_key: body.screen_key,
         shift: body.shift,
         certifications: Array.isArray(body.certifications) ? body.certifications : undefined,

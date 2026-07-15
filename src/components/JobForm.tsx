@@ -424,7 +424,7 @@ function jobToValues(job?: Job, defaultCompanyName?: string): JobFormValues {
     salary_period: job?.salary_period ?? "YEAR",
     company_name: job?.company_name ?? defaultCompanyName ?? "",
     reference_number: job?.reference_number ?? "",
-    status: job?.status ?? "draft",
+    status: job?.status ?? "published",
     // Default the screen ON for new jobs (suggested from the title once typed,
     // otherwise the maintenance-tech screen); editing preserves the saved choice.
     screen_key: job ? job.screen_key : "maintenance_tech",
@@ -698,15 +698,25 @@ export function JobForm({
     }
   }
 
+  // When creating a job, the two footer buttons ("Publish job" / "Save as
+  // draft") each stash their intended status here just before the native submit
+  // fires, so HTML5 field validation still runs. Edit mode leaves it null and
+  // keeps whatever status the form's Status select shows.
+  const submitStatusRef = useRef<JobStatus | null>(null);
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
 
+    const status = submitStatusRef.current ?? values.status;
+    submitStatusRef.current = null;
+
     // Ensure the posted location label is populated from city + state even if
     // the auto-fill was cleared. City is the required field that drives it.
     const payload = {
       ...values,
+      status,
       location: values.location.trim() || deriveLocation(values.city, values.state),
       notify_on_apply: notifyOnApply,
       visible_user_ids: [...visibleIds],
@@ -730,7 +740,7 @@ export function JobForm({
 
     // Celebrate a freshly published job on the dashboard (share link, flyer, QR).
     const data = (await response.json().catch(() => null)) as { job?: { slug?: string } } | null;
-    const publishedSlug = !job && values.status === "published" ? data?.job?.slug : undefined;
+    const publishedSlug = !job && status === "published" ? data?.job?.slug : undefined;
     router.push(publishedSlug ? `/o/${orgSlug}/admin?published=${encodeURIComponent(publishedSlug)}` : `/o/${orgSlug}/admin`);
     router.refresh();
   }
@@ -1254,18 +1264,23 @@ export function JobForm({
             />
           </label>
 
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Status</span>
-            <select
-              value={values.status}
-              onChange={(event) => updateField("status", event.target.value as JobStatus)}
-              className="field-input"
-            >
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="closed">Closed</option>
-            </select>
-          </label>
+          {job ? (
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Status</span>
+              <select
+                value={values.status}
+                onChange={(event) => updateField("status", event.target.value as JobStatus)}
+                className="field-input"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="closed">Closed</option>
+              </select>
+              <span className="text-xs text-zinc-500">
+                Published jobs appear on your careers page, sitemap, and job feeds. Draft and closed jobs stay private.
+              </span>
+            </label>
+          ) : null}
         </div>
       </fieldset>
 
@@ -1365,10 +1380,35 @@ export function JobForm({
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      <div className="flex gap-3">
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? "Saving..." : job ? "Update job" : "Create job"}
-        </button>
+      <div className="flex flex-wrap gap-3">
+        {job ? (
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? "Saving..." : "Update job"}
+          </button>
+        ) : (
+          <>
+            <button
+              type="submit"
+              disabled={loading}
+              onClick={() => {
+                submitStatusRef.current = "published";
+              }}
+              className="btn-primary"
+            >
+              {loading ? "Saving..." : "Publish job"}
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              onClick={() => {
+                submitStatusRef.current = "draft";
+              }}
+              className="btn-secondary"
+            >
+              Save as draft
+            </button>
+          </>
+        )}
         <button
           type="button"
           onClick={() => router.push(`/o/${orgSlug}/admin`)}

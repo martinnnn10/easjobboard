@@ -31,7 +31,10 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   const labels = getOrgLabels(organization);
 
   const sp = await searchParams;
-  const filter = sp.screen === "qualified" || sp.screen === "knockout" ? sp.screen : undefined;
+  const filter =
+    sp.screen === "qualified" || sp.screen === "knockout" || sp.screen === "resume_only" ? sp.screen : undefined;
+  const resumeOnly = filter === "resume_only";
+  const screenOutcome = resumeOnly ? undefined : filter;
 
   // Per-job visibility: restrict counts + rows to jobs this user may see.
   const access = getJobAccess(organization.id, user);
@@ -39,8 +42,13 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   const allCount = countApplicationsByOrganization(organization.id, undefined, access);
   const qualifiedCount = countApplicationsByOrganization(organization.id, "qualified", access);
   const knockoutCount = countApplicationsByOrganization(organization.id, "knockout", access);
+  const resumeOnlyCount = countApplicationsByOrganization(organization.id, undefined, access, true);
 
-  const total = filter ? countApplicationsByOrganization(organization.id, filter, access) : allCount;
+  const total = resumeOnly
+    ? resumeOnlyCount
+    : filter
+      ? countApplicationsByOrganization(organization.id, filter, access)
+      : allCount;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const requestedPage = Number.parseInt(sp.page ?? "1", 10);
   const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, requestedPage), pageCount) : 1;
@@ -49,13 +57,15 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
     orderBy: "score",
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
-    screenOutcome: filter,
+    screenOutcome,
+    resumeOnly,
     access,
   });
 
   const tabs = [
     { key: undefined as string | undefined, label: "All", count: allCount },
     { key: "qualified", label: "Qualified", count: qualifiedCount },
+    { key: "resume_only", label: "Resume only", count: resumeOnlyCount },
     { key: "knockout", label: "Auto-screened out", count: knockoutCount },
   ];
   const tabHref = (key: string | undefined) =>
@@ -102,7 +112,9 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
             ? `No auto-screened-out ${labels.applicantSingular}s.`
             : filter === "qualified"
               ? `No qualified ${labels.applicantSingular}s yet.`
-              : "No applications yet."}
+              : filter === "resume_only"
+                ? `No resume-only ${labels.applicantSingular}s — everyone has completed a skills screen.`
+                : "No applications yet."}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">

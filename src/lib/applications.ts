@@ -278,6 +278,8 @@ export type ListApplicationsOptions = {
   offset?: number;
   /** Filter by knockout verdict: "qualified" | "knockout". Omit for all. */
   screenOutcome?: string;
+  /** Only applications that never completed a skills screen (resume-only). */
+  resumeOnly?: boolean;
   /** Per-job visibility; omit to return all org applications (internal callers). */
   access?: JobAccess;
 };
@@ -286,7 +288,7 @@ export function listApplicationsByOrganization(
   organizationId: string,
   options: ListApplicationsOptions = {},
 ): ApplicationWithJob[] {
-  const { orderBy = "recent", limit, offset = 0, screenOutcome, access } = options;
+  const { orderBy = "recent", limit, offset = 0, screenOutcome, resumeOnly, access } = options;
 
   // "score" ranks by practical skills-screen score first (nulls last), then
   // resume keyword match, then recency; "recent" is reverse-chronological.
@@ -298,8 +300,11 @@ export function listApplicationsByOrganization(
   const params: Array<string | number> = [organizationId];
   let whereClause = "";
   if (screenOutcome) {
-    whereClause = " AND a.screen_outcome = ?";
+    whereClause += " AND a.screen_outcome = ?";
     params.push(screenOutcome);
+  }
+  if (resumeOnly) {
+    whereClause += " AND a.screen_status != 'completed'";
   }
   if (access) {
     const vis = hiddenJobsSql(access, "a.job_id");
@@ -341,6 +346,7 @@ export function countApplicationsByOrganization(
   organizationId: string,
   screenOutcome?: string,
   access?: JobAccess,
+  resumeOnly?: boolean,
 ): number {
   const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const params: Array<string> = [organizationId];
@@ -348,6 +354,9 @@ export function countApplicationsByOrganization(
   if (screenOutcome) {
     sql += " AND screen_outcome = ?";
     params.push(screenOutcome);
+  }
+  if (resumeOnly) {
+    sql += " AND screen_status != 'completed'";
   }
   sql += vis.clause;
   params.push(...vis.params);

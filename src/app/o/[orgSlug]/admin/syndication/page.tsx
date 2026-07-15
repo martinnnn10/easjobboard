@@ -11,7 +11,7 @@ const FEEDS = [
   {
     label: "Indeed feed",
     path: "/feed/indeed.xml",
-    description: "Register this feed URL with Indeed's XML feed program once; after that Indeed pulls updates on its own schedule.",
+    description: "Register this feed URL with Indeed's XML feed program. After that, Indeed pulls updates on its own schedule.",
   },
   {
     label: "Job boards feed",
@@ -44,8 +44,10 @@ export default async function SyndicationPage({ params }: PageProps) {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900">Job distribution</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Google for Jobs reads structured data embedded on every job page — no setup. The other boards below use your
-          feed URLs: register each feed once, then updates flow automatically.
+          EAS Recruit makes published jobs eligible for Google Jobs by adding JobPosting structured data and including
+          the job in the sitemap. Google must crawl and index the page before it can appear — placement is not
+          guaranteed. The other boards below use your feed URLs: register each feed once, then each board pulls updates
+          on its own schedule.
         </p>
       </div>
 
@@ -121,7 +123,8 @@ export default async function SyndicationPage({ params }: PageProps) {
             ) : (
               <span className="text-zinc-400">available once your public domain is set</span>
             )}{" "}
-            — submit to Google Search Console &amp; Bing Webmaster Tools so every job gets indexed.
+            — submit to Google Search Console &amp; Bing Webmaster Tools so search engines can discover and crawl your
+            jobs. Indexing and placement aren&apos;t guaranteed.
           </li>
           <li>
             <span className="font-medium text-zinc-900">Social cards:</span> job and careers pages include Open Graph /
