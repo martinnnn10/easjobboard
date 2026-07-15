@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FeedCard } from "@/components/FeedCard";
 import { requireOrgSession } from "@/lib/auth";
 import { getPublicBaseUrl, hasConfiguredPublicDomain } from "@/lib/env";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -11,17 +12,19 @@ const FEEDS = [
   {
     label: "Indeed feed",
     path: "/feed/indeed.xml",
-    description: "Register this feed URL with Indeed's XML feed program. After that, Indeed pulls updates on its own schedule.",
+    description:
+      "Register this URL with Indeed's XML feed program. After that, Indeed pulls updates on its own schedule.",
   },
   {
     label: "Job boards feed",
     path: "/feed/jobs.xml",
-    description: "The same link works for Jooble, Talent.com, Adzuna, and other boards — submit it once to each.",
+    description:
+      "Use this feed for job boards that accept a standard XML feed — Jooble, Talent.com, Adzuna, and others. Submit it once to each.",
   },
   {
     label: "Developer feed (JSON)",
     path: "/feed/jobs.json",
-    description: "For custom integrations — your live jobs as structured data.",
+    description: "Use this JSON feed for custom integrations or internal tooling.",
   },
 ];
 
@@ -65,30 +68,24 @@ export default async function SyndicationPage({ params }: PageProps) {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Your feeds</h2>
+        <p className="text-sm text-zinc-600">
+          Copy a feed URL and register it with the board — you don&apos;t need to open the raw feed to use it.
+        </p>
         <div className="grid gap-3">
           {FEEDS.map((feed) => (
-            <div key={feed.label} className="card space-y-1">
-              <p className="font-medium text-zinc-900">{feed.label}</p>
-              {domainReady ? (
-                <a
-                  href={url(feed.path)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block break-all text-sm text-brand-700 hover:underline"
-                >
-                  {url(feed.path)}
-                </a>
-              ) : (
-                <p className="text-sm text-zinc-400">Set your public domain in Settings to generate this URL.</p>
-              )}
-              <p className="text-xs text-zinc-500">{feed.description}</p>
-            </div>
+            <FeedCard
+              key={feed.label}
+              label={feed.label}
+              description={feed.description}
+              url={url(feed.path)}
+              ready={domainReady}
+            />
           ))}
           <div className="card space-y-1">
             <p className="font-medium text-zinc-900">Google for Jobs</p>
             <p className="text-sm text-zinc-600">
-              Structured data is embedded on every job page automatically. No feed to register — Google picks it up on
-              crawl once your careers pages are publicly reachable over HTTPS.
+              No feed to register — every published job page embeds JobPosting structured data, so listings become
+              eligible for Google Jobs once Google crawls the page. Placement isn&apos;t guaranteed.
             </p>
           </div>
         </div>

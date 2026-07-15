@@ -218,10 +218,10 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
             accent
           />
           <ActionCard
-            href={`/o/${orgSlug}/admin/jobs`}
+            href={`/o/${orgSlug}/admin/jobs?status=published`}
             label={`Open ${labels.jobsLower}`}
             value={publishedJobs.length}
-            hint="Live on your careers page →"
+            hint="Published roles candidates can apply to →"
           />
         </section>
       )}

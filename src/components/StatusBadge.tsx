@@ -6,10 +6,16 @@ const STYLES: Record<JobStatus, string> = {
   closed: "bg-red-100 text-red-800",
 };
 
+const LABELS: Record<JobStatus, string> = {
+  draft: "Draft",
+  published: "Published",
+  closed: "Closed",
+};
+
 export function StatusBadge({ status }: { status: JobStatus }) {
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STYLES[status]}`}>
-      {status}
+      {LABELS[status] ?? status}
     </span>
   );
 }

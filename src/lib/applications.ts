@@ -364,6 +364,11 @@ export function countApplicationsByOrganization(
   return row.count;
 }
 
+/** True if a job has at least one application — used for bulk-delete safety. */
+export function jobHasApplications(jobId: string): boolean {
+  return Boolean(getDb().prepare("SELECT 1 FROM applications WHERE job_id = ? LIMIT 1").get(jobId));
+}
+
 /**
  * Returns a count of applications in each pipeline stage for an organization.
  * Stages with no applications are included with a count of 0.
