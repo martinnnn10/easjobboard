@@ -76,6 +76,12 @@ export async function POST(request: Request, context: RouteContext) {
     const applicantLocation = String(formData.get("applicantLocation") ?? "").trim();
     const desiredPay = String(formData.get("desiredPay") ?? "").trim();
     const screenAnswersRaw = String(formData.get("screenAnswers") ?? "");
+    // Distribution attribution — where the applicant clicked through from.
+    const applySource = String(formData.get("source") ?? "").trim().slice(0, 60);
+    const referrer = String(formData.get("referrer") ?? "").trim().slice(0, 500);
+    const utmSource = String(formData.get("utm_source") ?? "").trim().slice(0, 120);
+    const utmMedium = String(formData.get("utm_medium") ?? "").trim().slice(0, 120);
+    const utmCampaign = String(formData.get("utm_campaign") ?? "").trim().slice(0, 120);
     const resume = formData.get("resume");
 
     if (!jobSlug || !name || !email) {
@@ -259,6 +265,11 @@ export async function POST(request: Request, context: RouteContext) {
       risk_level: risk.level,
       risk_flags: risk.flags,
       screen_summary: screenSummary,
+      apply_source: applySource,
+      referrer,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
     });
 
     if (screenResult) {

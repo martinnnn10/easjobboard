@@ -146,6 +146,12 @@ export type Application = {
   is_demo: boolean;
   /** How the application was created: 'applied' (public) or a manual/import source. */
   source: string;
+  /** Distribution attribution captured from the apply link (?source=…&utm_*=…). */
+  apply_source: string;
+  referrer: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
   created_at: string;
 };
 
@@ -789,6 +795,28 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "applications", "source")) {
     database.exec("ALTER TABLE applications ADD COLUMN source TEXT NOT NULL DEFAULT 'applied'");
   }
+  // Distribution attribution: where the applicant clicked through from, plus any
+  // UTM tags on the apply link. All optional (empty when applied directly).
+  for (const col of ["apply_source", "referrer", "utm_source", "utm_medium", "utm_campaign"]) {
+    if (!columnExists(database, "applications", col)) {
+      database.exec(`ALTER TABLE applications ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
+  // Manual distribution-status overrides per (job, channel) — e.g. an owner
+  // marking an Indeed feed "Registered". Absent rows fall back to the derived
+  // status (published ⇒ feed ready / eligible, etc.).
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS job_channel_status (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      job_id TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      status TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      updated_by TEXT NOT NULL DEFAULT ''
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_job_channel ON job_channel_status(job_id, channel);
+  `);
   // Candidate-level resume for imported/sourced people who never applied through
   // a public job page. Nullable — most sourced candidates have no resume.
   if (!columnExists(database, "candidates", "resume_filename")) {
@@ -1009,6 +1037,11 @@ export function rowToApplication(row: Record<string, unknown>): Application {
     screen_summary: parseJson<ScreenSummaryRecord | null>(row.screen_summary, null),
     is_demo: Number(row.is_demo ?? 0) === 1,
     source: (row.source as string | undefined) ?? "applied",
+    apply_source: (row.apply_source as string | undefined) ?? "",
+    referrer: (row.referrer as string | undefined) ?? "",
+    utm_source: (row.utm_source as string | undefined) ?? "",
+    utm_medium: (row.utm_medium as string | undefined) ?? "",
+    utm_campaign: (row.utm_campaign as string | undefined) ?? "",
     created_at: row.created_at as string,
   };
 }

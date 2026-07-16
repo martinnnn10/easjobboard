@@ -25,7 +25,7 @@ export async function GET(_request: Request, context: RouteContext) {
     return new Response("Job not found", { status: 404 });
   }
 
-  const target = getOrgJobUrl(orgSlug, job.slug);
+  const target = `${getOrgJobUrl(orgSlug, job.slug)}?source=qr`;
   const svg = await QRCode.toString(target, { type: "svg", margin: 1, width: 300 });
 
   return new Response(svg, {

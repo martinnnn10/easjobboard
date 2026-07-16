@@ -7,7 +7,10 @@ import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { getScreen, toPublicScreen } from "@/lib/screens";
 
-type PageProps = { params: Promise<{ orgSlug: string; jobSlug: string }> };
+type PageProps = {
+  params: Promise<{ orgSlug: string; jobSlug: string }>;
+  searchParams: Promise<{ source?: string; utm_source?: string; utm_medium?: string; utm_campaign?: string }>;
+};
 
 export async function generateMetadata({ params }: PageProps) {
   const { orgSlug, jobSlug } = await params;
@@ -45,13 +48,21 @@ export async function generateMetadata({ params }: PageProps) {
   };
 }
 
-export default async function OrgJobPage({ params }: PageProps) {
+export default async function OrgJobPage({ params, searchParams }: PageProps) {
   const { orgSlug, jobSlug } = await params;
   const organization = getOrganizationBySlug(orgSlug);
   if (!organization) notFound();
 
   const job = getJobByOrgAndSlug(organization.id, jobSlug);
   if (!job || job.status !== "published") notFound();
+
+  const sp = await searchParams;
+  const attribution = {
+    source: sp.source,
+    utm_source: sp.utm_source,
+    utm_medium: sp.utm_medium,
+    utm_campaign: sp.utm_campaign,
+  };
 
   const jsonLd = buildGoogleJobPostingJsonLd(organization, job);
   const template = getScreen(job.screen_key);
@@ -141,7 +152,13 @@ export default async function OrgJobPage({ params }: PageProps) {
         </article>
 
         <aside>
-          <ApplicationForm orgSlug={orgSlug} jobSlug={job.slug} jobTitle={job.title} screen={publicScreen} />
+          <ApplicationForm
+            orgSlug={orgSlug}
+            jobSlug={job.slug}
+            jobTitle={job.title}
+            screen={publicScreen}
+            attribution={attribution}
+          />
         </aside>
       </div>
     </div>

@@ -2,12 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AssignRecruiterSelect } from "@/components/AssignRecruiterSelect";
 import { ConfirmCareTaskPanel } from "@/components/ConfirmCareTaskPanel";
+import { DistributionPanel } from "@/components/DistributionPanel";
 import { ScheduleInterviewForm } from "@/components/ScheduleInterviewForm";
 import { StatusBadge } from "@/components/StatusBadge";
 import { APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { assignedCandidatesForJob, jobApplicants } from "@/lib/candidate-care";
 import { careTaskTypeLabel } from "@/lib/care-meta";
+import {
+  getJobDistribution,
+  getManualStatuses,
+  linkedInShareText,
+  manualPostingText,
+  sourcedJobUrl,
+} from "@/lib/distribution";
+import { getOrgUrl } from "@/lib/env";
 import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
@@ -44,6 +53,15 @@ export default async function JobDetailPage({ params }: PageProps) {
     .map((u) => ({ id: u.id, name: u.name }));
   const jobOption = [{ id: job.id, title: job.title }];
 
+  // Distribution status + source-tagged share links.
+  const distribution = getJobDistribution(job, getManualStatuses(job.id));
+  const distLinks = {
+    public: sourcedJobUrl(orgSlug, job.slug, "careers"),
+    apply: sourcedJobUrl(orgSlug, job.slug, "careers"),
+    flyer: `${getOrgUrl(orgSlug)}/jobs/${job.slug}/flyer`,
+  };
+  const feedUrl = `${getOrgUrl(orgSlug)}/feed/indeed.xml`;
+
   return (
     <div className="page-shell space-y-6">
       <div>
@@ -70,6 +88,18 @@ export default async function JobDetailPage({ params }: PageProps) {
           ) : null}
         </div>
       </div>
+
+      <DistributionPanel
+        orgSlug={orgSlug}
+        jobId={job.id}
+        writable={writable}
+        published={job.status === "published"}
+        channels={distribution}
+        links={distLinks}
+        feedUrl={feedUrl}
+        linkedInText={linkedInShareText(job, organization, orgSlug)}
+        manualPostingText={manualPostingText(job, organization, orgSlug)}
+      />
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Assigned candidates</h2>

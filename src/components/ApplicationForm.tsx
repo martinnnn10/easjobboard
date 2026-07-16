@@ -12,16 +12,25 @@ type ApplyReport = {
   strengths: string[];
 };
 
+export type ApplyAttribution = {
+  source?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+};
+
 export function ApplicationForm({
   orgSlug,
   jobSlug,
   jobTitle,
   screen,
+  attribution,
 }: {
   orgSlug: string;
   jobSlug: string;
   jobTitle: string;
   screen: PublicScreen | null;
+  attribution?: ApplyAttribution;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -79,6 +88,15 @@ export function ApplicationForm({
     if (submittingScreen && screen) {
       formData.append("screenKey", screen.key);
       formData.append("screenAnswers", JSON.stringify(answers));
+    }
+    // Distribution attribution: the source/UTM from the apply link plus the
+    // browser referrer, so the team can see which channel drove the apply.
+    if (attribution?.source) formData.append("source", attribution.source);
+    if (attribution?.utm_source) formData.append("utm_source", attribution.utm_source);
+    if (attribution?.utm_medium) formData.append("utm_medium", attribution.utm_medium);
+    if (attribution?.utm_campaign) formData.append("utm_campaign", attribution.utm_campaign);
+    if (typeof document !== "undefined" && document.referrer) {
+      formData.append("referrer", document.referrer);
     }
 
     const response = await fetch(`/api/o/${orgSlug}/apply`, {

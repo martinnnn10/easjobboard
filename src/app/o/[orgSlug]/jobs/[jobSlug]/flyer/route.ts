@@ -36,7 +36,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const job = getJobByOrgAndSlug(organization.id, jobSlug);
   if (!job || job.status !== "published") return new Response("Job not found", { status: 404 });
 
-  const applyUrl = getOrgJobUrl(orgSlug, job.slug);
+  const applyUrl = `${getOrgJobUrl(orgSlug, job.slug)}?source=flyer`;
   const brand = getBrandColor(organization);
   const salary = formatSalary(job.salary_min, job.salary_max, job.salary_period);
 

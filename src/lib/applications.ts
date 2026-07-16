@@ -47,6 +47,12 @@ export function createApplication(input: {
   created_at?: string;
   /** 'applied' (public) or a manual/import source. Marks the application. */
   source?: string;
+  /** Distribution attribution from the apply link. */
+  apply_source?: string;
+  referrer?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
   /** Actor for the timeline event (recruiter name for manual attaches). */
   actor?: string;
 }): Application {
@@ -74,12 +80,14 @@ export function createApplication(input: {
         id, organization_id, job_id, candidate_id, applicant_name, applicant_email, applicant_phone,
         cover_letter, resume_filename, resume_content_type, resume_data,
         resume_text, resume_skills, match_score, match_method, applicant_location, desired_pay,
-        screen_status, screen_score, screen_outcome, risk_level, risk_flags, screen_summary, source, created_at
+        screen_status, screen_score, screen_outcome, risk_level, risk_flags, screen_summary, source,
+        apply_source, referrer, utm_source, utm_medium, utm_campaign, created_at
       ) VALUES (
         @id, @organization_id, @job_id, @candidate_id, @applicant_name, @applicant_email, @applicant_phone,
         @cover_letter, @resume_filename, @resume_content_type, @resume_data,
         @resume_text, @resume_skills, @match_score, @match_method, @applicant_location, @desired_pay,
-        @screen_status, @screen_score, @screen_outcome, @risk_level, @risk_flags, @screen_summary, @source, @created_at
+        @screen_status, @screen_score, @screen_outcome, @risk_level, @risk_flags, @screen_summary, @source,
+        @apply_source, @referrer, @utm_source, @utm_medium, @utm_campaign, @created_at
       )`,
     )
     .run({
@@ -107,6 +115,11 @@ export function createApplication(input: {
       risk_flags: JSON.stringify(input.risk_flags ?? []),
       screen_summary: input.screen_summary ? JSON.stringify(input.screen_summary) : "",
       source,
+      apply_source: input.apply_source?.slice(0, 60) ?? "",
+      referrer: input.referrer?.slice(0, 500) ?? "",
+      utm_source: input.utm_source?.slice(0, 120) ?? "",
+      utm_medium: input.utm_medium?.slice(0, 120) ?? "",
+      utm_campaign: input.utm_campaign?.slice(0, 120) ?? "",
       created_at: input.created_at ?? nowIso(),
     });
 
