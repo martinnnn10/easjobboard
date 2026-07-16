@@ -185,6 +185,44 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
             )}
           </section>
 
+          {/* Applications by channel — apply-link attribution */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-zinc-900">Applications by channel</h2>
+            <p className="-mt-1 text-sm text-zinc-500">
+              Where applicants clicked through from, based on the source tag on the apply link (careers page, Indeed,
+              LinkedIn, QR, flyer). Direct applies with no tag roll up as “Direct / careers page”.
+            </p>
+            {r.byChannel.length === 0 ? (
+              <div className="card text-sm text-zinc-500">No applications in this range.</div>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Channel</th>
+                      <th className="px-4 py-3 text-right font-medium">Applications</th>
+                      <th className="px-4 py-3 text-right font-medium">Strong-fit</th>
+                      <th className="px-4 py-3 text-right font-medium">Strong-fit rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.byChannel.map((c) => {
+                      const rate = c.applicants === 0 ? 0 : Math.round((c.strongFit / c.applicants) * 100);
+                      return (
+                        <tr key={c.channel} className="border-b border-zinc-100 last:border-0">
+                          <td className="px-4 py-3 text-zinc-800">{c.label}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-zinc-700">{c.applicants}</td>
+                          <td className="px-4 py-3 text-right tabular-nums font-medium text-brand-700">{c.strongFit}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-zinc-600">{rate}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
           {/* Avg score by role */}
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Average skills score by role</h2>

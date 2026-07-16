@@ -80,6 +80,24 @@ export function resolveRange(
 
 export type SourceRow = { source: string; applicants: number; strongFit: number };
 export type RoleScoreRow = { job: string; avgScore: number; screened: number };
+/** Applications grouped by the apply-link attribution channel (?source=…). */
+export type ChannelRow = { channel: string; label: string; applicants: number; strongFit: number };
+
+/** Buyer-facing labels for the apply-link source channels. */
+const CHANNEL_LABELS: Record<string, string> = {
+  direct: "Direct / careers page",
+  careers: "Careers page",
+  google_jobs: "Google Jobs",
+  indeed: "Indeed",
+  linkedin: "LinkedIn",
+  ziprecruiter: "ZipRecruiter",
+  qr: "QR code",
+  flyer: "Flyer",
+};
+
+function channelLabel(channel: string): string {
+  return CHANNEL_LABELS[channel] ?? channel.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export type ReportData = {
   totalApplicants: number;
@@ -90,6 +108,7 @@ export type ReportData = {
   highRisk: number;
   avgScore: number | null;
   bySource: SourceRow[];
+  byChannel: ChannelRow[];
   avgScoreByRole: RoleScoreRow[];
   callsLogged: number;
   timeToFirstContactDays: number | null;
@@ -181,6 +200,31 @@ export function getReportData(organizationId: string, range: DateRange = {}, acc
   }>;
   const bySource: SourceRow[] = sourceRows.map((r) => ({
     source: r.source || "unknown",
+    applicants: r.applicants,
+    strongFit: r.strong ?? 0,
+  }));
+
+  // Applications grouped by the apply-link attribution channel (?source=…),
+  // scoped to the window and the jobs this viewer may see. Empty attribution
+  // (a direct apply) rolls up as "direct".
+  const channelRows = db
+    .prepare(
+      `SELECT COALESCE(NULLIF(apply_source, ''), 'direct') AS channel,
+              COUNT(*) AS applicants,
+              SUM(CASE WHEN screen_status = 'completed' AND screen_score >= ? AND risk_level != 'high' THEN 1 ELSE 0 END) AS strong
+       FROM applications
+       WHERE organization_id = ?${appRange.sql}${vis.clause}
+       GROUP BY channel
+       ORDER BY applicants DESC`,
+    )
+    .all(STRONG_FIT, organizationId, ...appRange.params, ...vis.params) as Array<{
+    channel: string;
+    applicants: number;
+    strong: number | null;
+  }>;
+  const byChannel: ChannelRow[] = channelRows.map((r) => ({
+    channel: r.channel,
+    label: channelLabel(r.channel),
     applicants: r.applicants,
     strongFit: r.strong ?? 0,
   }));
@@ -284,6 +328,7 @@ export function getReportData(organizationId: string, range: DateRange = {}, acc
     highRisk: funnel.high_risk ?? 0,
     avgScore: funnel.avg_score == null ? null : Math.round(funnel.avg_score),
     bySource,
+    byChannel,
     avgScoreByRole,
     callsLogged,
     timeToFirstContactDays,
@@ -298,9 +343,14 @@ export function getReportData(organizationId: string, range: DateRange = {}, acc
 
 /** Human labels + CSV rows for a report, used by the page and the export route. */
 export function reportToCsvRows(r: ReportData): Array<[string, string]> {
+  const channelRows: Array<[string, string]> = r.byChannel.map((c) => [
+    `Applications — ${c.label}`,
+    `${c.applicants} (${c.strongFit} strong-fit)`,
+  ]);
   return [
     ["Metric", "Value"],
     ["Applicants", String(r.totalApplicants)],
+    ...channelRows,
     ["Screened", String(r.screened)],
     ["Screen completion rate", r.screenCompletionRate === null ? "—" : `${r.screenCompletionRate}%`],
     ["Average skills score", r.avgScore === null ? "—" : String(r.avgScore)],
