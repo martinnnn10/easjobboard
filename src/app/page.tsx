@@ -1,43 +1,42 @@
 import Link from "next/link";
-import { ClaimVsProof } from "@/components/ScreenSignals";
+import { HeroShowcase } from "@/components/marketing/HeroShowcase";
 import { PricingTiers } from "@/components/marketing/PricingTiers";
 import { ProductPreviews } from "@/components/marketing/ProductPreviews";
 import { getPlatformEmail } from "@/lib/env";
 
-const VALUE_PROPS = [
-  {
-    title: "Practical skills screening",
-    body: "Applicants answer real maintenance, electrical, and controls scenarios — not keyword-stuffed resume fields. You see demonstrated ability, scored.",
-  },
-  {
-    title: "Call Queue ranked by ability",
-    body: "The strongest candidates surface first, with the recommended next action and one-tap call or email. No more scrolling a flat applicant list.",
-  },
-  {
-    title: "Resume Trap detection",
-    body: "Every candidate's resume keyword match is shown against their demonstrated score, so a great-on-paper / weak-in-practice applicant can't slip through.",
-  },
-  {
-    title: "Candidate intelligence profile",
-    body: "Strengths, risks, what to verify on the phone, and questions to ask the hiring manager — assembled from the screen, not guessed.",
-  },
-  {
-    title: "Interview kits for hiring managers",
-    body: "Hand a hiring manager or client a clean, redaction-ready summary of why this candidate is worth their time — generated in a click.",
-  },
-];
-
-const CATEGORIES = [
+const ROLE_CATEGORIES = [
   "Maintenance Technicians",
   "Industrial Electricians",
   "Controls / PLC Technicians",
   "Automation Engineers",
-  "Maintenance Managers",
   "Ammonia / Refrigeration",
-  "Food Manufacturing",
-  "Packaging",
-  "Plastics",
   "Plant Leadership",
+];
+
+const PROBLEMS = [
+  { t: "Resumes reward keywords", b: "A polished resume proves someone can describe the work — not that they can troubleshoot a live fault at 2am." },
+  { t: "Weak interviews burn hours", b: "Every 45-minute interview with a can't-do-the-work candidate is time your recruiters and hiring managers never get back." },
+  { t: "Manufacturing needs evidence", b: "Maintenance, controls, and electrical roles turn on practical judgment that a resume filter simply can't see." },
+  { t: "Recruiters need proof", b: "Agencies get one shot with a client — a submission needs demonstrated ability behind it, not just a strong-looking CV." },
+];
+
+const STEPS = [
+  { t: "Publish the role", b: "Post a manufacturing job to your EAS Recruit careers page in minutes, with the skills screen that fits the role." },
+  { t: "Capture applicants", b: "Resume-required applications arrive from your careers page, flyer, or QR — plus candidates you import or source." },
+  { t: "Run a practical screen", b: "Candidates answer real plant-floor scenarios. Every response is scored on demonstrated ability, not keywords." },
+  { t: "Rank who to call first", b: "The Call Queue surfaces the strongest candidates by ability and risk signals — the right first phone calls." },
+  { t: "Build the intelligence", b: "Candidate profiles and hiring-manager presentations assemble the evidence behind each call and submission." },
+  { t: "Keep follow-up on track", b: "Candidate Care keeps interviews, check-ins, and follow-ups from slipping through the cracks." },
+];
+
+const DIFFERENTIATORS: { icon: string; t: string; b: string }[] = [
+  { icon: "trap", t: "Resume Trap", b: "Spot candidates who look strong on paper but lack practical troubleshooting evidence — before you spend an interview." },
+  { icon: "screen", t: "Practical skills screens", b: "Let candidates show how they think through real maintenance, electrical, controls, and safety situations." },
+  { icon: "queue", t: "Ranked Call Queue", b: "Rank who deserves the first phone call based on demonstrated ability and risk signals — not resume keywords." },
+  { icon: "intel", t: "Candidate intelligence", b: "Strengths, risks, and what to verify on the phone — assembled from the screen, not guessed." },
+  { icon: "care", t: "Candidate Care", b: "Keep follow-ups, interviews, and check-ins from falling through the cracks after the first call." },
+  { icon: "kit", t: "Hiring-manager presentations", b: "Hand a hiring manager or client a clean, evidence-backed case for why a candidate is worth their time." },
+  { icon: "factory", t: "Built for manufacturing", b: "Screens and scoring shaped by real industrial hiring judgment — maintenance, controls, electrical, refrigeration, and operations." },
 ];
 
 const FAQS = [
@@ -46,55 +45,99 @@ const FAQS = [
     a: "It can be used standalone, but it's strongest as a manufacturing hiring intelligence layer — the part that tells you who can actually do the job before you interview.",
   },
   {
-    q: "Does this replace Indeed?",
-    a: "No. Indeed and other boards bring you applicants; EAS Recruit helps you qualify, rank, and manage them after they apply or are sourced.",
+    q: "How do jobs get distributed?",
+    a: "Published jobs go live on your EAS Recruit careers page and become eligible for Google Jobs once Google crawls them (JobPosting structured data + sitemap). You also get feed URLs that are ready for job boards that accept an XML feed. LinkedIn and ZipRecruiter are a manual share — we don't promise a board integration we haven't built.",
   },
   {
     q: "Is this for agencies or employers?",
-    a: "Both. Employers use it to hire faster with fewer wasted interviews; manufacturing recruiting agencies use it to prove candidate quality to clients before submitting.",
+    a: "Both. Employers hire faster with fewer wasted interviews; manufacturing recruiting agencies rank candidates, document the evidence, and build client-ready submissions before they submit.",
   },
   {
-    q: "What roles does it support?",
-    a: "Maintenance, controls, electrical, automation, refrigeration, and manufacturing leadership — skilled-trades roles where practical ability matters more than a resume.",
-  },
-  {
-    q: "How does Resume Trap work?",
+    q: "How does the Resume Trap work?",
     a: "Every candidate's resume keyword match is scored against how they actually perform on a practical skills screen. When the resume looks strong but the demonstrated score is low, that gap is the Resume Trap — surfaced before you spend an interview.",
   },
   {
     q: "Do candidates need to complete a skills screen?",
-    a: "That's the core signal, and it's short — a handful of real plant-floor scenarios that take a few minutes on a phone. You can also review applicants without a screen, but the screen is what powers the ranking.",
+    a: "That's the core signal, and it's short — a handful of real plant-floor scenarios that take a few minutes on a phone. You can review resume-only applicants too, but the screen is what powers the ranking.",
   },
   {
     q: "Is there a free trial?",
-    a: "Yes — a 14-day free trial, no credit card required. You can explore a labelled demo workspace or start with your real jobs right away.",
-  },
-  {
-    q: "Is my candidate data private?",
-    a: "Yes. Each organization's candidates, resumes, and screens are isolated to that workspace. Demo data is clearly labelled and never mixed into a real account.",
+    a: "Yes — a 14-day free trial, no credit card required. You can explore a clearly-labelled demo workspace or start with your real jobs right away.",
   },
 ];
+
+function FeatureIcon({ name, className }: { name: string; className?: string }) {
+  const paths: Record<string, React.ReactNode> = {
+    trap: (
+      <>
+        <path d="M12 3v6" />
+        <path d="M5 21a7 7 0 0 1 14 0" />
+        <path d="M8 9h8l-1.5 4.5a3 3 0 0 1-5 0z" />
+      </>
+    ),
+    screen: (
+      <>
+        <rect x="3" y="4" width="18" height="14" rx="2" />
+        <path d="M8 20h8M8 9l2 2-2 2M13 13h3" />
+      </>
+    ),
+    queue: (
+      <>
+        <path d="M4 7h10M4 12h7M4 17h4" />
+        <path d="M17.5 8.5 20 11l-2.5 2.5" />
+      </>
+    ),
+    intel: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v.01M11 12h1v4h1" />
+      </>
+    ),
+    care: (
+      <>
+        <path d="M12 21s-7-4.5-9.5-9A4.5 4.5 0 0 1 12 6.5 4.5 4.5 0 0 1 21.5 12c-2.5 4.5-9.5 9-9.5 9z" />
+        <path d="M3.5 12h4l1.5-3 2.5 5 1.5-3h4.5" />
+      </>
+    ),
+    kit: (
+      <>
+        <rect x="4" y="3" width="16" height="18" rx="2" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+      </>
+    ),
+    factory: (
+      <>
+        <path d="M3 21h18" />
+        <path d="M4 21V10l5 3V10l5 3V7l6 4v10" />
+        <path d="M8 21v-4M14 21v-4" />
+      </>
+    ),
+  };
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      {paths[name]}
+    </svg>
+  );
+}
 
 export default function HomePage() {
   const email = getPlatformEmail();
 
   return (
-    <div className="space-y-24 pb-24">
+    <div className="pb-24">
       {/* 1 — Hero */}
       <section className="hero-dark">
-        <div className="mx-auto w-full max-w-6xl px-4 py-20 md:py-28">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-400">
-              Manufacturing Hiring Intelligence
-            </p>
-            <h1 className="mt-4 text-4xl font-bold tracking-tight text-white md:text-5xl lg:text-6xl">
-              Stop interviewing candidates who only look good on paper.
+        <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 py-20 md:py-28 lg:grid-cols-[1.05fr_0.95fr]">
+          <div>
+            <p className="eyebrow text-brand-300">Manufacturing Hiring Intelligence</p>
+            <h1 className="mt-4 text-4xl font-bold leading-[1.05] tracking-tight text-white md:text-5xl lg:text-6xl">
+              Know who can actually do the job before you interview.
             </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg text-zinc-300">
-              EAS Recruit screens maintenance, electrical, controls, and manufacturing applicants for real-world
-              ability — so recruiters know who to call first.
+            <p className="mt-6 max-w-xl text-lg text-zinc-300">
+              EAS Recruit helps manufacturing teams and recruiting firms rank candidates by practical ability — not just
+              resume keywords. Traditional tools rank resumes. We rank demonstrated ability.
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/signup" className="btn-accent px-6 py-3 text-base">
                 Start free trial
               </Link>
@@ -106,179 +149,174 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="mt-6 text-sm text-zinc-400">
-              Built for maintenance, controls, automation, skilled trades, and manufacturing recruiting teams. No credit
-              card required to start.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 2 — Resume Trap */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label text-red-600">The Resume Trap</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">
-            The resume said 88. The skills screen said 9.
-          </h2>
-          <p className="mt-4 text-zinc-600">
-            Generic ATS tools reward keyword-heavy resumes. Skilled-trades candidates often have weak resumes but real
-            ability — and the polished resumes often can&apos;t do the work. EAS Recruit compares resume match against
-            demonstrated skill, so you see who is actually worth calling.
-          </p>
-        </div>
-
-        <div className="mt-10 grid gap-5 md:grid-cols-2">
-          <div className="card space-y-4 border-l-4 border-l-red-400">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-zinc-900">Candidate A</p>
-                <p className="text-xs text-zinc-500">Great on paper — can&apos;t do the work</p>
-              </div>
-              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
-                Resume Trap
-              </span>
-            </div>
-            <ClaimVsProof resumeMatch={88} screenScore={9} />
-            <p className="text-sm text-zinc-600">
-              Exactly who a keyword job board would have shortlisted first — and who would have cost you an interview.
+              14-day free trial · no credit card required. Built for maintenance, controls, automation, skilled trades,
+              and manufacturing recruiting teams.
             </p>
           </div>
 
-          <div className="card space-y-4 border-l-4 border-l-brand-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-zinc-900">Candidate B</p>
-                <p className="text-xs text-zinc-500">Weaker resume — strong demonstrated ability</p>
-              </div>
-              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
-                Call first
-              </span>
-            </div>
-            <ClaimVsProof resumeMatch={41} screenScore={86} />
-            <p className="text-sm text-zinc-600">
-              The candidate a resume filter buries — and the one your plant floor actually needs. EAS Recruit puts them
-              at the top of the queue.
-            </p>
+          <div className="flex justify-center lg:justify-end">
+            <HeroShowcase />
           </div>
         </div>
       </section>
 
-      {/* 3 — Product previews */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">See it in the product</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">
-            The decision layer on top of your applicants
-          </h2>
-          <p className="mt-4 text-zinc-600">
-            Ranked call queues, candidate intelligence, and interview kits — the working surfaces recruiters live in
-            every day.
-          </p>
-        </div>
-        <div className="mt-10">
-          <ProductPreviews />
-        </div>
-      </section>
-
-      {/* 4 — How it works */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">How it works</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">Three steps to your first call</h2>
-        </div>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {[
-            { n: "1", t: "Post or import a role", b: "Create a manufacturing job from a template or import one, and attach the skills screen that fits the role." },
-            { n: "2", t: "Candidates complete a practical screen", b: "Applicants answer real plant-floor scenarios. Every response is scored on demonstrated ability." },
-            { n: "3", t: "Call the strongest first", b: "Your Call Queue ranks candidates by ability with the recommended next action — so you spend time on the right people." },
-          ].map((s) => (
-            <div key={s.n} className="card space-y-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-lg font-bold text-white">
-                {s.n}
-              </span>
-              <h3 className="font-semibold text-zinc-900">{s.t}</h3>
-              <p className="text-sm text-zinc-600">{s.b}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 5 — Value props */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">Why EAS Recruit</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">
-            Not another ATS. A hiring intelligence layer.
-          </h2>
-        </div>
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {VALUE_PROPS.map((v) => (
-            <div key={v.title} className="card space-y-2">
-              <h3 className="font-semibold text-zinc-900">{v.title}</h3>
-              <p className="text-sm text-zinc-600">{v.body}</p>
-            </div>
-          ))}
-          <div className="flex flex-col justify-center rounded-2xl border border-brand-200 bg-brand-50 p-6">
-            <p className="text-lg font-bold text-brand-800">Know who can actually do the job</p>
-            <p className="mt-1 text-sm text-brand-800/80">— before you spend an hour interviewing them.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 6 — Built for manufacturing */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">Built for manufacturing hiring</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">
+      {/* 1b — Role strip (honest — capabilities, not customer logos) */}
+      <section className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 py-6 sm:flex-row sm:justify-between">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">
             Purpose-built for the roles that keep plants running
-          </h2>
-        </div>
-        <div className="mt-8 flex flex-wrap justify-center gap-2.5">
-          {CATEGORIES.map((c) => (
-            <span
-              key={c}
-              className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm"
-            >
-              {c}
-            </span>
-          ))}
-        </div>
-      </section>
-
-      {/* 7 — ROI */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="overflow-hidden rounded-3xl border border-zinc-200 bg-white">
-          <div className="grid gap-8 p-8 md:grid-cols-2 md:p-12">
-            <div className="space-y-4">
-              <p className="section-label text-brand-700">The ROI</p>
-              <h2 className="text-3xl font-bold tracking-tight text-zinc-900">Every bad interview costs your team time.</h2>
-              <p className="text-zinc-600">
-                If your team spends 30–60 minutes interviewing weak-fit candidates, every bad interview is time your
-                recruiters and hiring managers don&apos;t get back. EAS Recruit helps you screen them out before the
-                interview — so the meetings you take are with people who can do the job.
-              </p>
-            </div>
-            <div className="flex flex-col justify-center rounded-2xl bg-brand-50 p-8">
-              <p className="text-sm font-semibold uppercase tracking-wide text-brand-700">Interview-hours saved</p>
-              <p className="mt-2 text-4xl font-bold tracking-tight text-zinc-900">Fewer wasted hours</p>
-              <p className="mt-2 text-sm text-zinc-600">
-                The product tracks how many weak or high-risk candidates the screen filtered before anyone wasted an
-                interview — real numbers from your activity, never estimated.
-              </p>
-            </div>
+          </p>
+          <div className="flex flex-wrap justify-center gap-x-5 gap-y-1.5 text-sm font-medium text-zinc-500">
+            {ROLE_CATEGORIES.map((c) => (
+              <span key={c}>{c}</span>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 7b — Competitor comparison */}
-      <section className="mx-auto w-full max-w-4xl px-4">
+      {/* 2 — Problem */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-20">
+        <div className="max-w-2xl">
+          <p className="eyebrow">The problem</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
+            Resumes are noisy. Ability isn&apos;t.
+          </h2>
+          <p className="mt-4 text-lg text-zinc-600">
+            Keyword matches don&apos;t prove troubleshooting ability — and in manufacturing, that gap is expensive. The
+            candidates who read best on paper are often the ones who can&apos;t do the work.
+          </p>
+        </div>
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {PROBLEMS.map((p) => (
+            <div key={p.t} className="rounded-2xl border-l-4 border-l-red-300 bg-white p-5 shadow-sm">
+              <h3 className="font-semibold text-zinc-900">{p.t}</h3>
+              <p className="mt-2 text-sm text-zinc-600">{p.b}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 3 — How it works (connected workflow) */}
+      <section className="surface-steel border-y border-zinc-200">
+        <div className="mx-auto w-full max-w-6xl px-4 py-20">
+          <div className="max-w-2xl">
+            <p className="eyebrow">How it works</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
+              One connected workflow, from posting to the first call.
+            </h2>
+            <p className="mt-4 text-lg text-zinc-600">
+              Not a pile of disconnected features — a straight line from a published role to the candidate worth calling
+              first.
+            </p>
+          </div>
+          <ol className="mt-12 grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+            {STEPS.map((s, i) => (
+              <li key={s.t} className="relative">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white ring-4 ring-brand-100">
+                    {i + 1}
+                  </span>
+                  <span className="hidden h-px flex-1 bg-zinc-300 sm:block" />
+                </div>
+                <h3 className="mt-4 font-semibold text-zinc-900">{s.t}</h3>
+                <p className="mt-1.5 text-sm text-zinc-600">{s.b}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* 4 — Differentiators */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-20">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">Why not a generic ATS?</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">
+          <p className="eyebrow">Why EAS Recruit</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
+            A decision layer on top of your applicants.
+          </h2>
+          <p className="mt-4 text-lg text-zinc-600">
+            Every capability points at one outcome: knowing who&apos;s actually worth your team&apos;s time.
+          </p>
+        </div>
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {DIFFERENTIATORS.map((d) => (
+            <div key={d.t} className="feature-card">
+              <span className="icon-tile">
+                <FeatureIcon name={d.icon} className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 font-semibold text-zinc-900">{d.t}</h3>
+              <p className="mt-1.5 text-sm text-zinc-600">{d.b}</p>
+            </div>
+          ))}
+          <div className="flex flex-col justify-center rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white shadow-sm">
+            <p className="text-lg font-bold leading-snug">Know who can actually do the job</p>
+            <p className="mt-1 text-sm text-white/80">— before you spend an hour interviewing them.</p>
+            <Link href="/signup" className="btn-accent mt-4 w-fit px-4 py-2 text-sm">
+              Start free trial
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 5 — Audience split */}
+      <section className="mx-auto w-full max-w-6xl px-4 pb-20">
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="surface-panel flex flex-col p-8">
+            <p className="eyebrow">For manufacturing hiring teams</p>
+            <h3 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900">
+              Hire the people who keep the line running.
+            </h3>
+            <p className="mt-3 flex-1 text-zinc-600">
+              Find stronger maintenance, controls, engineering, and operations candidates without relying on resume
+              keywords alone — and stop losing interview hours to great-on-paper applicants.
+            </p>
+            <Link href="/signup" className="btn-primary mt-6 w-fit">
+              Start free trial
+            </Link>
+          </div>
+          <div className="surface-panel flex flex-col p-8">
+            <p className="eyebrow">For recruiting agencies</p>
+            <h3 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900">
+              Submit candidates with evidence behind them.
+            </h3>
+            <p className="mt-3 flex-1 text-zinc-600">
+              Rank candidates, document the demonstrated ability, and create client-ready submissions faster — so every
+              candidate you send carries proof, not just a polished resume.
+            </p>
+            <Link href="/book-demo" className="btn-secondary mt-6 w-fit">
+              Book a demo
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 6 — Product previews (real UI vocabulary) */}
+      <section className="surface-steel border-y border-zinc-200">
+        <div className="mx-auto w-full max-w-6xl px-4 py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="eyebrow">See it in the product</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
+              The working surfaces recruiters live in.
+            </h2>
+            <p className="mt-4 text-lg text-zinc-600">
+              Ranked call queues, candidate intelligence, skills-screen results, and claim-vs-proof — built from the real
+              product, not stock screenshots.
+            </p>
+          </div>
+          <div className="mt-12">
+            <ProductPreviews />
+          </div>
+        </div>
+      </section>
+
+      {/* 7 — Comparison */}
+      <section className="mx-auto w-full max-w-4xl px-4 py-20">
+        <div className="mx-auto max-w-2xl text-center">
+          <p className="eyebrow">Why not a generic ATS?</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
             EAS Recruit vs. a generic ATS or job board
           </h2>
         </div>
-        <div className="mt-8 overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
+        <div className="mt-10 overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
           <table className="min-w-full text-left text-sm">
             <thead className="border-b border-zinc-200 bg-zinc-50">
               <tr>
@@ -293,7 +331,7 @@ export default function HomePage() {
                 ["Resume Trap detection", true, false],
                 ["Ranked Call Queue", true, false],
                 ["Manufacturing-specific scoring", true, false],
-                ["Interview kits", true, false],
+                ["Hiring-manager presentations", true, false],
                 ["Candidate intelligence profile", true, false],
                 ["Job posting & applicant tracking", true, true],
               ].map(([label, eas, ats]) => (
@@ -312,25 +350,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 8 — Pricing */}
-      <section id="pricing" className="mx-auto w-full max-w-6xl px-4">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="section-label">Pricing</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">Simple, transparent pricing</h2>
-          <p className="mt-4 text-zinc-600">
-            Every plan starts with a 14-day free trial — no credit card required, cancel anytime.
-          </p>
-        </div>
-        <div className="mt-10">
-          <PricingTiers />
-        </div>
-      </section>
-
-      {/* 8b — Trust / founder */}
-      <section className="mx-auto w-full max-w-5xl px-4">
-        <div className="rounded-3xl border border-zinc-200 bg-white p-8 md:p-12">
-          <p className="section-label text-brand-700">Built from real manufacturing recruiting workflows</p>
-          <h2 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900">
+      {/* 8 — Proof / founder (honest) */}
+      <section className="mx-auto w-full max-w-5xl px-4 pb-20">
+        <div className="surface-panel p-8 md:p-12">
+          <p className="eyebrow">Built from real manufacturing recruiting workflows</p>
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 md:text-3xl">
             Made by operators who&apos;ve done this hiring themselves.
           </h2>
           <p className="mt-4 max-w-3xl text-zinc-600">
@@ -349,23 +373,41 @@ export default function HomePage() {
           </div>
           <p className="mt-4 text-xs text-zinc-400">
             Each organization&apos;s candidate data is private to that workspace. We don&apos;t publish customer names
-            without permission — so you won&apos;t find invented testimonials here.
+            without permission — so you won&apos;t find invented testimonials or logos here.
           </p>
         </div>
       </section>
 
-      {/* 9 — Trial band */}
-      <section className="mx-auto w-full max-w-6xl px-4">
-        <div className="hero-dark rounded-3xl px-8 py-14 text-center md:px-12">
-          <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-white">
-            Know who can actually do the job — before you interview.
+      {/* 9 — Pricing */}
+      <section id="pricing" className="surface-steel border-y border-zinc-200">
+        <div className="mx-auto w-full max-w-6xl px-4 py-20">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="eyebrow">Pricing</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">
+              Simple, transparent pricing.
+            </h2>
+            <p className="mt-4 text-lg text-zinc-600">
+              Every plan starts with a 14-day free trial — no credit card required, cancel anytime.
+            </p>
+          </div>
+          <div className="mt-12">
+            <PricingTiers />
+          </div>
+        </div>
+      </section>
+
+      {/* 10 — Closing CTA */}
+      <section className="mx-auto w-full max-w-6xl px-4 py-20">
+        <div className="hero-dark rounded-3xl px-8 py-16 text-center md:px-12">
+          <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-tight text-white md:text-4xl">
+            Start ranking candidates by demonstrated ability.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-zinc-300">
+          <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-300">
             Start your 14-day free trial and see your first ranked Call Queue this week.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/signup" className="btn-accent px-6 py-3 text-base">
-              Start your 14-day free trial
+              Start free trial
             </Link>
             <Link
               href="/book-demo"
@@ -377,11 +419,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 10 — FAQ */}
+      {/* 11 — FAQ */}
       <section className="mx-auto w-full max-w-3xl px-4">
         <div className="text-center">
-          <p className="section-label">FAQ</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900">Questions, answered</h2>
+          <p className="eyebrow">FAQ</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-zinc-900 md:text-4xl">Questions, answered</h2>
         </div>
         <dl className="mt-10 space-y-4">
           {FAQS.map((f) => (
