@@ -139,7 +139,7 @@ export function ApplicationForm({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="section-label">Your skills check</p>
+                <p className="eyebrow">Your skills check</p>
                 <p className="mt-1 text-sm text-zinc-600">Here&apos;s how you did — the hiring team sees this too.</p>
               </div>
               <span className={`inline-flex items-baseline gap-1 rounded-full px-3 py-1 text-lg font-bold ${band.cls}`}>
@@ -168,7 +168,8 @@ export function ApplicationForm({
   return (
     <form onSubmit={handleSubmit} className="card space-y-5">
       <div>
-        <h2 className="text-xl font-semibold text-zinc-900">Apply for {jobTitle}</h2>
+        <p className="eyebrow">Apply now</p>
+        <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-zinc-900">Apply for {jobTitle}</h2>
         <p className="mt-1 text-sm text-zinc-600">
           Your resume goes to the hiring team.
           {screen ? " An optional skills check below lets you show what you can actually do." : ""}
@@ -231,7 +232,7 @@ export function ApplicationForm({
       {screen ? (
         <div className="space-y-4 rounded-xl border border-brand-200 bg-brand-50/40 p-4">
           <div>
-            <p className="section-label text-brand-700">Optional skills check — answer these to stand out</p>
+            <p className="eyebrow">Optional skills check — answer these to stand out</p>
             <p className="mt-1 text-sm text-zinc-700">
               This short screen helps you show what you can actually do, even if your resume does not tell the full
               story. You can skip it, but candidates who complete it are highlighted for the recruiter.
@@ -249,7 +250,7 @@ export function ApplicationForm({
           ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-white">
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-brand-100">
                   <div
                     className="h-full rounded-full bg-brand-500 transition-all"
                     style={{ width: `${screen.questions.length ? (answeredCount / screen.questions.length) * 100 : 0}%` }}
