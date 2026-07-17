@@ -36,6 +36,25 @@ function isSessionRevoked(
 }
 
 /**
+ * Non-redirecting session check for the public auth pages. Returns the fully
+ * validated session (user + org still exist and the token isn't revoked) or
+ * null. Lets /login, /signup, and org admin login bounce an already
+ * authenticated user to their dashboard instead of re-showing the form.
+ */
+export async function getVerifiedSession(): Promise<OrgSessionResult | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  const session = await parseSessionToken(token);
+  if (!session) return null;
+
+  const user = getUserById(session.userId);
+  const organization = getOrganizationById(session.orgId);
+  if (!user || !organization || isSessionRevoked(user, session)) return null;
+
+  return { session, user, organization };
+}
+
+/**
  * For use in Server Components (pages). Redirects to login if unauthorized.
  */
 export async function requireOrgSession(orgSlug: string): Promise<OrgSessionResult> {

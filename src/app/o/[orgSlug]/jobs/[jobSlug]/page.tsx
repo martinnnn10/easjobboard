@@ -179,8 +179,20 @@ export default async function OrgJobPage({ params, searchParams }: PageProps) {
 
           <section>
             <h2 className="eyebrow mb-3" style={{ color: brandColor }}>About the role</h2>
-            <div className="prose prose-zinc max-w-none whitespace-pre-wrap leading-relaxed text-zinc-700">
-              {job.description}
+            {/* Split on blank lines into paragraphs for real spacing; keep single
+                line breaks (e.g. bullet lists) inside each via whitespace-pre-line.
+                Text is rendered as React children, so it is always escaped — a
+                description can never inject raw HTML. */}
+            <div className="max-w-none space-y-4 leading-relaxed text-zinc-700">
+              {job.description
+                .split(/\n{2,}/)
+                .map((para) => para.trim())
+                .filter(Boolean)
+                .map((para, index) => (
+                  <p key={index} className="whitespace-pre-line">
+                    {para}
+                  </p>
+                ))}
             </div>
           </section>
         </article>

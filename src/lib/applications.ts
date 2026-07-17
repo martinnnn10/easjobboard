@@ -3,6 +3,7 @@ import { recordCandidateEvent } from "./candidate-events";
 import { upsertCandidate } from "./candidates";
 import {
   getDb,
+  isOrgInDemoMode,
   rowToApplication,
   type Application,
   type ApplicationStatus,
@@ -15,6 +16,15 @@ import { canSeeJob, hiddenJobsSql, type JobAccess } from "./job-visibility";
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+/**
+ * SQL fragment that excludes seeded demo rows from a real workspace's counts and
+ * lists, but keeps them while the org is in demo mode. `col` lets callers use a
+ * table alias (e.g. "a.is_demo") in joined queries.
+ */
+function demoFilterSql(organizationId: string, col = "is_demo"): string {
+  return isOrgInDemoMode(organizationId) ? "" : ` AND ${col} = 0`;
 }
 
 export type ApplicationWithJob = Application & {
@@ -324,6 +334,8 @@ export function listApplicationsByOrganization(
     whereClause += vis.clause;
     params.push(...vis.params);
   }
+  // Hide seeded demo applications from real workspaces (kept in demo mode).
+  whereClause += demoFilterSql(organizationId, "a.is_demo");
   let limitClause = "";
   if (limit != null) {
     limitClause = " LIMIT ? OFFSET ?";
@@ -373,6 +385,7 @@ export function countApplicationsByOrganization(
   }
   sql += vis.clause;
   params.push(...vis.params);
+  sql += demoFilterSql(organizationId);
   const row = getDb().prepare(sql).get(...params) as { count: number };
   return row.count;
 }
@@ -450,7 +463,7 @@ export function getScreeningStats(organizationId: string, access?: JobAccess): S
          SUM(CASE WHEN resume_filename IS NOT NULL AND resume_filename != '' THEN 1 ELSE 0 END) AS resumes,
          SUM(CASE WHEN screen_status != 'completed' THEN 1 ELSE 0 END) AS resume_only,
          AVG(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN screen_score END) AS avg_score
-       FROM applications WHERE organization_id = ?${vis.clause}`,
+       FROM applications WHERE organization_id = ?${vis.clause}${demoFilterSql(organizationId)}`,
     )
     .get(STRONG_FIT, REVIEW_FLOOR, STRONG_FIT, organizationId, ...vis.params) as {
     screened: number | null;
@@ -475,18 +488,22 @@ export function getScreeningStats(organizationId: string, access?: JobAccess): S
 }
 
 /**
- * The single "worth a call" predicate, shared by the Call Queue page and the
- * dashboard's "N to work" card so the count and the list can never disagree:
- * a completed screen still in new/screening that cleared the review floor.
+ * "Worth a call" count for the dashboard's Call-first card. It must match what
+ * the Call Queue page actually lists, which is BOTH sections it renders while
+ * still in new/screening: screened candidates that cleared the review floor,
+ * PLUS resume-only applicants (a resume on file but no completed screen). Demo
+ * rows are excluded outside demo mode so the count matches the page exactly.
  */
 export function getCallQueueCount(organizationId: string, access?: JobAccess): number {
   const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
   const row = getDb()
     .prepare(
       `SELECT COUNT(*) AS count FROM applications
-       WHERE organization_id = ? AND screen_status = 'completed'
-         AND screen_score IS NOT NULL AND screen_score >= ?
-         AND status IN ('new','screening')${vis.clause}`,
+       WHERE organization_id = ? AND status IN ('new','screening')
+         AND (
+           (screen_status = 'completed' AND screen_score IS NOT NULL AND screen_score >= ?)
+           OR (screen_status != 'completed' AND resume_filename IS NOT NULL AND resume_filename != '')
+         )${vis.clause}${demoFilterSql(organizationId)}`,
     )
     .get(organizationId, REVIEW_FLOOR, ...vis.params) as { count: number };
   return row.count;

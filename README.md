@@ -71,3 +71,12 @@ Register each organization's feed URL with job boards after deploying to HTTPS:
 
 - SQLite database: `./data/jobs.db` (persist on your host)
 - Platform SMTP sends mail on behalf of EAS Recruit to each organization's configured inbox
+- After a new deployment, browser tabs left open on the old build may briefly show a
+  "Server Action" cache error on their next submit. This is stale client JavaScript, not a
+  server fault — a hard refresh (reload) clears it.
+
+## Billing
+
+Subscription/billing is per-organization and lives under `/o/{org-slug}/billing/*`
+(`checkout`, `portal`), with the Stripe webhook at `/api/stripe/webhook`. There are no
+top-level `/api/stripe/checkout|portal|status|team|grant-free` routes.

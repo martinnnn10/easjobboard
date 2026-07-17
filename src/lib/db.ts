@@ -921,6 +921,20 @@ export function getDb(): Database.Database {
   return db;
 }
 
+/**
+ * True when the organization is a demo workspace (its `organizations.is_demo`
+ * flag is set). Seeded demo applications/candidates carry `is_demo = 1`; count
+ * and list queries use this to include those rows only while the workspace is
+ * in demo mode, and exclude them from real workspaces so demo data never
+ * inflates the numbers a recruiter acts on.
+ */
+export function isOrgInDemoMode(organizationId: string): boolean {
+  const row = getDb()
+    .prepare("SELECT is_demo FROM organizations WHERE id = ?")
+    .get(organizationId) as { is_demo?: number } | undefined;
+  return Number(row?.is_demo ?? 0) === 1;
+}
+
 export function rowToOrganization(row: Record<string, unknown>): Organization {
   return {
     id: row.id as string,
