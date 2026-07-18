@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node scripts/smoke-test.mjs",
+    "backup": "node scripts/backup-db.mjs",
+    "email:test": "node scripts/send-test-email.mjs",
+    "deploy:build": "bash scripts/build-deploy.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

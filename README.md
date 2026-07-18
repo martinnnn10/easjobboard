@@ -77,6 +77,11 @@ Register each organization's feed URL with job boards after deploying to HTTPS:
 
 ## Billing
 
-Subscription/billing is per-organization and lives under `/o/{org-slug}/billing/*`
-(`checkout`, `portal`), with the Stripe webhook at `/api/stripe/webhook`. There are no
-top-level `/api/stripe/checkout|portal|status|team|grant-free` routes.
+Billing is served in **two places** today (see `DEPLOYMENT.md` → "Production entrypoint"):
+
+- **In the app source:** per-organization routes under `/o/{org-slug}/billing/*` (`checkout`, `portal`).
+- **In the production proxy (`start.js`, not in source):** the top-level `/api/stripe/checkout`,
+  `/api/stripe/portal`, `/api/stripe/status`, `/api/stripe/team`, `/api/stripe/grant-free`, and
+  `/api/stripe/webhook` routes, plus the `/subscription/paywall` gate. These run in the reverse
+  proxy that fronts the Next.js server in production and are **not reproducible from this repo yet.**
+  Reconciling the proxy paywall into the app is tracked as a follow-up (see DEPLOYMENT.md).
