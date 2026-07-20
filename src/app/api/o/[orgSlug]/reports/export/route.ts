@@ -1,5 +1,5 @@
 import { authErrorResponse } from "@/lib/api";
-import { requireOrgSession } from "@/lib/auth";
+import { requireOrgSessionApi } from "@/lib/auth";
 import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import {
@@ -25,7 +25,11 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const organization = getOrganizationBySlug(orgSlug);
     if (!organization) return new Response("Not found", { status: 404 });
-    const { user } = await requireOrgSession(orgSlug);
+    // API auth guard: throws "UNAUTHORIZED" for unauthenticated/foreign-org
+    // callers (→ 401 via authErrorResponse) instead of redirecting like the
+    // page guard, which previously fell through to a 500. Export runs only
+    // after auth succeeds.
+    const { user } = await requireOrgSessionApi(orgSlug);
 
     const url = new URL(request.url);
     const preset: RangePreset = isRangePreset(url.searchParams.get("range") ?? undefined)

@@ -52,6 +52,7 @@ export function DistributionPanel({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   async function setStatus(channel: string, status: string) {
     setBusy(channel);
@@ -72,57 +73,95 @@ export function DistributionPanel({
       <div>
         <h2 className="text-lg font-semibold text-zinc-900">Job distribution</h2>
         <p className="text-sm text-zinc-600">
-          Where this job is live, eligible, or needs a manual share. We don&apos;t claim a board auto-posts your job
-          unless a real integration confirms it.
+          Where this job is live, eligible, or needs a manual share. We don&apos;t claim a board auto-posts your job or
+          that Google indexed it unless it&apos;s been manually or externally confirmed.
         </p>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {channels.map((ch) => (
-          <div key={ch.channel} className="card space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-medium text-zinc-900">{ch.name}</p>
-              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONE_CLASS[ch.tone]}`}>
-                {ch.label}
-              </span>
-            </div>
-            <p className="text-xs text-zinc-500">{ch.detail}</p>
-            {writable && published && ch.manualOptions.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                <span className="text-[11px] uppercase tracking-wide text-zinc-400">Mark:</span>
-                {ch.manualOptions.map((opt) => {
-                  const active = ch.manual === opt.value;
-                  return (
+      {/* Compact summary — always visible */}
+      <div className="card space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium text-zinc-900">Channel status</p>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-sm font-medium text-brand-700 hover:text-brand-800"
+            aria-expanded={expanded}
+          >
+            {expanded ? "Hide channels" : "View all channels"}
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {channels.map((ch) => (
+            <span
+              key={ch.channel}
+              className="inline-flex items-center gap-1.5 rounded-full bg-zinc-50 px-2.5 py-1 text-xs ring-1 ring-zinc-200"
+            >
+              <span className="font-medium text-zinc-700">{ch.name}</span>
+              <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${TONE_CLASS[ch.tone]}`}>{ch.label}</span>
+            </span>
+          ))}
+        </div>
+        {/* Legend */}
+        <dl className="grid gap-x-4 gap-y-1 border-t border-zinc-100 pt-3 text-[11px] text-zinc-500 sm:grid-cols-2 lg:grid-cols-3">
+          <LegendItem term="Live" tone="live" def="confirmed on your EAS Recruit careers page" />
+          <LegendItem term="Eligible" tone="eligible" def="technical requirements are in place" />
+          <LegendItem term="Feed ready" tone="ready" def="job is included in a board feed" />
+          <LegendItem term="Manually marked" tone="off" def="team-recorded status" />
+          <LegendItem term="Live confirmed" tone="live" def="team verified the external listing" />
+          <LegendItem term="Manual share required" tone="ready" def="no auto-posting — share the link yourself" />
+        </dl>
+      </div>
+
+      {/* Expandable per-channel detail + controls */}
+      {expanded ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {channels.map((ch) => (
+            <div key={ch.channel} className="card space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-zinc-900">{ch.name}</p>
+                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONE_CLASS[ch.tone]}`}>
+                  {ch.label}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-500">{ch.detail}</p>
+              {writable && published && ch.manualOptions.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] uppercase tracking-wide text-zinc-400">Mark:</span>
+                  {ch.manualOptions.map((opt) => {
+                    const active = ch.manual === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={busy === ch.channel}
+                        onClick={() => setStatus(ch.channel, active ? "" : opt.value)}
+                        className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                          active
+                            ? "border-brand-600 bg-brand-600 text-white"
+                            : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                  {ch.manual ? (
                     <button
-                      key={opt.value}
                       type="button"
                       disabled={busy === ch.channel}
-                      onClick={() => setStatus(ch.channel, active ? "" : opt.value)}
-                      className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                        active
-                          ? "border-brand-600 bg-brand-600 text-white"
-                          : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
-                      }`}
+                      onClick={() => setStatus(ch.channel, "")}
+                      className="text-xs text-zinc-500 hover:text-zinc-800"
                     >
-                      {opt.label}
+                      Reset manual status
                     </button>
-                  );
-                })}
-                {ch.manual ? (
-                  <button
-                    type="button"
-                    disabled={busy === ch.channel}
-                    onClick={() => setStatus(ch.channel, "")}
-                    className="text-xs text-zinc-500 hover:text-zinc-800"
-                  >
-                    Reset to auto
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {/* Share + copy actions */}
       <div className="card space-y-3">
@@ -139,6 +178,17 @@ export function DistributionPanel({
         </div>
       </div>
     </section>
+  );
+}
+
+function LegendItem({ term, tone, def }: { term: string; tone: StatusTone; def: string }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className={`mt-0.5 inline-block h-2 w-2 shrink-0 rounded-full ${TONE_CLASS[tone].split(" ")[0]}`} aria-hidden />
+      <span>
+        <span className="font-medium text-zinc-700">{term}</span> = {def}
+      </span>
+    </div>
   );
 }
 

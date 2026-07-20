@@ -57,11 +57,11 @@ const TONE_FOR: Record<string, StatusTone> = {
 const LABELS: Record<string, string> = {
   live: "Live",
   live_confirmed: "Live confirmed",
-  posted: "Posted",
+  posted: "Manually posted",
   indexed: "Indexed",
   eligible: "Eligible",
   submitted: "Submitted",
-  registered: "Registered",
+  registered: "Feed registered",
   api_connected: "API connected",
   feed_ready: "Feed ready",
   manual_share_required: "Manual share required",
@@ -69,6 +69,36 @@ const LABELS: Record<string, string> = {
   not_eligible: "Not eligible",
   not_connected: "Not connected",
   not_ready: "Not ready",
+};
+
+/**
+ * Buyer-facing BADGE label for a manual (team-recorded) status, per channel.
+ * The same value (e.g. "submitted") reads differently by channel — "Indexing
+ * requested" for Google, "Feed submitted" for XML boards — and team-set states
+ * are tagged "· Manually marked" so they can't be mistaken for a verified
+ * automatic post. "Live confirmed" means a human verified the external listing.
+ */
+const CHANNEL_MANUAL_LABELS: Record<DistributionChannel, Record<string, string>> = {
+  careers: {},
+  google_jobs: { submitted: "Indexing requested · Manually marked", indexed: "Indexed · Manually marked" },
+  indeed: { registered: "Feed registered · Manually marked", live_confirmed: "Live confirmed" },
+  job_boards: { submitted: "Feed submitted · Manually marked", live_confirmed: "Live confirmed" },
+  linkedin: { posted: "Manually posted" },
+  ziprecruiter: { posted: "Manually posted" },
+};
+
+/**
+ * Short label shown on each manual CONTROL chip, per channel (the panel prefixes
+ * it with "Mark:" → e.g. "Mark: Indexing requested"). Explicit, never claiming
+ * automatic posting or that a board indexed the job.
+ */
+const CHANNEL_CONTROL_LABELS: Record<DistributionChannel, Record<string, string>> = {
+  careers: {},
+  google_jobs: { submitted: "Indexing requested", indexed: "Indexed" },
+  indeed: { registered: "Feed registered", live_confirmed: "Live confirmed" },
+  job_boards: { submitted: "Feed submitted", live_confirmed: "Live confirmed" },
+  linkedin: { posted: "Manually posted" },
+  ziprecruiter: { posted: "Manually posted" },
 };
 
 // Manual statuses each channel exposes to owners. Deliberately excludes states
@@ -145,14 +175,23 @@ function view(
   detail: string,
   manual: string | null,
 ): ChannelView {
+  // When the effective status IS the team's manual override, use the
+  // channel-aware "· Manually marked" label; otherwise the system-derived one.
+  const isManual = manual != null && status === manual;
+  const label = isManual
+    ? CHANNEL_MANUAL_LABELS[channel][status] ?? LABELS[status] ?? status
+    : LABELS[status] ?? status;
   return {
     channel,
     name,
     status,
-    label: LABELS[status] ?? status,
+    label,
     tone: TONE_FOR[status] ?? "off",
     detail,
-    manualOptions: MANUAL_OPTIONS[channel].map((v) => ({ value: v, label: LABELS[v] ?? v })),
+    manualOptions: MANUAL_OPTIONS[channel].map((v) => ({
+      value: v,
+      label: CHANNEL_CONTROL_LABELS[channel][v] ?? LABELS[v] ?? v,
+    })),
     manual,
   };
 }
