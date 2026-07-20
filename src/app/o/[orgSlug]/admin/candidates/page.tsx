@@ -97,9 +97,14 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
             </p>
           </div>
           {writable ? (
-            <Link href={`/o/${orgSlug}/admin/candidates/new`} className="btn-primary shrink-0">
-              + Add candidate
-            </Link>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <Link href={`/o/${orgSlug}/admin/candidates/import`} className="btn-secondary">
+                Import CSV
+              </Link>
+              <Link href={`/o/${orgSlug}/admin/candidates/new`} className="btn-primary">
+                + Add candidate
+              </Link>
+            </div>
           ) : null}
         </div>
       </div>
@@ -201,7 +206,33 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
       </form>
 
       {candidates.length === 0 ? (
-        <div className="card text-zinc-600">No candidates match your filters.</div>
+        <div className="card mx-auto max-w-lg space-y-2 py-12 text-center">
+          {hasFilters || view !== "all" ? (
+            <>
+              <h2 className="text-lg font-semibold text-zinc-900">No candidates match this view</h2>
+              <p className="text-sm text-zinc-600">
+                Try the <span className="font-medium text-zinc-800">All candidates</span> tab or clear your filters.
+              </p>
+              <Link href={`/o/${orgSlug}/admin/candidates`} className="btn-secondary mx-auto mt-2 text-sm">
+                Clear filters
+              </Link>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold text-zinc-900">Your candidate pool is empty</h2>
+              <p className="text-sm text-zinc-600">
+                Add a candidate by hand, or import a CSV export from Indeed or your ATS. Imported people become rankable
+                by demonstrated ability once you send them a skills screen.
+              </p>
+              {writable ? (
+                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                  <Link href={`/o/${orgSlug}/admin/candidates/import`} className="btn-primary text-sm">Import candidates</Link>
+                  <Link href={`/o/${orgSlug}/admin/candidates/new`} className="btn-secondary text-sm">Add one candidate</Link>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       ) : (
         <div className="space-y-3">
           {candidates.map((candidate) => (

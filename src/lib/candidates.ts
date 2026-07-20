@@ -470,6 +470,41 @@ export function setCandidateCrmStatus(id: string, organizationId: string, status
   return result.changes > 0;
 }
 
+/**
+ * Fill ONLY currently-empty fields on an existing candidate from imported data
+ * (the "update missing fields only" import strategy). Never overwrites data the
+ * recruiter already has. Returns the list of fields that were filled.
+ */
+export function updateCandidateMissingFields(
+  id: string,
+  organizationId: string,
+  incoming: { phone?: string; location?: string; title?: string; company?: string },
+): string[] {
+  const database = getDb();
+  const row = database
+    .prepare("SELECT phone, location, title, company FROM candidates WHERE id = ? AND organization_id = ?")
+    .get(id, organizationId) as { phone?: string; location?: string; title?: string; company?: string } | undefined;
+  if (!row) return [];
+
+  const filled: string[] = [];
+  const sets: string[] = [];
+  const values: string[] = [];
+  for (const key of ["phone", "location", "title", "company"] as const) {
+    const current = String(row[key] ?? "").trim();
+    const next = String(incoming[key] ?? "").trim();
+    if (!current && next) {
+      sets.push(`${key} = ?`);
+      values.push(next);
+      filled.push(key);
+    }
+  }
+  if (sets.length === 0) return [];
+  database
+    .prepare(`UPDATE candidates SET ${sets.join(", ")}, updated_at = ? WHERE id = ? AND organization_id = ?`)
+    .run(...values, nowIso(), id, organizationId);
+  return filled;
+}
+
 // ─── Sourced / passive candidates ──────────────────────────────────────────
 
 export type DuplicateMatch = {

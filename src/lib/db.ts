@@ -817,6 +817,28 @@ function initDb(database: Database.Database): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_job_channel ON job_channel_status(job_id, channel);
   `);
+  // Import Center batch records — one row per bulk CSV import, for an audit
+  // trail and the post-import summary. Never stores third-party credentials.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS import_batches (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT '',
+      source_label TEXT NOT NULL DEFAULT '',
+      filename TEXT NOT NULL DEFAULT '',
+      imported_by TEXT NOT NULL DEFAULT '',
+      imported_by_name TEXT NOT NULL DEFAULT '',
+      attached_job_id TEXT NOT NULL DEFAULT '',
+      attached_job_title TEXT NOT NULL DEFAULT '',
+      total_rows INTEGER NOT NULL DEFAULT 0,
+      created_count INTEGER NOT NULL DEFAULT 0,
+      updated_count INTEGER NOT NULL DEFAULT 0,
+      skipped_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_import_batches_org ON import_batches(organization_id);
+  `);
   // Candidate-level resume for imported/sourced people who never applied through
   // a public job page. Nullable — most sourced candidates have no resume.
   if (!columnExists(database, "candidates", "resume_filename")) {
