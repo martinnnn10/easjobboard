@@ -75,14 +75,27 @@ echo "    verified: no database in the zip"
 step "6. Boot the bundle on a throwaway DB and run smoke tests (port ${VERIFY_PORT})"
 SRV_PID=""
 cleanup() {
-  [ -n "$SRV_PID" ] && kill "$SRV_PID" 2>/dev/null || true
+  # `node server.js` forks a next-server worker that binds the port. Because the
+  # launch below uses `exec`, SRV_PID *is* node and the worker is its direct
+  # child — reap the worker first, then node, or the worker orphans and keeps
+  # the port (→ EADDRINUSE on the next run).
+  if [ -n "$SRV_PID" ]; then
+    pkill -TERM -P "$SRV_PID" 2>/dev/null || true
+    kill "$SRV_PID" 2>/dev/null || true
+  fi
   rm -rf "$BUNDLE/data"   # remove the throwaway DB created during verification
 }
 trap cleanup EXIT
 
+# Pre-flight: free the port if a stale verifier from a previous run still holds
+# it, so this run doesn't silently smoke-test the wrong (orphaned) server.
+command -v fuser >/dev/null 2>&1 && fuser -k "${VERIFY_PORT}/tcp" 2>/dev/null || true
+
+# `exec` replaces the subshell with node, so SRV_PID tracks node itself (not the
+# subshell) — cleanup can then reliably reap node and its next-server worker.
 ( cd "$BUNDLE" && PORT="$VERIFY_PORT" HOSTNAME=127.0.0.1 \
     AUTH_SECRET="deploy-verify-secret" GIT_COMMIT="$COMMIT" \
-    node server.js >"$REPO/$OUT_DIR/verify-server.log" 2>&1 ) &
+    exec node server.js >"$REPO/$OUT_DIR/verify-server.log" 2>&1 ) &
 SRV_PID=$!
 
 # Wait for the app; /api/health also initialises the DB schema.
