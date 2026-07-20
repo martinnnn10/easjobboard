@@ -10,7 +10,7 @@ import {
 const STYLES: Record<ApplicationStatus, string> = {
   new: "bg-sky-50 text-sky-700 border-sky-200",
   screening: "bg-amber-50 text-amber-700 border-amber-200",
-  interview: "bg-violet-50 text-violet-700 border-violet-200",
+  interview: "bg-slate-100 text-slate-700 border-slate-300",
   offer: "bg-teal-50 text-teal-700 border-teal-200",
   hired: "bg-green-50 text-green-700 border-green-200",
   rejected: "bg-red-50 text-red-700 border-red-200",

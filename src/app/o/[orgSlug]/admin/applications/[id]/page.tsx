@@ -421,7 +421,9 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
           <section className="card space-y-4">
             <h2 className="text-lg font-semibold text-zinc-900">Activity</h2>
             {events.length === 0 ? (
-              <p className="text-sm text-zinc-500">No activity yet.</p>
+              <p className="text-sm text-zinc-500">
+                No activity yet. Calls, notes, stage changes, and emails will appear here as a timeline.
+              </p>
             ) : (
               <ol className="space-y-4">
                 {events.map((event) => (

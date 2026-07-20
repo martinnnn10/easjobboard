@@ -154,7 +154,9 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold text-zinc-900">Applicants by source</h2>
             {r.bySource.length === 0 ? (
-              <div className="card text-sm text-zinc-500">No candidates added in this range.</div>
+              <div className="card text-sm text-zinc-500">
+                No candidates added in this date range. Try a wider range, or import candidates to build your pool.
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
                 <table className="min-w-full text-left text-sm">
@@ -193,7 +195,9 @@ export default async function ReportsPage({ params, searchParams }: PageProps) {
               LinkedIn, QR, flyer). Direct applies with no tag roll up as “Direct / careers page”.
             </p>
             {r.byChannel.length === 0 ? (
-              <div className="card text-sm text-zinc-500">No applications in this range.</div>
+              <div className="card text-sm text-zinc-500">
+                No applications in this date range. Widen the range, or share your job links to start capturing applies.
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
                 <table className="min-w-full text-left text-sm">

@@ -576,7 +576,9 @@ export default async function CandidateProfilePage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-zinc-900">Timeline</h2>
             {writable ? <CandidateNoteForm orgSlug={orgSlug} candidateId={candidate.id} /> : null}
             {events.length === 0 ? (
-              <p className="text-sm text-zinc-500">No activity yet.</p>
+              <p className="text-sm text-zinc-500">
+                No activity yet. Log a call or add a note above to start this candidate&apos;s timeline.
+              </p>
             ) : (
               <ul className="space-y-3">
                 {events.map((event) => (

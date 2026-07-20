@@ -58,9 +58,12 @@ export default async function PipelinePage({ params }: PageProps) {
       </div>
 
       {cards.length === 0 ? (
-        <div className="card text-zinc-600">
-          No applications yet. Once candidates apply, they&apos;ll appear here as cards you can move through your
-          hiring stages.
+        <div className="card space-y-1 py-10 text-center">
+          <p className="font-medium text-zinc-800">No applications yet</p>
+          <p className="mx-auto max-w-md text-sm text-zinc-600">
+            Once candidates apply, they&apos;ll appear here as cards you can drag through your hiring stages —
+            ranked by practical skills score within each stage.
+          </p>
         </div>
       ) : (
         <PipelineBoard orgSlug={orgSlug} initialCards={cards} readOnly={!writable} />
