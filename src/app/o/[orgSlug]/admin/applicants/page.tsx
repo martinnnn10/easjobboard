@@ -1,17 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
-import { BadgeRow, ScreenScoreBadge } from "@/components/ScreenSignals";
-import {
-  countApplicationsByOrganization,
-  listApplicationsByOrganization,
-} from "@/lib/applications";
+import { BadgeRow, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
+import { countApplicationsByOrganization, listApplicationsByOrganization } from "@/lib/applications";
 import { requireOrgSession } from "@/lib/auth";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
-import { badgesForApplication } from "@/lib/candidate-intel";
+import { badgesForApplication, deriveRecommendedAction, normalizeRiskLevel } from "@/lib/candidate-intel";
 import { getJobAccess } from "@/lib/job-visibility";
 import { getOrganizationBySlug, getOrgLabels } from "@/lib/organizations";
 import { canViewResumes, canWrite } from "@/lib/roles";
+
+function appliedAgo(iso: string): string {
+  const days = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+  return days === 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`;
+}
 
 const PAGE_SIZE = 25;
 
@@ -77,7 +79,7 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   return (
     <div className="page-shell space-y-6">
       <div>
-        <Link href={`/o/${orgSlug}/admin`} className="text-sm text-blue-600 hover:underline">
+        <Link href={`/o/${orgSlug}/admin`} className="text-sm font-medium text-brand-700 hover:underline">
           ← Back to admin
         </Link>
         <h1 className="mt-2 text-3xl font-bold text-zinc-900">{labels.applicants}</h1>
@@ -107,63 +109,90 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
       </div>
 
       {applicants.length === 0 ? (
-        <div className="card text-zinc-600">
-          {filter === "knockout"
-            ? `No auto-screened-out ${labels.applicantSingular}s.`
-            : filter === "qualified"
-              ? `No qualified ${labels.applicantSingular}s yet.`
-              : filter === "resume_only"
-                ? `No resume-only ${labels.applicantSingular}s — everyone has completed a skills screen.`
-                : "No applications yet."}
+        <div className="card space-y-1 py-10 text-center">
+          <p className="font-medium text-zinc-800">
+            {filter === "knockout"
+              ? `No auto-screened-out ${labels.applicantSingular}s`
+              : filter === "qualified"
+                ? `No qualified ${labels.applicantSingular}s yet`
+                : filter === "resume_only"
+                  ? `No resume-only ${labels.applicantSingular}s`
+                  : "No applications yet"}
+          </p>
+          <p className="mx-auto max-w-md text-sm text-zinc-600">
+            {filter === "knockout"
+              ? "Nobody has been screened out by a job's must-pass rules."
+              : filter === "qualified"
+                ? "Candidates who clear a skills screen's must-pass rules land here, ranked by practical score."
+                : filter === "resume_only"
+                  ? "Everyone who has applied has completed a skills screen — applicants without one show up here."
+                  : "Share a job link or import candidates, and applicants will appear here ranked by practical skills score — who can actually do the work."}
+          </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
-              <tr>
-                <th className="px-4 py-3 font-medium">Applicant</th>
-                <th className="px-4 py-3 font-medium">Job</th>
-                <th className="px-4 py-3 font-medium">Skills screen</th>
-                <th className="px-4 py-3 font-medium">Signals</th>
-                <th className="px-4 py-3 font-medium">Stage</th>
-                <th className="px-4 py-3 font-medium">Applied</th>
-                <th className="px-4 py-3 font-medium">Resume</th>
-              </tr>
-            </thead>
-            <tbody>
-              {applicants.map((application) => (
-                <tr key={application.id} className="border-b border-zinc-100 last:border-0">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/o/${orgSlug}/admin/applications/${application.id}`}
-                      className="font-medium text-zinc-900 hover:text-blue-700"
-                    >
-                      {application.applicant_name}
-                    </Link>
-                    <div className="text-zinc-500">{application.applicant_email}</div>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">{application.job_title}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <ScreenScoreBadge score={application.screen_score} status={application.screen_status} />
+        <div className="space-y-3">
+          {applicants.map((application) => {
+            const risk = normalizeRiskLevel(application.risk_level);
+            const action =
+              application.screen_summary?.recommendedAction ??
+              deriveRecommendedAction(application.screen_score, application.screen_status, risk);
+            const topSignal = application.screen_summary?.strengths?.[0] ?? null;
+            const topRisk = application.risk_flags?.[0]?.label ?? null;
+            return (
+              <div key={application.id} className="card space-y-3">
+                <div className="flex flex-wrap items-start gap-4">
+                  <div className="flex-none pt-0.5">
+                    <ScreenScoreBadge
+                      score={application.screen_score}
+                      status={application.screen_status}
+                      size="lg"
+                    />
+                  </div>
+
+                  <div className="min-w-[15rem] flex-1 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/o/${orgSlug}/admin/applications/${application.id}`}
+                        className="font-semibold text-zinc-900 hover:text-brand-700"
+                      >
+                        {application.applicant_name}
+                      </Link>
                       {application.screen_outcome === "knockout" ? (
                         <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                          Knockout
+                          Auto-screened out
                         </span>
                       ) : application.screen_outcome === "qualified" ? (
                         <span className="inline-flex rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-800">
                           Qualified
                         </span>
                       ) : null}
+                      {risk !== "low" ? <RiskPill level={risk} /> : null}
                     </div>
-                    <div className="mt-1 text-[11px] text-zinc-400">
-                      {application.match_score === null ? "" : `Resume kw: ${application.match_score}%`}
+                    <p className="text-xs text-zinc-500">
+                      {application.job_title}
+                      {application.applicant_location ? ` · ${application.applicant_location}` : ""}
+                      {application.desired_pay ? ` · wants ${application.desired_pay}` : ""}
+                      {" · applied "}
+                      {appliedAgo(application.created_at)}
+                    </p>
+                    <p className="text-sm font-medium text-zinc-800">{action}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                      {topSignal ? (
+                        <span className="text-brand-700">
+                          <span className="font-semibold">Signal:</span> {topSignal}
+                        </span>
+                      ) : null}
+                      {topRisk ? (
+                        <span className="text-red-600">
+                          <span className="font-semibold">Risk:</span> {topRisk}
+                        </span>
+                      ) : null}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <BadgeRow badges={badgesForApplication(application)} max={3} />
-                  </td>
-                  <td className="px-4 py-3">
+                    <BadgeRow badges={badgesForApplication(application)} max={4} />
+                    <p className="text-xs text-zinc-400">{application.applicant_email}</p>
+                  </div>
+
+                  <div className="flex flex-none flex-col items-start gap-2 sm:items-end">
                     {writable ? (
                       <ApplicationStatusSelect
                         orgSlug={orgSlug}
@@ -175,21 +204,21 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                         {APPLICATION_STATUS_LABELS[application.status] ?? application.status}
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">{new Date(application.created_at).toLocaleString()}</td>
-                  <td className="px-4 py-3">
                     {resumesOk ? (
-                      <a href={`/api/o/${orgSlug}/applications/${application.id}/resume`} className="text-blue-600 hover:underline">
-                        {application.resume_filename}
+                      <a
+                        href={`/api/o/${orgSlug}/applications/${application.id}/resume`}
+                        className="text-xs font-medium text-brand-700 hover:underline"
+                      >
+                        Resume ↓
                       </a>
                     ) : (
-                      <span className="text-xs text-zinc-400">Restricted</span>
+                      <span className="text-xs text-zinc-400">Resume restricted</span>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

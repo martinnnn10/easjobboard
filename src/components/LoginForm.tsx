@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 export function LoginForm({ nextPath, orgSlug }: { nextPath?: string; orgSlug?: string }) {
@@ -90,6 +91,13 @@ export function LoginForm({ nextPath, orgSlug }: { nextPath?: string; orgSlug?: 
       <button type="submit" disabled={loading} className="btn-primary w-full">
         {loading ? "Signing in..." : "Sign in"}
       </button>
+
+      <p className="text-center text-sm text-zinc-500">
+        New to EAS Recruit?{" "}
+        <Link href="/signup" className="font-medium text-brand-700 hover:underline">
+          Start a free trial
+        </Link>
+      </p>
     </form>
   );
 }

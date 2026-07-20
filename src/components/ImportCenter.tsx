@@ -389,7 +389,7 @@ export function ImportCenter({ orgSlug, jobs }: { orgSlug: string; jobs: JobOpti
       {step === "done" && result ? (
         <section className="space-y-4">
           <div className="card space-y-4">
-            <p className="eyebrow" style={{ color: "#4a761b" }}>Import complete</p>
+            <p className="eyebrow text-brand-700">Import complete</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label="Created" value={result.created} tone="text-brand-700" />
               <Stat label="Updated" value={result.updated} />

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SEAT_PRICE_USD, TRIAL_DAYS } from "@/lib/pricing";
@@ -126,6 +127,12 @@ export function SignupForm() {
         </button>
         <p className="text-center text-xs text-zinc-500">
           No credit card required. Your {TRIAL_DAYS}-day trial starts as soon as your workspace is created.
+        </p>
+        <p className="text-center text-sm text-zinc-500">
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-brand-700 hover:underline">
+            Sign in
+          </Link>
         </p>
       </div>
     </form>

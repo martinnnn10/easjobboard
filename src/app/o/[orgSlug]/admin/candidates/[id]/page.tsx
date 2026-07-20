@@ -291,8 +291,8 @@ export default async function CandidateProfilePage({ params }: PageProps) {
             <div className="grid gap-5 sm:grid-cols-2">
               <WhyColumn title="Why they're strong" tone="good" items={why.whyStrong} empty="No screen strengths captured yet." />
               <WhyColumn title="Why they're risky" tone="bad" items={why.whyRisky} empty="No red flags surfaced." />
-              <WhyColumn title="Verify on the phone screen" tone="amber" items={why.verifyOnPhone} empty="Nothing specific to verify." />
-              <WhyColumn title="Ask the hiring manager" tone="blue" items={why.askHiringManager} empty="—" />
+              <WhyColumn title="Verify on the phone screen" tone="amber" items={why.verifyOnPhone} empty="No specific flags — a standard reference check should suffice." />
+              <WhyColumn title="Ask the hiring manager" tone="blue" items={why.askHiringManager} empty="No blockers to raise — confirm start date and shift fit." />
             </div>
 
             {dimensionBars.length > 0 ? (
