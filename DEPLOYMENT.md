@@ -67,6 +67,28 @@ npm run deploy:build
 
 Output: `deploy-dist/easrecruit-<timestamp>-<commit>.zip`.
 
+### Build provenance — `GIT_COMMIT` (required)
+
+Every build **must** bake the exact source commit into the artifact so the
+running deploy is traceable back to source (see *Release tagging* below).
+
+- `next.config.ts` resolves the commit at build time in this order:
+  **`GIT_COMMIT` env → `git rev-parse --short HEAD` → `"unknown"`**, and exposes
+  it (plus a build timestamp) via Next's `env` inlining. The value is compiled
+  **into** the bundle, so `/api/health` self-reports the commit even if the
+  runtime environment never sets `GIT_COMMIT`.
+- `npm run deploy:build` sets `GIT_COMMIT` automatically (to the same short
+  commit used in the zip name), so the zip name, the baked commit, and the
+  release tag all agree.
+- **When building by hand or in CI, set it explicitly** so a checkout without
+  `.git` (or a detached/dirty tree) still bakes the right value:
+  ```bash
+  GIT_COMMIT="$(git rev-parse --short HEAD)" npm run build
+  ```
+- A build that reports `commit: "unknown"` at `/api/health` is **not
+  deployable** — it cannot be matched to a source commit. Rebuild with
+  `GIT_COMMIT` set.
+
 ### Files INCLUDED in the bundle/zip
 - `server.js`, `package.json`
 - `.next/` (standalone server chunks, `BUILD_ID`, manifests)
@@ -80,6 +102,36 @@ Output: `deploy-dist/easrecruit-<timestamp>-<commit>.zip`.
 - `.env*`, `backups/`, source, tests, git history
 
 > Do **not** hand-edit compiled files under `.next/`. Change source and rebuild.
+
+---
+
+## Release tagging & traceability
+
+Every production deploy must be pinned to an **exact source commit** and an
+**annotated git tag**, so an audit can prove which code is live.
+
+1. **Tag the released commit** (short, immutable, one per deploy):
+   ```bash
+   git tag -a deploy-<N> <commit> -m "Deploy <N>: <one-line summary>"
+   git push origin deploy-<N>
+   ```
+   Example: `deploy-17` marks the audited Deploy 17 baseline.
+2. **Build from that commit with the commit baked in** (see *Build provenance*),
+   then deploy the resulting zip via the checklist below.
+3. **Prove it after deploy:** `/api/health`'s `commit` must equal
+   `git rev-parse --short deploy-<N>`. If it does, the running server is
+   provably that tag's code.
+
+**What is (and isn't) a baseline artifact:**
+
+| Artifact | Role | Traceable? |
+|----------|------|------------|
+| Git tag `deploy-<N>` + baked build | Deployable baseline | Yes — `/api/health.commit` ↔ `git rev-parse --short deploy-<N>` |
+| Audit evidence zip (report + screenshots) | **Documentation only** | Describes a deploy; pins **no** commit, contains **no** source — never deploy it |
+
+> The audit "zip" is a report plus screenshots. It is evidence *about* a deploy,
+> not a deployable artifact. The reproducible baseline is the **tag + baked
+> build**, not the evidence package.
 
 ---
 
@@ -122,6 +174,8 @@ BASE_URL=https://easrecruit.ai SMOKE_ORG=<realOrg> SMOKE_JOB=<realJob> npm run s
 pm2 logs eas-recruit --lines 50                      # scan for errors
 ```
 - [ ] `/api/health` returns 200 with `database: reachable`.
+- [ ] **Commit matches the release:** `curl -s .../api/health | grep -o '"commit":"[^"]*"'`
+      equals `git rev-parse --short <release-tag>` (proves the deployed code).
 - [ ] Smoke tests pass (public pages, no internal-origin leaks, admin requires auth).
 - [ ] Spot-check: careers page, a job page, apply flow, feeds/sitemap/robots.
 
@@ -215,9 +269,13 @@ reason) on any misconfiguration or send failure.
 
 ## Monitoring & logging
 
-- **Health check:** `GET /api/health` → `{ ok, service, version, commit, uptimeSeconds,
-  database, timestamp }`. Returns **200** when the DB is reachable, **503** otherwise.
-  Point uptime monitors / load balancers here.
+- **Health check:** `GET /api/health` → `{ ok, service, version, commit, builtAt,
+  uptimeSeconds, database, timestamp }`. Returns **200** when the DB is reachable,
+  **503** otherwise. Point uptime monitors / load balancers here.
+  - `commit` is the **short source commit baked at build time** (see *Build
+    provenance*). It is the field that lets you prove which code is running:
+    it should equal `git rev-parse --short <release-tag>` for the deployed
+    release. `builtAt` is the build timestamp.
 - **PM2 logs:** `pm2 logs eas-recruit` (default files under `~/.pm2/logs/eas-recruit-{out,error}.log`).
 - **Restart:** `pm2 restart eas-recruit --update-env` · **Status:** `pm2 status` · **Boot persist:** `pm2 save`.
 

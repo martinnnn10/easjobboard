@@ -48,7 +48,10 @@ fi
 # ── 3. Build ─────────────────────────────────────────────────────────────────
 step "3. Production build (next build, output: standalone)"
 rm -rf .next
-npm run build
+# Bake the exact commit into the artifact (next.config.ts reads GIT_COMMIT), so
+# the deployed build's /api/health reports a commit that matches this zip's
+# name and the release tag — provenance travels with the bundle.
+GIT_COMMIT="$COMMIT" npm run build
 
 # ── 4. Assemble standalone bundle ────────────────────────────────────────────
 step "4. Assemble bundle -> $BUNDLE"

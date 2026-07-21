@@ -40,7 +40,11 @@ export function GET() {
       ok: databaseReachable,
       service: "eas-recruit",
       version: appVersion(),
+      // Baked at build time by next.config.ts (`env.GIT_COMMIT`), so a running
+      // deploy self-reports the exact source commit it was built from. Falls
+      // back to the Next build id, then "unknown".
       commit: process.env.GIT_COMMIT ?? process.env.BUILD_ID ?? "unknown",
+      builtAt: process.env.BUILD_TIME ?? "unknown",
       uptimeSeconds: Math.round(process.uptime()),
       database: databaseReachable ? "reachable" : "unreachable",
       timestamp: new Date().toISOString(),
