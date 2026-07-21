@@ -119,8 +119,9 @@ Every production deploy must be pinned to an **exact source commit** and an
 2. **Build from that commit with the commit baked in** (see *Build provenance*),
    then deploy the resulting zip via the checklist below.
 3. **Prove it after deploy:** `/api/health`'s `commit` must equal
-   `git rev-parse --short deploy-<N>`. If it does, the running server is
-   provably that tag's code.
+   `git rev-parse --short "deploy-<N>^{commit}"`. If it does, the running server
+   is provably that tag's code. (The `^{commit}` suffix dereferences an
+   annotated tag to its commit; it is also correct for a lightweight tag.)
 
 **What is (and isn't) a baseline artifact:**
 
@@ -175,7 +176,7 @@ pm2 logs eas-recruit --lines 50                      # scan for errors
 ```
 - [ ] `/api/health` returns 200 with `database: reachable`.
 - [ ] **Commit matches the release:** `curl -s .../api/health | grep -o '"commit":"[^"]*"'`
-      equals `git rev-parse --short <release-tag>` (proves the deployed code).
+      equals `git rev-parse --short "<release-tag>^{commit}"` (proves the deployed code).
 - [ ] Smoke tests pass (public pages, no internal-origin leaks, admin requires auth).
 - [ ] Spot-check: careers page, a job page, apply flow, feeds/sitemap/robots.
 
@@ -274,8 +275,8 @@ reason) on any misconfiguration or send failure.
   **503** otherwise. Point uptime monitors / load balancers here.
   - `commit` is the **short source commit baked at build time** (see *Build
     provenance*). It is the field that lets you prove which code is running:
-    it should equal `git rev-parse --short <release-tag>` for the deployed
-    release. `builtAt` is the build timestamp.
+    it should equal `git rev-parse --short "<release-tag>^{commit}"` for the
+    deployed release. `builtAt` is the build timestamp.
 - **PM2 logs:** `pm2 logs eas-recruit` (default files under `~/.pm2/logs/eas-recruit-{out,error}.log`).
 - **Restart:** `pm2 restart eas-recruit --update-env` · **Status:** `pm2 status` · **Boot persist:** `pm2 save`.
 
