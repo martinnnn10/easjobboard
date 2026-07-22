@@ -11,40 +11,42 @@ back safely. The goal is to make changes safe, not to add product features.
 |-------|-------|-------|
 | App source | this repo (`src/`) | Canonical for the **application**. |
 | Build output | `.next/standalone` (git-ignored) | Produced by `next build` (`output: "standalone"`). |
-| Runtime entrypoint | **`start.js` (proxy/paywall)** | ⚠️ **Not in source** — see below. |
+| Runtime entrypoint | **`start.js`** (proxy: email verification + rate limiting) | **Source-controlled** (Deploy 20) — shipped in the artifact. |
 | App server | `server.js` (inside the bundle) | The standalone Next.js server. |
 | Database | `data/jobs.db` (SQLite, WAL) | git-ignored; lives on the host, **never** in the zip. |
 | Process manager | PM2 (`ecosystem.config.js`) | app name `eas-recruit`, cwd `/home/ubuntu/eas-recruit`. |
 
-### ⚠️ Production entrypoint (the biggest risk found)
+### Production entrypoint (`start.js`) — source-controlled since Deploy 20
 
-PM2 runs **`start.js`**, but the `start.js` in *production* is **not the one in this
-repo**. Production ships an ~820-line **reverse proxy + Stripe paywall**:
+PM2 runs **`start.js`**, a reverse proxy that spawns the Next server on `:3031`
+and listens on `:3030`. As of Deploy 20 it is **the version in this repo** — the
+prior "written in the sandbox, copied to prod by hand" drift is closed.
 
-- Listens on `:3030`, spawns the Next server on `:3031`, and proxies between them.
-- Serves the paywall routes itself (not the Next app):
-  `/api/stripe/checkout`, `/api/stripe/portal`, `/api/stripe/status`,
-  `/api/stripe/team`, `/api/stripe/grant-free`, `/api/stripe/webhook`,
-  `/subscription/paywall`, `/subscription/success`, `/account/change-password`.
-- Runs its **own SQLite migrations** on the `users` table
-  (`stripe_customer_id`, `subscription_status`, `free_access`, `must_change_password`).
-- Redirects unsubscribed users to `/subscription/paywall`.
-- Hardcodes a **fallback `AUTH_SECRET`** and a `FREE_DOMAINS` allowlist.
+What it does:
+- Adds `Connection: close` (avoids HTTP/1.1 keep-alive pool exhaustion on RSC prefetch).
+- **Email verification**: intercepts `/api/auth/signup` (strips the session cookie
+  so signup can't auto-login, emails a verification link), `/api/auth/login`
+  (blocks unverified accounts with 403), `/api/auth/resend-verification`, and
+  `GET /verify-email`. Tokens are 256-bit, SHA-256-hashed at rest, single-use,
+  24-hour expiry.
+- **Rate limiting** (durable, SQLite-backed) on register / login / resend →
+  429 + `Retry-After`. Keyed by the trusted last-hop client IP (see below).
+- **One-time** legacy `email_verified` backfill, guarded by a `proxy_migrations`
+  row so it never re-runs on restart.
 
-The repo's `start.js` is only a 3-line keep-alive stub and **must not** be deployed
-as-is (it would drop the paywall and change ports).
+Secrets & config — all from the **environment**, nothing hardcoded:
+`SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`, `FROM_EMAIL`, `FROM_NAME`,
+`PUBLIC_BASE_URL` (defaults to `https://easrecruit.ai`), `AUTH_SECRET`,
+optional `TRUSTED_PROXY_HOPS` (default 1), `RL_REGISTER` / `RL_LOGIN` / `RL_RESEND`.
 
-**Consequences / rules until this is reconciled (tracked for a follow-up sprint):**
-1. A build "from source" does **not** reproduce the production launcher. **Do not
-   overwrite the live `start.js`** during deploy (the deploy bundle deliberately
-   excludes `start.js`).
-2. The hardcoded fallback `AUTH_SECRET` is a security risk. **Ensure `AUTH_SECRET`
-   is set in the environment** (the app itself already requires it) and, if the
-   fallback was ever the effective secret, **rotate it**.
-3. Subscription state is split across two tables (`users` via the proxy,
-   `organizations` via the app). Don't assume one source of truth for billing.
-4. Recommended next sprint: move the proxy paywall into the app (billing routes
-   already exist under `/o/{slug}/billing/*`) so the entrypoint is in source.
+**Trusted-proxy / IP handling:** one hop (Nginx). The real client IP is the
+**last** entry Nginx appends to `X-Forwarded-For`; client-supplied XFF entries
+before it are ignored, so a spoofed header cannot shift the rate-limit key. Keep
+the proxy port (`:3030`) private behind Nginx — do not expose it publicly.
+
+The proxy contains **no Stripe/paywall logic** — billing lives entirely in the
+Next app (`/api/o/{slug}/billing/*`, `/api/stripe/webhook`). `start.js` never
+touches billing, candidate data, scoring, or job distribution.
 
 ---
 
@@ -90,16 +92,20 @@ running deploy is traceable back to source (see *Release tagging* below).
   `GIT_COMMIT` set.
 
 ### Files INCLUDED in the bundle/zip
+- **`start.js`** — the source-controlled proxy (email verification + rate
+  limiting). The build asserts the artifact copy is byte-identical to the source
+  `start.js` (same SHA-256) and aborts on any mismatch.
 - `server.js`, `package.json`
 - `.next/` (standalone server chunks, `BUILD_ID`, manifests)
 - `.next/static/` (CSS/JS assets — required or pages render unstyled)
-- `.next/node_modules/` + top-level `node_modules/` (runtime deps)
+- `node_modules/` (runtime deps) — includes **`nodemailer`** and
+  **`better-sqlite3`** (kept external so `start.js` can `require()` them; no
+  manual install on the host).
 - `public/`
 
 ### Files EXCLUDED (by design)
 - `data/` — the live database (protected; see below)
-- `start.js` — the production proxy/paywall is maintained on the host (see warning)
-- `.env*`, `backups/`, source, tests, git history
+- `.env*`, `backups/`, source, tests, git history — **never** ship secrets or a DB
 
 > Do **not** hand-edit compiled files under `.next/`. Change source and rebuild.
 
@@ -148,25 +154,33 @@ Assume the release lives at `/home/ubuntu/eas-recruit` and the DB at
 - [ ] Copy the *current* live bundle aside for rollback (or keep the previous zip).
 - [ ] Confirm `AUTH_SECRET` and required env are set in the environment.
 
-### Deploy (does NOT overwrite DB or the proxy `start.js`)
+### Deploy (ships the new source-controlled `start.js`; protects only `data/`)
+As of Deploy 20 the reviewed `start.js` **is** in the artifact and is meant to
+replace the running proxy. Back up the current proxy first, then deploy it.
 ```bash
 cd /home/ubuntu/eas-recruit
-# 1. Back up first (belt and braces):
-node scripts/backup-db.mjs            # or: npm run backup
+# 1. Back up the DB and the CURRENT proxy (for rollback):
+node scripts/backup-db.mjs                                  # or: npm run backup
+cp start.js "start.js.bak.$(date -u +%Y%m%dT%H%M%SZ)"       # keep the live proxy
 
-# 2. Unpack the new bundle WITHOUT clobbering data/ or start.js:
+# 2. Unpack the new bundle WITHOUT clobbering the live DB:
 mkdir -p /tmp/rel && unzip -q /path/to/easrecruit-<ts>-<commit>.zip -d /tmp/rel
-rsync -a --delete \
-  --exclude 'data' --exclude 'start.js' \
-  /tmp/rel/ /home/ubuntu/eas-recruit/
+rsync -a --delete --exclude 'data' /tmp/rel/ /home/ubuntu/eas-recruit/
+#   ^ start.js IS synced now (it's the source-controlled proxy). data/ is not.
 
-# 3. Restart:
+# 3. Restart (SMTP_* / AUTH_SECRET / PUBLIC_BASE_URL must be in the PM2 env):
 pm2 restart eas-recruit --update-env
 pm2 save
+
+# 4. Prove the proxy on disk matches source (== the zip's start.js):
+sha256sum start.js    # must equal the source/artifact start.js SHA-256
 ```
-- Database protection: `data/` is **excluded** from both the zip and the rsync, so
+- **Database protection:** `data/` is excluded from both the zip and the rsync, so
   the live SQLite file is never overwritten.
-- `start.js` is excluded from rsync, so the production proxy/paywall is preserved.
+- **`start.js` is now synced** (no `--exclude 'start.js'`) so production runs the
+  reviewed, source-controlled proxy — no more hidden drift.
+- **Dependencies:** the bundle already contains `nodemailer` + `better-sqlite3`.
+  If you rebuild deps on the host instead, use `npm ci` (locked versions).
 
 ### Post-deploy verification
 ```bash
@@ -184,11 +198,14 @@ pm2 logs eas-recruit --lines 50                      # scan for errors
 ```bash
 cd /home/ubuntu/eas-recruit
 node scripts/backup-db.mjs                            # snapshot current state first
-rsync -a --delete --exclude 'data' --exclude 'start.js' /tmp/rel-PREVIOUS/ ./
+rsync -a --delete --exclude 'data' /tmp/rel-PREVIOUS/ ./   # re-sync the previous bundle
+# If rolling back to a release whose start.js differed, restore the saved proxy:
+cp start.js.bak.<timestamp> start.js                  # the copy saved in step 1 above
 pm2 restart eas-recruit --update-env
-curl -s http://127.0.0.1:3030/api/health
+curl -s http://127.0.0.1:3030/api/health              # confirm commit + DB reachable
 ```
-- Keep the **previous** deploy bundle (unzipped or zipped) so rollback is a re-sync.
+- Keep the **previous** deploy bundle (unzipped or zipped) and the saved
+  `start.js.bak.<ts>` so rollback is a re-sync plus (if needed) a proxy restore.
 - The database is backward-compatible within a release train (additive migrations),
   so rolling the app back does **not** require a DB restore. Restore the DB only if a
   migration or data corruption is the reason for rollback (see Backups → Restore).

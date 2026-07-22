@@ -35,7 +35,10 @@ const nextConfig: NextConfig = {
   // Keep these external so their bundled worker/asset files (e.g. pdf-parse's
   // PDF worker) resolve from node_modules at runtime instead of being traced
   // into the server chunks, where they go missing.
-  serverExternalPackages: ["better-sqlite3", "pdf-parse", "mammoth", "sharp"],
+  // nodemailer is kept external (not bundled into the app chunks) so it lands
+  // in the standalone node_modules, where the source-controlled start.js proxy
+  // require()s it at runtime — no manual install on the production host.
+  serverExternalPackages: ["better-sqlite3", "pdf-parse", "mammoth", "sharp", "nodemailer"],
   // Baked at build time (see resolveGitCommit) and read by /api/health so a
   // running deploy is traceable to its exact source commit.
   env: {

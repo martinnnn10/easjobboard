@@ -5,10 +5,10 @@
 # Runs: typecheck -> lint -> build -> assemble standalone bundle -> zip ->
 # boot the zip on an EPHEMERAL throwaway database and run the smoke tests.
 #
-# It never touches the live database and never bundles one. It also does NOT
-# include the production proxy `start.js` (the Stripe/paywall launcher, which is
-# not yet in source — see DEPLOYMENT.md "Production entrypoint"). On deploy you
-# preserve the existing start.js and data/ (see DEPLOYMENT.md checklist).
+# It never touches the live database and never bundles one. It DOES bundle the
+# source-controlled `start.js` (the proxy that adds email verification + rate
+# limiting) and asserts the artifact copy is byte-identical to source, so the
+# deploy is reproducible from source alone (see DEPLOYMENT.md).
 #
 # Usage:  bash scripts/build-deploy.sh
 # Env:    VERIFY_PORT (default 3399), OUT_DIR (default deploy-dist), SKIP_LINT=1
@@ -61,6 +61,16 @@ cp -r .next/standalone/. "$BUNDLE"/
 mkdir -p "$BUNDLE/.next/static"
 cp -r .next/static/. "$BUNDLE/.next/static"/
 if [ -d public ]; then cp -r public "$BUNDLE/public"; fi
+# Ship the SOURCE-CONTROLLED production entrypoint (proxy + email verification
+# + rate limiting). Deploy 20 makes source the single source of truth for
+# start.js, so it travels IN the artifact — no more copying it in by hand.
+cp start.js "$BUNDLE/start.js"
+SRC_START_SHA="$(sha256sum start.js | cut -d' ' -f1)"
+ART_START_SHA="$(sha256sum "$BUNDLE/start.js" | cut -d' ' -f1)"
+if [ "$SRC_START_SHA" != "$ART_START_SHA" ]; then
+  echo "    ERROR: start.js source/artifact hash mismatch — aborting."; exit 1
+fi
+echo "    start.js source == artifact (sha256 ${SRC_START_SHA})"
 # Never ship a database.
 rm -rf "$BUNDLE/data"
 echo "    bundle assembled ($(du -sh "$BUNDLE" | cut -f1))"
