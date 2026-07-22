@@ -205,7 +205,7 @@ export default async function OrgAdminPage({ params, searchParams }: PageProps) 
             accent
           />
           <ActionCard
-            href={`/o/${orgSlug}/admin/applicants?screen=resume_only`}
+            href={`/o/${orgSlug}/admin/applicants?view=resume-only`}
             label={`Resume-only ${labels.applicantSingular}s`}
             value={resumeOnlyCount}
             hint="Applied without a skills screen — send one →"

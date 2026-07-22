@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DuplicateJobButton } from "@/components/DuplicateJobButton";
+import { DrilldownCounts, jobApplicantsHref } from "@/components/JobDrilldownCounts";
 import { StatusBadge } from "@/components/StatusBadge";
+import type { ApplicationCategory } from "@/lib/applications";
 import type { JobStatus } from "@/lib/db";
 
 export type JobRow = {
@@ -24,6 +26,51 @@ export type JobRow = {
 };
 
 type BulkAction = "publish" | "draft" | "close" | "duplicate" | "delete";
+
+/** A count cell that drills into the job's filtered applicants when > 0. */
+function CountCell({
+  orgSlug,
+  jobId,
+  n,
+  view,
+  tone = "text-zinc-700",
+}: {
+  orgSlug: string;
+  jobId: string;
+  n: number;
+  view: ApplicationCategory;
+  tone?: string;
+}) {
+  if (n <= 0) return <span className="text-zinc-400">0</span>;
+  return (
+    <Link
+      href={jobApplicantsHref(orgSlug, jobId, view)}
+      className={`font-semibold tabular-nums hover:underline ${tone}`}
+    >
+      {n}
+    </Link>
+  );
+}
+
+/** Prominent primary action — the hiring workflow's main door into a job. */
+function ViewApplicantsButton({
+  orgSlug,
+  job,
+  className = "",
+}: {
+  orgSlug: string;
+  job: JobRow;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={jobApplicantsHref(orgSlug, job.id)}
+      className={`inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-brand-700 ${className}`}
+    >
+      {job.applicants > 0 ? `View ${job.applicants} applicant${job.applicants === 1 ? "" : "s"}` : "View applicants"}
+    </Link>
+  );
+}
 
 export function JobsTable({
   orgSlug,
@@ -88,6 +135,64 @@ export function JobsTable({
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Single-job close/archive (non-destructive; keeps application history). */
+  async function closeOne(jobId: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/o/${orgSlug}/jobs/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobIds: [jobId], action: "close" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) setError(data.error ?? "Could not close the job.");
+      else router.refresh();
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Secondary actions, tucked behind a native <details> menu. */
+  function MoreMenu({ job }: { job: JobRow }) {
+    const itemCls = "block w-full rounded px-2 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-100";
+    return (
+      <details className="relative">
+        <summary className="btn-secondary cursor-pointer list-none text-sm [&::-webkit-details-marker]:hidden">
+          More ▾
+        </summary>
+        <div className="absolute right-0 z-20 mt-1 w-48 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
+          {writable ? <DuplicateJobButton orgSlug={orgSlug} jobId={job.id} className={itemCls} /> : null}
+          {job.status === "published" ? (
+            <a
+              href={`/o/${orgSlug}/jobs/${job.slug}/flyer`}
+              target="_blank"
+              rel="noreferrer"
+              className={itemCls}
+            >
+              View flyer
+            </a>
+          ) : null}
+          <Link href={`/o/${orgSlug}/admin/jobs/${job.id}#distribution`} className={itemCls}>
+            Distribution
+          </Link>
+          {writable && sourcingOn ? (
+            <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className={itemCls}>
+              Source candidates
+            </Link>
+          ) : null}
+          {writable && job.status !== "closed" ? (
+            <button type="button" disabled={busy} onClick={() => closeOne(job.id)} className={itemCls}>
+              Close / archive
+            </button>
+          ) : null}
+        </div>
+      </details>
+    );
   }
 
   return (
@@ -173,7 +278,10 @@ export function JobsTable({
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+      {error && selected.size === 0 ? <p className="text-sm text-red-600">{error}</p> : null}
+
+      {/* ── Desktop table (md and up) ─────────────────────────────────────── */}
+      <div className="hidden overflow-x-auto rounded-xl border border-zinc-200 bg-white md:block">
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
             <tr>
@@ -190,7 +298,6 @@ export function JobsTable({
               ) : null}
               <th className="px-4 py-3 font-medium">Title</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Screen</th>
               <th className="px-4 py-3 text-right font-medium">Applicants</th>
               <th className="px-4 py-3 text-right font-medium">Screened</th>
               <th className="px-4 py-3 text-right font-medium">Strong-fit</th>
@@ -225,60 +332,33 @@ export function JobsTable({
                   <td className="px-4 py-3">
                     <StatusBadge status={job.status} />
                   </td>
-                  <td className="px-4 py-3">
-                    {job.screenLabel ? (
-                      <span className="inline-flex rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                        {job.screenLabel}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-zinc-400">No screen</span>
-                    )}
+                  <td className="px-4 py-3 text-right">
+                    <CountCell orgSlug={orgSlug} jobId={job.id} n={job.applicants} view="all" />
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-zinc-700">{job.applicants}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-zinc-700">{job.completed}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <span className={job.strongFit ? "font-semibold text-brand-700" : "text-zinc-400"}>{job.strongFit}</span>
+                  <td className="px-4 py-3 text-right">
+                    <CountCell orgSlug={orgSlug} jobId={job.id} n={job.completed} view="screened" />
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <span className={job.needsReview ? "font-semibold text-amber-600" : "text-zinc-400"}>{job.needsReview}</span>
+                  <td className="px-4 py-3 text-right">
+                    <CountCell orgSlug={orgSlug} jobId={job.id} n={job.strongFit} view="strong-fit" tone="text-brand-700" />
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    <span className={job.highRisk ? "font-semibold text-red-600" : "text-zinc-400"}>{job.highRisk}</span>
+                  <td className="px-4 py-3 text-right">
+                    <CountCell orgSlug={orgSlug} jobId={job.id} n={job.needsReview} view="review" tone="text-amber-600" />
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {job.callsDue ? (
-                      <Link href={`/o/${orgSlug}/admin/queue`} className="font-semibold text-brand-700 hover:underline">
-                        {job.callsDue}
-                      </Link>
-                    ) : (
-                      <span className="text-zinc-400">0</span>
-                    )}
+                  <td className="px-4 py-3 text-right">
+                    <CountCell orgSlug={orgSlug} jobId={job.id} n={job.highRisk} view="high-risk" tone="text-red-600" />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <CountCell orgSlug={orgSlug} jobId={job.id} n={job.callsDue} view="calls-due" tone="text-brand-700" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <ViewApplicantsButton orgSlug={orgSlug} job={job} />
                       {writable ? (
-                        <>
-                          <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="text-brand-700 hover:underline">
-                            Edit
-                          </Link>
-                          {sourcingOn ? (
-                            <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/source`} className="text-brand-700 hover:underline">
-                              Source
-                            </Link>
-                          ) : null}
-                          <DuplicateJobButton orgSlug={orgSlug} jobId={job.id} />
-                        </>
+                        <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="btn-secondary text-sm">
+                          Edit
+                        </Link>
                       ) : null}
-                      {job.status === "published" ? (
-                        <>
-                          <a href={`/o/${orgSlug}/jobs/${job.slug}`} className="text-brand-700 hover:underline" target="_blank" rel="noreferrer">
-                            View
-                          </a>
-                          <a href={`/o/${orgSlug}/jobs/${job.slug}/flyer`} className="text-brand-700 hover:underline" target="_blank" rel="noreferrer">
-                            Flyer
-                          </a>
-                        </>
-                      ) : null}
+                      <MoreMenu job={job} />
                     </div>
                   </td>
                 </tr>
@@ -286,6 +366,38 @@ export function JobsTable({
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Mobile cards (below md) ───────────────────────────────────────── */}
+      <div className="space-y-3 md:hidden">
+        {rows.map((job) => (
+          <div key={job.id} className="card space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <Link
+                  href={`/o/${orgSlug}/admin/jobs/${job.id}`}
+                  className="font-semibold text-zinc-900 hover:text-brand-700"
+                >
+                  {job.title}
+                </Link>
+                <p className="text-xs text-zinc-500">{job.location}</p>
+              </div>
+              <StatusBadge status={job.status} />
+            </div>
+
+            <DrilldownCounts orgSlug={orgSlug} jobId={job.id} counts={job} size="sm" />
+
+            <div className="flex flex-wrap items-center gap-2">
+              <ViewApplicantsButton orgSlug={orgSlug} job={job} className="flex-1" />
+              {writable ? (
+                <Link href={`/o/${orgSlug}/admin/jobs/${job.id}/edit`} className="btn-secondary text-sm">
+                  Edit
+                </Link>
+              ) : null}
+              <MoreMenu job={job} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

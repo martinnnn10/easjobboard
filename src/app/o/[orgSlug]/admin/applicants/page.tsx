@@ -1,12 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApplicationStatusSelect } from "@/components/ApplicationStatusSelect";
+import { JobFilterSelect } from "@/components/JobFilterSelect";
 import { BadgeRow, RiskPill, ScreenScoreBadge } from "@/components/ScreenSignals";
-import { countApplicationsByOrganization, listApplicationsByOrganization } from "@/lib/applications";
-import { requireOrgSession } from "@/lib/auth";
+import { StatusBadge } from "@/components/StatusBadge";
+import {
+  countApplications,
+  listApplicationsByOrganization,
+  type ApplicationCategory,
+} from "@/lib/applications";
 import { APPLICATION_STATUS_LABELS } from "@/lib/application-status";
+import { requireOrgSession } from "@/lib/auth";
 import { badgesForApplication, deriveRecommendedAction, normalizeRiskLevel } from "@/lib/candidate-intel";
-import { getJobAccess } from "@/lib/job-visibility";
+import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
+import { getJobById, listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug, getOrgLabels } from "@/lib/organizations";
 import { canViewResumes, canWrite } from "@/lib/roles";
 
@@ -17,9 +24,36 @@ function appliedAgo(iso: string): string {
 
 const PAGE_SIZE = 25;
 
+/** The category views a recruiter can drill into — labels + the exact filter each maps to. */
+type ViewDef = { slug: string; label: string; category?: ApplicationCategory; screenOutcome?: string };
+const VIEWS: ViewDef[] = [
+  { slug: "all", label: "All" },
+  { slug: "strong-fit", label: "Strong fit", category: "strong-fit" },
+  { slug: "screened", label: "Screened", category: "screened" },
+  { slug: "review", label: "Review", category: "review" },
+  { slug: "high-risk", label: "High risk", category: "high-risk" },
+  { slug: "calls-due", label: "Calls due", category: "calls-due" },
+  { slug: "resume-only", label: "Resume only", category: "resume-only" },
+  { slug: "knockout", label: "Auto-screened out", screenOutcome: "knockout" },
+];
+
+/** Resolve the active view slug, accepting the legacy `screen` param for old links. */
+function resolveViewSlug(view?: string, legacyScreen?: string): string {
+  const candidate =
+    view ??
+    (legacyScreen === "resume_only"
+      ? "resume-only"
+      : legacyScreen === "knockout"
+        ? "knockout"
+        : legacyScreen === "qualified"
+          ? "strong-fit"
+          : undefined);
+  return VIEWS.some((v) => v.slug === candidate) ? (candidate as string) : "all";
+}
+
 type PageProps = {
   params: Promise<{ orgSlug: string }>;
-  searchParams: Promise<{ page?: string; screen?: string }>;
+  searchParams: Promise<{ page?: string; view?: string; job?: string; screen?: string }>;
 };
 
 export default async function OrgApplicantsPage({ params, searchParams }: PageProps) {
@@ -33,24 +67,32 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
   const labels = getOrgLabels(organization);
 
   const sp = await searchParams;
-  const filter =
-    sp.screen === "qualified" || sp.screen === "knockout" || sp.screen === "resume_only" ? sp.screen : undefined;
-  const resumeOnly = filter === "resume_only";
-  const screenOutcome = resumeOnly ? undefined : filter;
-
-  // Per-job visibility: restrict counts + rows to jobs this user may see.
   const access = getJobAccess(organization.id, user);
 
-  const allCount = countApplicationsByOrganization(organization.id, undefined, access);
-  const qualifiedCount = countApplicationsByOrganization(organization.id, "qualified", access);
-  const knockoutCount = countApplicationsByOrganization(organization.id, "knockout", access);
-  const resumeOnlyCount = countApplicationsByOrganization(organization.id, undefined, access, true);
+  // Resolve an optional job scope. A missing/foreign/hidden job silently falls
+  // back to the org-wide list — org isolation and per-job visibility preserved.
+  const requestedJobId = typeof sp.job === "string" && sp.job ? sp.job : undefined;
+  let job = requestedJobId ? getJobById(requestedJobId) : null;
+  if (job && (job.organization_id !== organization.id || !canSeeJob(access, job.id))) job = null;
+  const jobId = job ? job.id : undefined;
 
-  const total = resumeOnly
-    ? resumeOnlyCount
-    : filter
-      ? countApplicationsByOrganization(organization.id, filter, access)
-      : allCount;
+  const activeSlug = resolveViewSlug(sp.view, sp.screen);
+  const activeView = VIEWS.find((v) => v.slug === activeSlug) ?? VIEWS[0];
+
+  // One count per view — the same query family the list uses, so a tab's number
+  // always equals the rows it opens (and the Jobs-page counts it came from).
+  const counts: Record<string, number> = {};
+  for (const v of VIEWS) {
+    counts[v.slug] = countApplications({
+      organizationId: organization.id,
+      jobId,
+      category: v.category,
+      screenOutcome: v.screenOutcome,
+      access,
+    });
+  }
+
+  const total = counts[activeSlug] ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const requestedPage = Number.parseInt(sp.page ?? "1", 10);
   const page = Number.isFinite(requestedPage) ? Math.min(Math.max(1, requestedPage), pageCount) : 1;
@@ -59,50 +101,100 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
     orderBy: "score",
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
-    screenOutcome,
-    resumeOnly,
+    jobId,
+    category: activeView.category,
+    screenOutcome: activeView.screenOutcome,
     access,
   });
 
-  const tabs = [
-    { key: undefined as string | undefined, label: "All", count: allCount },
-    { key: "qualified", label: "Qualified", count: qualifiedCount },
-    { key: "resume_only", label: "Resume only", count: resumeOnlyCount },
-    { key: "knockout", label: "Auto-screened out", count: knockoutCount },
-  ];
-  const tabHref = (key: string | undefined) =>
-    `/o/${orgSlug}/admin/applicants${key ? `?screen=${key}` : ""}`;
+  // Jobs a recruiter may see, for the Job filter dropdown.
+  const jobOptions = listJobsByOrganization(organization.id)
+    .filter((j) => canSeeJob(access, j.id))
+    .map((j) => ({ id: j.id, title: j.title, status: j.status }));
+
+  const href = (slug: string, pageNum?: number) => {
+    const p = new URLSearchParams();
+    if (jobId) p.set("job", jobId);
+    if (slug !== "all") p.set("view", slug);
+    if (pageNum && pageNum > 1) p.set("page", String(pageNum));
+    const qs = p.toString();
+    return `/o/${orgSlug}/admin/applicants${qs ? `?${qs}` : ""}`;
+  };
 
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const rangeEnd = (page - 1) * PAGE_SIZE + applicants.length;
 
   return (
     <div className="page-shell space-y-6">
-      <div>
-        <Link href={`/o/${orgSlug}/admin`} className="text-sm font-medium text-brand-700 hover:underline">
-          ← Back to admin
-        </Link>
-        <h1 className="mt-2 text-3xl font-bold text-zinc-900">{labels.applicants}</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Ranked by practical skills-screen score — who can actually do the work — not resume keywords. Resumes are
-          also emailed to {organization.application_email} when candidates apply.
-        </p>
+      {/* Header — job-scoped context, or the general pool */}
+      <div className="space-y-2">
+        {job ? (
+          <>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+              <Link href={`/o/${orgSlug}/admin/jobs`} className="font-medium text-brand-700 hover:underline">
+                ← Back to jobs
+              </Link>
+              <Link href={`/o/${orgSlug}/admin/jobs/${job.id}`} className="text-zinc-500 hover:text-zinc-800">
+                Job command center →
+              </Link>
+              <Link href={`/o/${orgSlug}/admin/applicants`} className="text-zinc-500 hover:text-zinc-800">
+                Clear job filter ✕
+              </Link>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-zinc-900">
+                {labels.applicantSingular === "candidate" ? "Applicants" : labels.applicants} for {job.title}
+              </h1>
+              <StatusBadge status={job.status} />
+            </div>
+            <p className="text-sm text-zinc-600">
+              {job.location ? `${job.location} · ` : ""}
+              {counts.all} total · everyone who applied or was attached to this job, ranked by practical skills score.
+            </p>
+          </>
+        ) : (
+          <>
+            <Link href={`/o/${orgSlug}/admin`} className="text-sm font-medium text-brand-700 hover:underline">
+              ← Back to admin
+            </Link>
+            <h1 className="text-3xl font-bold text-zinc-900">{labels.applicants}</h1>
+            <p className="text-sm text-zinc-600">
+              Everyone who applied or was attached to a job, ranked by practical skills score — not resume keywords.
+              Filter by job to work one req at a time. The <Link href={`/o/${orgSlug}/admin/queue`} className="text-brand-700 hover:underline">Call Queue</Link> is the prioritized subset worth calling first.
+            </p>
+          </>
+        )}
+        <div className="pt-1">
+          <JobFilterSelect orgSlug={orgSlug} jobs={jobOptions} currentJobId={jobId} view={activeSlug} />
+        </div>
       </div>
 
+      {/* Category views double as the job's intelligence summary */}
       <div className="flex flex-wrap gap-2">
-        {tabs.map((tab) => {
-          const active = filter === tab.key;
+        {VIEWS.map((v) => {
+          const active = v.slug === activeSlug;
+          if (v.slug !== "all" && counts[v.slug] === 0 && !active) {
+            return (
+              <span
+                key={v.slug}
+                className="rounded-full border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-300"
+              >
+                {v.label} <span className="tabular-nums">0</span>
+              </span>
+            );
+          }
           return (
             <Link
-              key={tab.label}
-              href={tabHref(tab.key)}
+              key={v.slug}
+              href={href(v.slug)}
+              aria-current={active ? "page" : undefined}
               className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
                 active
                   ? "border-zinc-900 bg-zinc-900 text-white"
                   : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
               }`}
             >
-              {tab.label} <span className={active ? "text-zinc-300" : "text-zinc-400"}>{tab.count}</span>
+              {v.label} <span className={`tabular-nums ${active ? "text-zinc-300" : "text-zinc-400"}`}>{counts[v.slug]}</span>
             </Link>
           );
         })}
@@ -111,22 +203,22 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
       {applicants.length === 0 ? (
         <div className="card space-y-1 py-10 text-center">
           <p className="font-medium text-zinc-800">
-            {filter === "knockout"
-              ? `No auto-screened-out ${labels.applicantSingular}s`
-              : filter === "qualified"
-                ? `No qualified ${labels.applicantSingular}s yet`
-                : filter === "resume_only"
-                  ? `No resume-only ${labels.applicantSingular}s`
-                  : "No applications yet"}
+            {activeSlug === "all"
+              ? job
+                ? "No applicants on this job yet"
+                : "No applications yet"
+              : `No ${activeView.label.toLowerCase()} ${labels.applicantSingular}s${job ? " on this job" : ""}`}
           </p>
           <p className="mx-auto max-w-md text-sm text-zinc-600">
-            {filter === "knockout"
-              ? "Nobody has been screened out by a job's must-pass rules."
-              : filter === "qualified"
-                ? "Candidates who clear a skills screen's must-pass rules land here, ranked by practical score."
-                : filter === "resume_only"
-                  ? "Everyone who has applied has completed a skills screen — applicants without one show up here."
-                  : "Share a job link or import candidates, and applicants will appear here ranked by practical skills score — who can actually do the work."}
+            {activeSlug === "all"
+              ? job
+                ? "Share this job's apply link or attach candidates, and applicants will appear here ranked by practical skills score."
+                : "Share a job link or import candidates, and applicants will appear here ranked by practical skills score — who can actually do the work."
+              : activeSlug === "resume-only"
+                ? "Everyone here has completed a skills screen — applicants without one show up in this view."
+                : activeSlug === "knockout"
+                  ? "Nobody has been screened out by a must-pass rule."
+                  : "No candidates match this category yet. Try another view or send skills screens to rank more people."}
           </p>
         </div>
       ) : (
@@ -138,6 +230,8 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
               deriveRecommendedAction(application.screen_score, application.screen_status, risk);
             const topSignal = application.screen_summary?.strengths?.[0] ?? null;
             const topRisk = application.risk_flags?.[0]?.label ?? null;
+            const externalSource =
+              application.source && application.source !== "applied" ? application.source : null;
             return (
               <div key={application.id} className="card space-y-3">
                 <div className="flex flex-wrap items-start gap-4">
@@ -169,11 +263,12 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                       {risk !== "low" ? <RiskPill level={risk} /> : null}
                     </div>
                     <p className="text-xs text-zinc-500">
-                      {application.job_title}
-                      {application.applicant_location ? ` · ${application.applicant_location}` : ""}
-                      {application.desired_pay ? ` · wants ${application.desired_pay}` : ""}
-                      {" · applied "}
-                      {appliedAgo(application.created_at)}
+                      {/* Only show the job name in the org-wide view; it's redundant when scoped. */}
+                      {!job ? `${application.job_title} · ` : ""}
+                      {application.applicant_location ? `${application.applicant_location} · ` : ""}
+                      {application.desired_pay ? `wants ${application.desired_pay} · ` : ""}
+                      applied {appliedAgo(application.created_at)}
+                      {externalSource ? ` · via ${externalSource}` : ""}
                     </p>
                     <p className="text-sm font-medium text-zinc-800">{action}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
@@ -189,7 +284,15 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                       ) : null}
                     </div>
                     <BadgeRow badges={badgesForApplication(application)} max={4} />
-                    <p className="text-xs text-zinc-400">{application.applicant_email}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+                      <span>{application.applicant_email}</span>
+                      <Link
+                        href={`/o/${orgSlug}/admin/candidates/${application.candidate_id}`}
+                        className="font-medium text-brand-700 hover:underline"
+                      >
+                        Open candidate →
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="flex flex-none flex-col items-start gap-2 sm:items-end">
@@ -205,12 +308,16 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
                       </span>
                     )}
                     {resumesOk ? (
-                      <a
-                        href={`/api/o/${orgSlug}/applications/${application.id}/resume`}
-                        className="text-xs font-medium text-brand-700 hover:underline"
-                      >
-                        Resume ↓
-                      </a>
+                      application.resume_filename ? (
+                        <a
+                          href={`/api/o/${orgSlug}/applications/${application.id}/resume`}
+                          className="text-xs font-medium text-brand-700 hover:underline"
+                        >
+                          Resume ↓
+                        </a>
+                      ) : (
+                        <span className="text-xs text-zinc-400">No resume</span>
+                      )
                     ) : (
                       <span className="text-xs text-zinc-400">Resume restricted</span>
                     )}
@@ -229,20 +336,14 @@ export default async function OrgApplicantsPage({ params, searchParams }: PagePr
           </span>
           <div className="flex gap-2">
             {page > 1 ? (
-              <Link
-                href={`/o/${orgSlug}/admin/applicants?${filter ? `screen=${filter}&` : ""}page=${page - 1}`}
-                className="btn-secondary px-3 py-1.5"
-              >
+              <Link href={href(activeSlug, page - 1)} className="btn-secondary px-3 py-1.5">
                 ← Previous
               </Link>
             ) : (
               <span className="btn-secondary pointer-events-none px-3 py-1.5 opacity-50">← Previous</span>
             )}
             {page < pageCount ? (
-              <Link
-                href={`/o/${orgSlug}/admin/applicants?${filter ? `screen=${filter}&` : ""}page=${page + 1}`}
-                className="btn-secondary px-3 py-1.5"
-              >
+              <Link href={href(activeSlug, page + 1)} className="btn-secondary px-3 py-1.5">
                 Next →
               </Link>
             ) : (

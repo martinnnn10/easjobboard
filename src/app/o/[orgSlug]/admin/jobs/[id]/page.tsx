@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { AssignRecruiterSelect } from "@/components/AssignRecruiterSelect";
 import { ConfirmCareTaskPanel } from "@/components/ConfirmCareTaskPanel";
 import { DistributionPanel } from "@/components/DistributionPanel";
+import { DrilldownCounts, jobApplicantsHref } from "@/components/JobDrilldownCounts";
 import { ScheduleInterviewForm } from "@/components/ScheduleInterviewForm";
 import { StatusBadge } from "@/components/StatusBadge";
+import { getJobScreeningSummaries } from "@/lib/applications";
 import { APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
 import { assignedCandidatesForJob, jobApplicants } from "@/lib/candidate-care";
@@ -42,7 +44,19 @@ export default async function JobDetailPage({ params }: PageProps) {
   const job = getJobById(id);
   if (!job || job.organization_id !== organization.id) notFound();
   // Restricted job: hide from users who aren't on its visibility list.
-  if (!canSeeJob(getJobAccess(organization.id, user), job.id)) notFound();
+  const access = getJobAccess(organization.id, user);
+  if (!canSeeJob(access, job.id)) notFound();
+
+  // Per-job applicant intelligence — the same counts the Jobs table shows, so
+  // the drill-downs here open exactly those candidates.
+  const summary = getJobScreeningSummaries(organization.id, access)[id] ?? {
+    applicants: 0,
+    completed: 0,
+    strongFit: 0,
+    needsReview: 0,
+    highRisk: 0,
+    callsDue: 0,
+  };
 
   const assigned = assignedCandidatesForJob(organization.id, id);
   const assignedIds = new Set(assigned.map((a) => a.candidateId));
@@ -89,17 +103,70 @@ export default async function JobDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <DistributionPanel
-        orgSlug={orgSlug}
-        jobId={job.id}
-        writable={writable}
-        published={job.status === "published"}
-        channels={distribution}
-        links={distLinks}
-        feedUrl={feedUrl}
-        linkedInText={linkedInShareText(job, organization, orgSlug)}
-        manualPostingText={manualPostingText(job, organization, orgSlug)}
-      />
+      {/* Command-center quick links */}
+      <nav className="flex flex-wrap gap-2 text-sm">
+        <span className="rounded-full bg-zinc-900 px-3 py-1.5 font-medium text-white">Overview</span>
+        <Link
+          href={jobApplicantsHref(orgSlug, job.id)}
+          className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          Applicants
+        </Link>
+        <Link
+          href={jobApplicantsHref(orgSlug, job.id, "screened")}
+          className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          Screening
+        </Link>
+        <Link
+          href={`/o/${orgSlug}/admin/queue`}
+          className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          Call Queue
+        </Link>
+        <a
+          href="#distribution"
+          className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          Distribution
+        </a>
+      </nav>
+
+      {/* Applicant intelligence — drill straight into this job's candidates */}
+      <section className="card space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-zinc-900">Applicant intelligence</h2>
+          <Link
+            href={jobApplicantsHref(orgSlug, job.id)}
+            className="inline-flex items-center justify-center rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            {summary.applicants > 0
+              ? `View ${summary.applicants} applicant${summary.applicants === 1 ? "" : "s"}`
+              : "View applicants"}
+          </Link>
+        </div>
+        {summary.applicants > 0 ? (
+          <DrilldownCounts orgSlug={orgSlug} jobId={job.id} counts={summary} />
+        ) : (
+          <p className="text-sm text-zinc-500">
+            No applicants yet. Share this job&apos;s apply link or attach candidates from your pool.
+          </p>
+        )}
+      </section>
+
+      <section id="distribution" className="scroll-mt-6">
+        <DistributionPanel
+          orgSlug={orgSlug}
+          jobId={job.id}
+          writable={writable}
+          published={job.status === "published"}
+          channels={distribution}
+          links={distLinks}
+          feedUrl={feedUrl}
+          linkedInText={linkedInShareText(job, organization, orgSlug)}
+          manualPostingText={manualPostingText(job, organization, orgSlug)}
+        />
+      </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-zinc-900">Assigned candidates</h2>

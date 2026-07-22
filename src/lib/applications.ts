@@ -293,6 +293,72 @@ export function getApplicationResume(
   };
 }
 
+/**
+ * Drill-down categories for the Jobs → Applicants workflow. Each maps to a SQL
+ * fragment (see applicationCategoryClause) that mirrors EXACTLY the per-job
+ * counts in getJobScreeningSummaries, so a count and the list it opens can
+ * never disagree.
+ */
+export type ApplicationCategory =
+  | "all"
+  | "screened"
+  | "strong-fit"
+  | "review"
+  | "high-risk"
+  | "calls-due"
+  | "resume-only";
+
+export function isApplicationCategory(value: unknown): value is ApplicationCategory {
+  return (
+    value === "all" ||
+    value === "screened" ||
+    value === "strong-fit" ||
+    value === "review" ||
+    value === "high-risk" ||
+    value === "calls-due" ||
+    value === "resume-only"
+  );
+}
+
+/**
+ * SQL WHERE fragment (and params) for a drill-down category. `col` is an optional
+ * table-alias prefix (e.g. "a."). These conditions mirror getJobScreeningSummaries
+ * one-for-one — reusing the shared STRONG_FIT / REVIEW_FLOOR thresholds — so the
+ * number a recruiter clicks always equals the rows they land on.
+ */
+export function applicationCategoryClause(
+  category: ApplicationCategory | undefined,
+  col = "",
+): { clause: string; params: number[] } {
+  const c = col;
+  switch (category) {
+    case "screened":
+      return { clause: ` AND ${c}screen_status = 'completed' AND ${c}screen_score IS NOT NULL`, params: [] };
+    case "strong-fit":
+      return {
+        clause: ` AND ${c}screen_status = 'completed' AND ${c}screen_score >= ? AND ${c}risk_level != 'high'`,
+        params: [STRONG_FIT],
+      };
+    case "review":
+      return {
+        clause: ` AND ${c}screen_status = 'completed' AND ${c}screen_score >= ? AND ${c}screen_score < ?`,
+        params: [REVIEW_FLOOR, STRONG_FIT],
+      };
+    case "high-risk":
+      return { clause: ` AND ${c}risk_level = 'high'`, params: [] };
+    case "calls-due":
+      return {
+        clause: ` AND ${c}screen_status = 'completed' AND ${c}screen_score >= ? AND ${c}status IN ('new','screening')`,
+        params: [REVIEW_FLOOR],
+      };
+    case "resume-only":
+      return { clause: ` AND ${c}screen_status != 'completed'`, params: [] };
+    case "all":
+    default:
+      return { clause: "", params: [] };
+  }
+}
+
 export type ListApplicationsOptions = {
   orderBy?: "recent" | "score";
   /** Max rows to return. Omit for all rows. */
@@ -303,6 +369,10 @@ export type ListApplicationsOptions = {
   screenOutcome?: string;
   /** Only applications that never completed a skills screen (resume-only). */
   resumeOnly?: boolean;
+  /** Restrict to a single job (Jobs → Applicants drill-down). */
+  jobId?: string;
+  /** Drill-down category; matches the Jobs-page intelligence counts exactly. */
+  category?: ApplicationCategory;
   /** Per-job visibility; omit to return all org applications (internal callers). */
   access?: JobAccess;
 };
@@ -311,7 +381,7 @@ export function listApplicationsByOrganization(
   organizationId: string,
   options: ListApplicationsOptions = {},
 ): ApplicationWithJob[] {
-  const { orderBy = "recent", limit, offset = 0, screenOutcome, resumeOnly, access } = options;
+  const { orderBy = "recent", limit, offset = 0, screenOutcome, resumeOnly, jobId, category, access } = options;
 
   // "score" ranks by practical skills-screen score first (nulls last), then
   // resume keyword match, then recency; "recent" is reverse-chronological.
@@ -322,12 +392,21 @@ export function listApplicationsByOrganization(
 
   const params: Array<string | number> = [organizationId];
   let whereClause = "";
+  if (jobId) {
+    whereClause += " AND a.job_id = ?";
+    params.push(jobId);
+  }
   if (screenOutcome) {
     whereClause += " AND a.screen_outcome = ?";
     params.push(screenOutcome);
   }
   if (resumeOnly) {
     whereClause += " AND a.screen_status != 'completed'";
+  }
+  if (category) {
+    const cat = applicationCategoryClause(category, "a.");
+    whereClause += cat.clause;
+    params.push(...cat.params);
   }
   if (access) {
     const vis = hiddenJobsSql(access, "a.job_id");
@@ -346,9 +425,9 @@ export function listApplicationsByOrganization(
     .prepare(
       // Explicit columns: never load the resume BLOB or full extracted text into
       // memory for list views — only the small fields the table renders.
-      `SELECT a.id, a.organization_id, a.job_id, a.applicant_name, a.applicant_email,
+      `SELECT a.id, a.organization_id, a.job_id, a.candidate_id, a.applicant_name, a.applicant_email,
               a.applicant_phone, a.cover_letter, a.resume_filename, a.resume_content_type,
-              a.status, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
+              a.status, a.source, a.resume_skills, a.match_score, a.applicant_location, a.desired_pay,
               a.screen_status, a.screen_score, a.screen_outcome, a.risk_level, a.risk_flags, a.screen_summary,
               a.is_demo, a.created_at, j.title AS job_title, j.slug AS job_slug
        FROM applications a
@@ -386,6 +465,43 @@ export function countApplicationsByOrganization(
   sql += vis.clause;
   params.push(...vis.params);
   sql += demoFilterSql(organizationId);
+  const row = getDb().prepare(sql).get(...params) as { count: number };
+  return row.count;
+}
+
+/**
+ * Count applications for the Jobs → Applicants drill-down: optionally scoped to a
+ * single job and/or a category. Uses applicationCategoryClause, so these counts
+ * line up exactly with the list a recruiter opens and with the Jobs-page numbers.
+ */
+export function countApplications(opts: {
+  organizationId: string;
+  jobId?: string;
+  category?: ApplicationCategory;
+  /** Knockout verdict filter: "qualified" | "knockout". */
+  screenOutcome?: string;
+  access?: JobAccess;
+}): number {
+  const { organizationId, jobId, category, screenOutcome, access } = opts;
+  const params: Array<string | number> = [organizationId];
+  let sql = "SELECT COUNT(*) AS count FROM applications a WHERE a.organization_id = ?";
+  if (jobId) {
+    sql += " AND a.job_id = ?";
+    params.push(jobId);
+  }
+  if (screenOutcome) {
+    sql += " AND a.screen_outcome = ?";
+    params.push(screenOutcome);
+  }
+  const cat = applicationCategoryClause(category, "a.");
+  sql += cat.clause;
+  params.push(...cat.params);
+  if (access) {
+    const vis = hiddenJobsSql(access, "a.job_id");
+    sql += vis.clause;
+    params.push(...vis.params);
+  }
+  sql += demoFilterSql(organizationId, "a.is_demo");
   const row = getDb().prepare(sql).get(...params) as { count: number };
   return row.count;
 }

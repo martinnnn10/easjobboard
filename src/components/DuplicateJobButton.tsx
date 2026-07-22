@@ -7,7 +7,15 @@ import { useRouter } from "next/navigation";
  * Clones a job into a new draft and navigates to its editor — for reposting the
  * same role in a different city without retyping everything.
  */
-export function DuplicateJobButton({ orgSlug, jobId }: { orgSlug: string; jobId: string }) {
+export function DuplicateJobButton({
+  orgSlug,
+  jobId,
+  className,
+}: {
+  orgSlug: string;
+  jobId: string;
+  className?: string;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -36,7 +44,7 @@ export function DuplicateJobButton({ orgSlug, jobId }: { orgSlug: string; jobId:
       type="button"
       onClick={duplicate}
       disabled={busy}
-      className="text-blue-600 hover:underline disabled:opacity-50"
+      className={className ?? "text-blue-600 hover:underline disabled:opacity-50"}
     >
       {busy ? "Duplicating…" : "Duplicate"}
     </button>
