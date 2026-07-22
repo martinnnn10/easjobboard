@@ -151,6 +151,13 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
         <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
       </>
     ),
+    screens: (
+      <>
+        <rect x="5" y="3" width="14" height="18" rx="2" />
+        <path d="M9 3.5h6a1 1 0 0 1 1 1V6a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z" />
+        <path d="M8.5 12.5l2 2 4-4.5" />
+      </>
+    ),
     applicants: (
       <>
         <path d="M14 6h6M14 10h6M14 14h4" />

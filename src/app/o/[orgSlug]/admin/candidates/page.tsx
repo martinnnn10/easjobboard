@@ -8,6 +8,7 @@ import { requireOrgSession } from "@/lib/auth";
 import { getPoolSkills, listCandidates, type CandidateView } from "@/lib/candidates";
 import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { listJobsByOrganization } from "@/lib/jobs";
+import { listPublishedScreenOptions } from "@/lib/screen-store";
 import { SCREEN_OPTIONS } from "@/lib/screens";
 import {
   CANDIDATE_CRM_STATUS_LABELS,
@@ -80,7 +81,10 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
         .filter((j) => canSeeJob(access, j.id))
         .map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
     : [];
-  const screenOptions = SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label }));
+  const screenOptions = [
+    ...SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label })),
+    ...listPublishedScreenOptions(organization.id),
+  ];
 
   // Preserve the active tab when the filter form submits.
   const tabQuery = (v: CandidateView) => (v === "all" ? "" : `?view=${v}`);

@@ -40,6 +40,7 @@ export default async function AdminLayout({ children, params }: LayoutProps) {
     { key: "dashboard", label: "Dashboard", href: base },
     { key: "queue", label: "Call Queue", href: `${base}/queue` },
     { key: "jobs", label: isAgency ? "Job Orders" : "Jobs", href: `${base}/jobs` },
+    { key: "screens", label: "Skills Screens", href: `${base}/screens` },
     { key: "candidates", label: isAgency ? "Candidates" : "Applicants", href: `${base}/candidates` },
     { key: "pipeline", label: "Pipeline", href: `${base}/pipeline` },
     { key: "care", label: "Candidate Care", href: `${base}/care` },

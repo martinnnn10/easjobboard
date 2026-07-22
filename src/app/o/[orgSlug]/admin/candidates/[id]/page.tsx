@@ -24,7 +24,8 @@ import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam, canWrite } from "@/lib/roles";
 import { getInvitesForCandidate } from "@/lib/screen-invites";
 import { getScreenSubmission } from "@/lib/screen-submissions";
-import { DIMENSION_LABELS, SCREEN_OPTIONS, getScreenLabel, type ScreenDimension } from "@/lib/screens";
+import { listPublishedScreenOptions, resolveScreenLabel } from "@/lib/screen-store";
+import { DIMENSION_LABELS, SCREEN_OPTIONS, type ScreenDimension } from "@/lib/screens";
 import { listUsersByOrganization } from "@/lib/users";
 
 type PageProps = { params: Promise<{ orgSlug: string; id: string }> };
@@ -104,7 +105,10 @@ export default async function CandidateProfilePage({ params }: PageProps) {
         .filter((j) => canSeeJob(access, j.id))
         .map((j) => ({ id: j.id, title: j.title, screenKey: j.screen_key }))
     : [];
-  const screenOptions = SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label }));
+  const screenOptions = [
+    ...SCREEN_OPTIONS.map((o) => ({ key: o.key, label: o.label })),
+    ...listPublishedScreenOptions(organization.id),
+  ];
 
   // Candidate Care: assignments, interviews, and the follow-up tasks that keep
   // this candidate warm around each interview.
@@ -343,7 +347,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
             <p className="text-xs text-zinc-500">
               Sent {new Date(pendingInvite.sent_at).toLocaleDateString()}
               {pendingInvite.sent_by ? ` by ${pendingInvite.sent_by}` : ""}
-              {getScreenLabel(pendingInvite.screen_key) ? ` · ${getScreenLabel(pendingInvite.screen_key)}` : ""}. Their
+              {resolveScreenLabel(pendingInvite.screen_key) ? ` · ${resolveScreenLabel(pendingInvite.screen_key)}` : ""}. Their
               demonstrated-ability score and the intelligence below light up the moment they finish.
             </p>
           </div>

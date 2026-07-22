@@ -14,7 +14,7 @@ import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { canWrite } from "@/lib/roles";
 import { createScreenInvite } from "@/lib/screen-invites";
-import { getScreenLabel, isScreenKey } from "@/lib/screens";
+import { resolveScreenLabel, screenBelongsToOrg, screenExists } from "@/lib/screen-store";
 
 export const runtime = "nodejs";
 
@@ -64,9 +64,11 @@ export async function POST(request: Request, context: RouteContext) {
     // screen. A job with no screen requires the recruiter to pick one.
     const overrideKey = typeof body.screen_key === "string" ? body.screen_key.trim() : "";
     const screenKey = overrideKey || job.screen_key;
-    if (!isScreenKey(screenKey)) {
+    // Accept built-in screens and the org's own custom screens; never another
+    // org's screen (isolation), and never an unresolvable key.
+    if (!screenKey || !screenExists(screenKey) || !screenBelongsToOrg(screenKey, organization.id)) {
       return NextResponse.json(
-        { error: "This job has no skills screen configured. Choose a screen template to send." },
+        { error: "This job has no skills screen configured. Choose a screen to send." },
         { status: 400 },
       );
     }
@@ -114,7 +116,7 @@ export async function POST(request: Request, context: RouteContext) {
     });
 
     const link = `${getPublicBaseUrl()}/screen/${invite.token}`;
-    const screenLabel = getScreenLabel(screenKey);
+    const screenLabel = resolveScreenLabel(screenKey);
 
     // Deliver by email when we can; always return the link for copy-send.
     let emailed = false;

@@ -30,6 +30,7 @@ export type ScreenInvite = {
   message: string;
   sent_by: string;
   sent_at: string;
+  started_at: string;
   completed_at: string;
   expires_at: string;
   created_at: string;
@@ -49,6 +50,7 @@ function rowToInvite(row: Record<string, unknown>): ScreenInvite {
     message: (row.message as string | undefined) ?? "",
     sent_by: (row.sent_by as string | undefined) ?? "",
     sent_at: (row.sent_at as string | undefined) ?? "",
+    started_at: (row.started_at as string | undefined) ?? "",
     completed_at: (row.completed_at as string | undefined) ?? "",
     expires_at: (row.expires_at as string | undefined) ?? "",
     created_at: row.created_at as string,
@@ -128,6 +130,26 @@ export function getInvitesForCandidate(candidateId: string, organizationId: stri
     .prepare("SELECT * FROM screen_invites WHERE candidate_id = ? AND organization_id = ? ORDER BY sent_at DESC")
     .all(candidateId, organizationId) as Array<Record<string, unknown>>;
   return rows.map(rowToInvite);
+}
+
+/** Invites for a job, newest first — drives the job command center funnel. */
+export function getInvitesForJob(jobId: string, organizationId: string): ScreenInvite[] {
+  const rows = getDb()
+    .prepare("SELECT * FROM screen_invites WHERE job_id = ? AND organization_id = ? ORDER BY sent_at DESC")
+    .all(jobId, organizationId) as Array<Record<string, unknown>>;
+  return rows.map(rowToInvite);
+}
+
+/**
+ * Stamp the moment a candidate first opened their screen link (once). Never
+ * changes status or touches a completed invite — purely a funnel signal.
+ */
+export function markInviteStarted(token: string): void {
+  getDb()
+    .prepare(
+      "UPDATE screen_invites SET started_at = ? WHERE token = ? AND started_at = '' AND status = 'pending'",
+    )
+    .run(new Date().toISOString(), token);
 }
 
 /**

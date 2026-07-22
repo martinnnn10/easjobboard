@@ -36,12 +36,54 @@ export const DIMENSION_LABELS: Record<ScreenDimension, string> = {
 
 export type QuestionType =
   | "multiple_choice"
+  | "multi_select"
   | "short_answer"
   | "scenario"
   | "ranking"
   | "experience";
 
 export type RankingItem = { id: string; text: string };
+
+/** Manufacturing categories for the self-service screen library (Deploy 21). */
+export type ScreenCategory =
+  | "industrial_maintenance"
+  | "electrical_maintenance"
+  | "controls_plc"
+  | "automation_engineering"
+  | "reliability"
+  | "maintenance_leadership"
+  | "production_operations"
+  | "utilities_refrigeration"
+  | "safety_loto"
+  | "custom";
+
+export const SCREEN_CATEGORY_LABELS: Record<ScreenCategory, string> = {
+  industrial_maintenance: "Industrial Maintenance",
+  electrical_maintenance: "Electrical Maintenance",
+  controls_plc: "Controls / PLC",
+  automation_engineering: "Automation Engineering",
+  reliability: "Reliability",
+  maintenance_leadership: "Maintenance Leadership",
+  production_operations: "Production / Operations",
+  utilities_refrigeration: "Utilities / Refrigeration",
+  safety_loto: "Safety / LOTO",
+  custom: "Custom",
+};
+
+export const SCREEN_CATEGORIES = Object.keys(SCREEN_CATEGORY_LABELS) as ScreenCategory[];
+
+export function isScreenCategory(value: unknown): value is ScreenCategory {
+  return typeof value === "string" && value in SCREEN_CATEGORY_LABELS;
+}
+
+export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  multiple_choice: "Single-answer multiple choice",
+  multi_select: "Multiple-select",
+  scenario: "Scenario-based diagnostic",
+  ranking: "Ordered troubleshooting steps",
+  short_answer: "Short written response",
+  experience: "Experience level",
+};
 
 export type ScreenQuestion = {
   id: string;
@@ -53,16 +95,33 @@ export type ScreenQuestion = {
   weight: number;
   help?: string;
   /**
-   * Safety-critical / knockout question: if answered and scored below the
-   * must-pass threshold, the applicant is auto-disqualified regardless of
-   * overall score. Used for lockout/tagout and zero-energy verification.
+   * Safety-critical question (LOTO, zero-energy verification): if answered and
+   * scored below the must-pass threshold, the applicant is flagged as a
+   * safety-critical failure / knockout regardless of overall score.
    */
   mustPass?: boolean;
+  /**
+   * General knockout: failing this question (below the must-pass threshold)
+   * flags the applicant as a knockout, without asserting a safety concern.
+   * Distinct from `mustPass`, which additionally means "safety-critical".
+   */
+  knockout?: boolean;
+  /** Author-chosen difficulty, surfaced in the builder and evidence view. */
+  difficulty?: "easy" | "medium" | "hard";
+  /**
+   * Shown AFTER submission only (never to the candidate mid-screen): why the
+   * correct answer is correct. Recruiter/evidence facing.
+   */
+  explanation?: string;
+  /** Optional evidence/risk interpretation shown on the recruiter results view. */
+  riskInterpretation?: string;
 
-  // multiple_choice / experience
+  // multiple_choice / experience / multi_select
   options?: string[];
   /** Correct option index (multiple_choice). Server-side only. */
   correctIndex?: number;
+  /** Correct option indices (multi_select). Server-side only. */
+  correctIndices?: number[];
   /**
    * Score per option for `experience` questions (0-100), index-aligned to
    * `options`. Server-side only.
@@ -79,13 +138,24 @@ export type ScreenQuestion = {
   idealPoints?: { label: string; any: string[] }[];
   /** Interview follow-up to ask when this answer is weak. */
   followUpIfWeak?: string;
+  /**
+   * Written response that is NOT auto-scored — held for a recruiter to read and
+   * judge. Honors "don't score written answers with unsupported AI certainty":
+   * a manual-review question is excluded from the automatic weighted score and
+   * listed for human review instead.
+   */
+  manualReview?: boolean;
 
   // ranking — `items` are stored in the CORRECT order (server-side only)
   items?: RankingItem[];
 };
 
 export type ScreenTemplate = {
-  key: ScreenKey;
+  /**
+   * Resolution key. A built-in code template uses its ScreenKey; a DB-backed
+   * custom screen uses its version id (sv_…) or logical id (scr_…).
+   */
+  key: string;
   label: string;
   shortLabel: string;
   blurb: string;
@@ -585,6 +655,12 @@ export function isScreenKey(value: unknown): value is ScreenKey {
   return typeof value === "string" && value in ROLE_SCREENS;
 }
 
+/**
+ * Resolve a BUILT-IN screen by key. Client-safe (no DB). Custom self-service
+ * screens (sv_…/scr_… keys) are resolved server-side by `resolveScreen` in
+ * lib/screen-store, which falls back to this for built-in keys — so the scoring
+ * engine, public shape, and knockout rules work identically for both.
+ */
 export function getScreen(key: string | null | undefined): ScreenTemplate | null {
   if (!key || !isScreenKey(key)) return null;
   return ROLE_SCREENS[key];
@@ -639,7 +715,7 @@ export type PublicQuestion = {
 };
 
 export type PublicScreen = {
-  key: ScreenKey;
+  key: string;
   label: string;
   blurb: string;
   questions: PublicQuestion[];

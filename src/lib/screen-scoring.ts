@@ -1,7 +1,7 @@
 import { completeJson, isLlmConfigured } from "./anthropic";
+import { resolveScreen } from "./screen-store";
 import {
   DIMENSION_LABELS,
-  getScreen,
   type ScreenDimension,
   type ScreenQuestion,
   type ScreenTemplate,
@@ -19,8 +19,11 @@ import {
  * not by how many buzzwords it contains.
  */
 
-/** Raw answer value as submitted: text, a chosen option index, or ranking ids. */
-export type ScreenAnswerValue = string | number | string[];
+/**
+ * Raw answer value as submitted: text, a chosen option index, ranking ids
+ * (string[]), or multi-select option indices (number[]).
+ */
+export type ScreenAnswerValue = string | number | string[] | number[];
 export type ScreenAnswers = Record<string, ScreenAnswerValue>;
 
 export type PerAnswer = {
@@ -35,6 +38,8 @@ export type PerAnswer = {
   redFlags: string[];
   strongSignals: string[];
   followUp: string;
+  /** Written response held for a recruiter to read — excluded from the auto score. */
+  needsReview: boolean;
 };
 
 export type ScreenResult = {
@@ -49,6 +54,8 @@ export type ScreenResult = {
   followUpQuestions: string[];
   answeredCount: number;
   totalCount: number;
+  /** Question ids whose written answers await manual review (unscored). */
+  manualReviewQuestionIds: string[];
 };
 
 const STRONG = 70;
@@ -70,7 +77,7 @@ export type KnockoutVerdict = {
  * flags and enables filtering; it never auto-rejects the applicant.
  */
 export function evaluateKnockout(screenKey: string, result: ScreenResult): KnockoutVerdict {
-  const template = getScreen(screenKey);
+  const template = resolveScreen(screenKey);
   if (!template) return { qualified: true, reasons: [] };
 
   const reasons: string[] = [];
@@ -81,8 +88,11 @@ export function evaluateKnockout(screenKey: string, result: ScreenResult): Knock
 
   for (const answer of result.perAnswer) {
     const question = template.questions.find((q) => q.id === answer.questionId);
-    if (question?.mustPass && answer.answered && answer.score < MUST_PASS_MIN) {
+    if (!question || !answer.answered || answer.needsReview) continue;
+    if (question.mustPass && answer.score < MUST_PASS_MIN) {
       reasons.push(`Missed safety-critical question: "${question.prompt}"`);
+    } else if (question.knockout && answer.score < MUST_PASS_MIN) {
+      reasons.push(`Failed a knockout question: "${question.prompt}"`);
     }
   }
 
@@ -100,8 +110,17 @@ function answerToText(question: ScreenQuestion, value: ScreenAnswerValue | undef
     if (Number.isInteger(index) && question.options?.[index]) return question.options[index];
     return "";
   }
+  if (question.type === "multi_select") {
+    const arr = Array.isArray(value) ? value : [];
+    const opts = question.options ?? [];
+    const texts = arr
+      .map((v) => (typeof v === "number" ? v : Number(v)))
+      .filter((n) => Number.isInteger(n) && opts[n] !== undefined)
+      .map((n) => opts[n]);
+    return texts.join(", ");
+  }
   if (question.type === "ranking") {
-    const ids = Array.isArray(value) ? value : [];
+    const ids = (Array.isArray(value) ? value : []).map(String);
     const byId = new Map((question.items ?? []).map((item) => [item.id, item.text]));
     return ids.map((id) => byId.get(id)).filter(Boolean).join(" → ");
   }
@@ -109,7 +128,7 @@ function answerToText(question: ScreenQuestion, value: ScreenAnswerValue | undef
 }
 
 // ─── Deterministic scorers ─────────────────────────────────────────────────
-function scoreMultipleChoice(q: ScreenQuestion, value: ScreenAnswerValue | undefined): Omit<PerAnswer, "questionId" | "type" | "dimension" | "prompt" | "answerText" | "answered"> {
+function scoreMultipleChoice(q: ScreenQuestion, value: ScreenAnswerValue | undefined): OpenScore {
   const index = typeof value === "number" ? value : Number(value);
   const correct = Number.isInteger(index) && index === q.correctIndex;
   if (!Number.isInteger(index) || index < 0) {
@@ -130,6 +149,42 @@ function scoreMultipleChoice(q: ScreenQuestion, value: ScreenAnswerValue | undef
     redFlags: ["Incorrect on a basic judgment question"],
     strongSignals: [],
     followUp: q.followUpIfWeak ?? "",
+  };
+}
+
+/**
+ * Multi-select partial credit: reward correct picks, penalize wrong picks.
+ * score = 100 · (correctlySelected − incorrectlySelected) / |correct|, clamped.
+ * All-correct-and-nothing-wrong = 100; selecting everything is not a shortcut.
+ */
+function scoreMultiSelect(q: ScreenQuestion, value: ScreenAnswerValue | undefined): OpenScore {
+  const correct = new Set(q.correctIndices ?? []);
+  const opts = q.options ?? [];
+  const selected = (Array.isArray(value) ? value : [])
+    .map((v) => (typeof v === "number" ? v : Number(v)))
+    .filter((n) => Number.isInteger(n) && n >= 0 && n < opts.length);
+  const selectedSet = new Set(selected);
+  if (selectedSet.size === 0) {
+    return { score: 0, rationale: "No options selected.", redFlags: ["Left unanswered"], strongSignals: [], followUp: "" };
+  }
+  if (correct.size === 0) {
+    return { score: 0, rationale: "No answer key configured.", redFlags: [], strongSignals: [], followUp: "" };
+  }
+  let hits = 0;
+  let wrong = 0;
+  for (const s of selectedSet) {
+    if (correct.has(s)) hits++;
+    else wrong++;
+  }
+  const score = clampScore(((hits - wrong) / correct.size) * 100);
+  const missed = [...correct].filter((c) => !selectedSet.has(c)).length;
+  return {
+    score,
+    rationale: `Selected ${hits} of ${correct.size} correct option${correct.size === 1 ? "" : "s"}` +
+      (wrong > 0 ? `, plus ${wrong} incorrect` : "") + (missed > 0 ? `; missed ${missed}.` : "."),
+    redFlags: score < WEAK ? ["Weak on a multi-select judgment question"] : [],
+    strongSignals: score >= STRONG ? ["Correctly identified the key factors"] : [],
+    followUp: score < STRONG ? q.followUpIfWeak ?? "" : "",
   };
 }
 
@@ -309,13 +364,29 @@ function assemble(
 ): ScreenResult {
   const perAnswer: PerAnswer[] = [];
 
+  const manualReviewQuestionIds: string[] = [];
+  const isManual = new Map<string, boolean>();
+
   for (const q of template.questions) {
     const raw = answers[q.id];
     const answerText = answerToText(q, raw);
     const answered = answerText.trim().length > 0;
+    const needsReview = q.manualReview === true;
+    isManual.set(q.id, needsReview);
 
     let base: OpenScore;
-    if (q.type === "multiple_choice") base = scoreMultipleChoice(q, raw);
+    if (needsReview) {
+      // Not auto-scored — held for a human. Excluded from the weighted score.
+      base = {
+        score: 0,
+        rationale: "Written response — held for manual review.",
+        redFlags: [],
+        strongSignals: [],
+        followUp: "",
+      };
+      if (answered) manualReviewQuestionIds.push(q.id);
+    } else if (q.type === "multiple_choice") base = scoreMultipleChoice(q, raw);
+    else if (q.type === "multi_select") base = scoreMultiSelect(q, raw);
     else if (q.type === "experience") base = scoreExperience(q, raw);
     else if (q.type === "ranking") base = scoreRanking(q, raw);
     else base = openScores.get(q.id) ?? scoreOpenHeuristic(q, answerText);
@@ -332,15 +403,18 @@ function assemble(
       redFlags: base.redFlags,
       strongSignals: base.strongSignals,
       followUp: base.followUp,
+      needsReview,
     });
   }
 
-  // Weighted overall + per-dimension.
+  // Weighted overall + per-dimension. Manual-review questions are excluded from
+  // the automatic score entirely (they carry no answer key).
   const weightOf = (id: string) => template.questions.find((q) => q.id === id)?.weight ?? 1;
   let wsum = 0;
   let wtot = 0;
   const dimAgg = new Map<ScreenDimension, { s: number; w: number }>();
   for (const a of perAnswer) {
+    if (isManual.get(a.questionId)) continue;
     const w = weightOf(a.questionId);
     wsum += a.score * w;
     wtot += w;
@@ -389,6 +463,7 @@ function assemble(
     followUpQuestions,
     answeredCount,
     totalCount: template.questions.length,
+    manualReviewQuestionIds,
   };
 }
 
@@ -415,7 +490,7 @@ export function evaluateIdealPoints(
   questionId: string,
   answerText: string,
 ): { label: string; hit: boolean }[] {
-  const template = getScreen(screenKey);
+  const template = resolveScreen(screenKey);
   const question = template?.questions.find((q) => q.id === questionId);
   if (!question?.idealPoints) return [];
   const lower = (answerText ?? "").toLowerCase();
@@ -431,11 +506,11 @@ export function evaluateIdealPoints(
  * fallback path.
  */
 export function scoreScreenOffline(screenKey: string, answers: ScreenAnswers): ScreenResult | null {
-  const template = getScreen(screenKey);
+  const template = resolveScreen(screenKey);
   if (!template) return null;
   const openScores = new Map<string, OpenScore>();
   for (const q of template.questions) {
-    if (q.type === "short_answer" || q.type === "scenario") {
+    if ((q.type === "short_answer" || q.type === "scenario") && !q.manualReview) {
       openScores.set(q.id, scoreOpenHeuristic(q, answerToText(q, answers[q.id])));
     }
   }
@@ -451,11 +526,11 @@ export async function scoreScreen(
   screenKey: string,
   answers: ScreenAnswers,
 ): Promise<ScreenResult | null> {
-  const template = getScreen(screenKey);
+  const template = resolveScreen(screenKey);
   if (!template) return null;
 
   const openQuestions = template.questions.filter(
-    (q) => q.type === "short_answer" || q.type === "scenario",
+    (q) => (q.type === "short_answer" || q.type === "scenario") && !q.manualReview,
   );
 
   let openScores = new Map<string, OpenScore>();

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { PublicScreenForm } from "@/components/PublicScreenForm";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationById } from "@/lib/organizations";
-import { getInviteByToken } from "@/lib/screen-invites";
-import { getScreen, toPublicScreen } from "@/lib/screens";
+import { getInviteByToken, markInviteStarted } from "@/lib/screen-invites";
+import { estimateMinutes, resolveScreen } from "@/lib/screen-store";
+import { toPublicScreen } from "@/lib/screens";
 
 export const runtime = "nodejs";
 
@@ -61,7 +62,7 @@ export default async function ScreenTokenPage({ params }: PageProps) {
     );
   }
 
-  const template = getScreen(invite.screen_key);
+  const template = resolveScreen(invite.screen_key);
   if (!template) {
     return (
       <MessageCard
@@ -71,11 +72,16 @@ export default async function ScreenTokenPage({ params }: PageProps) {
     );
   }
 
+  // Record the first open for the recruiter's funnel (idempotent; never changes
+  // status, never touches a completed invite).
+  markInviteStarted(invite.token);
+
   const organization = getOrganizationById(invite.organization_id);
   const job = invite.job_id ? getJobById(invite.job_id) : null;
   const orgName = organization?.name ?? "the hiring team";
   const jobTitle = job?.title ?? "";
   const publicScreen = toPublicScreen(template);
+  const minutes = estimateMinutes(template.questions);
 
   return (
     <Shell>
@@ -90,6 +96,10 @@ export default async function ScreenTokenPage({ params }: PageProps) {
             This short screen helps you show what you can actually do, even if your resume does not tell the full story.
             It should only take a few minutes, and there are no trick questions — answer the way you&apos;d handle it on
             the floor.
+          </p>
+          <p className="text-xs font-medium text-zinc-500">
+            About {minutes} minute{minutes === 1 ? "" : "s"} · {publicScreen.questions.length} question
+            {publicScreen.questions.length === 1 ? "" : "s"}
           </p>
           {invite.message ? (
             <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700">

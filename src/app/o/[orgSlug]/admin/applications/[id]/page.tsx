@@ -67,7 +67,10 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
   const events = listCandidateEvents(id, organization.id);
   const submission = getScreenSubmission(id, organization.id);
   const job = getJobByOrgAndSlug(organization.id, application.job_slug);
-  const screenKey = job?.screen_key ?? submission?.screenKey ?? "";
+  // Prefer the exact version the candidate completed (pinned on the submission)
+  // so the evidence view always matches what they took — even if the job has
+  // since been re-attached to a newer screen version.
+  const screenKey = submission?.screenKey ?? job?.screen_key ?? "";
   const badges = badgesForApplication(application);
   const riskLevel = normalizeRiskLevel(application.risk_level);
   const summary = application.screen_summary;
@@ -296,14 +299,23 @@ export default async function ApplicationDetailPage({ params }: PageProps) {
               </div>
               <div className="space-y-4">
                 {submission.perAnswer.map((answer, i) => (
-                  <div key={answer.questionId} className={`rounded-lg border p-3 ${answerBand(answer.score)}`}>
+                  <div
+                    key={answer.questionId}
+                    className={`rounded-lg border p-3 ${answer.needsReview ? "border-zinc-200 bg-zinc-50" : answerBand(answer.score)}`}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-semibold text-zinc-900">
                         <span className="text-zinc-400">{i + 1}.</span> {answer.prompt}
                       </p>
-                      <span className="flex-none rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold text-zinc-800">
-                        {answer.score}
-                      </span>
+                      {answer.needsReview ? (
+                        <span className="flex-none rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                          Manual review
+                        </span>
+                      ) : (
+                        <span className="flex-none rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold text-zinc-800">
+                          {answer.score}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800">
                       {answer.answerText || <span className="italic text-zinc-400">No answer</span>}

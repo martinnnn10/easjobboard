@@ -552,6 +552,55 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_screen_invites_token ON screen_invites(token);
   `);
 
+  // ── Self-service skills-screen builder (Deploy 21) ────────────────────────
+  // Org-scoped screen library. `screen_templates` is the logical screen a
+  // customer builds and edits (the DRAFT definition lives here, editable);
+  // `screen_versions` are immutable published snapshots. A job/invite pins a
+  // specific version id (sv_…) so historic candidate results stay tied to the
+  // exact version they completed — editing a used screen creates a NEW version
+  // and never rewrites a completed one. The built-in code templates in
+  // lib/screens.ts are untouched and remain resolvable by their string keys.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS screen_templates (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      target_role TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'custom',
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'draft',
+      passing_score INTEGER NOT NULL DEFAULT 0,
+      draft_definition TEXT NOT NULL DEFAULT '{}',
+      published_version_id TEXT NOT NULL DEFAULT '',
+      published_version INTEGER NOT NULL DEFAULT 0,
+      seeded_from TEXT NOT NULL DEFAULT '',
+      created_by TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_screen_templates_org ON screen_templates(organization_id);
+    CREATE INDEX IF NOT EXISTS idx_screen_templates_status ON screen_templates(organization_id, status);
+
+    CREATE TABLE IF NOT EXISTS screen_versions (
+      id TEXT PRIMARY KEY,
+      template_id TEXT NOT NULL,
+      organization_id TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      definition TEXT NOT NULL,
+      question_count INTEGER NOT NULL DEFAULT 0,
+      estimated_minutes INTEGER NOT NULL DEFAULT 0,
+      passing_score INTEGER NOT NULL DEFAULT 0,
+      published_by TEXT NOT NULL DEFAULT '',
+      published_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id),
+      FOREIGN KEY (template_id) REFERENCES screen_templates(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_screen_versions_template ON screen_versions(template_id);
+    CREATE INDEX IF NOT EXISTS idx_screen_versions_org ON screen_versions(organization_id);
+  `);
+
   migrateLegacyJobs(database);
 
   if (!tableExists(database, "jobs")) {
@@ -810,6 +859,11 @@ function initDb(database: Database.Database): void {
   }
   if (!columnExists(database, "jobs", "screen_key")) {
     database.exec("ALTER TABLE jobs ADD COLUMN screen_key TEXT NOT NULL DEFAULT ''");
+  }
+  // When a candidate first opens their skills-screen link — powers the invite
+  // funnel (sent → started → completed) on the job command center.
+  if (!columnExists(database, "screen_invites", "started_at")) {
+    database.exec("ALTER TABLE screen_invites ADD COLUMN started_at TEXT NOT NULL DEFAULT ''");
   }
   // Demo labelling: mark sample rows so they can be badged and never mistaken
   // for real candidates in a real workspace.

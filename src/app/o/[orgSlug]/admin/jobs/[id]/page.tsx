@@ -4,6 +4,7 @@ import { AssignRecruiterSelect } from "@/components/AssignRecruiterSelect";
 import { ConfirmCareTaskPanel } from "@/components/ConfirmCareTaskPanel";
 import { DistributionPanel } from "@/components/DistributionPanel";
 import { DrilldownCounts, jobApplicantsHref } from "@/components/JobDrilldownCounts";
+import { JobScreeningPanel } from "@/components/JobScreeningPanel";
 import { ScheduleInterviewForm } from "@/components/ScheduleInterviewForm";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getJobScreeningSummaries } from "@/lib/applications";
@@ -23,6 +24,9 @@ import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam, canWrite } from "@/lib/roles";
+import { getJobScreeningMetrics } from "@/lib/screen-metrics";
+import { estimateMinutes, listScreens, resolveScreen, resolveScreenLabel, templateIdForKey } from "@/lib/screen-store";
+import { isScreenKey } from "@/lib/screens";
 import { listUsersByOrganization } from "@/lib/users";
 
 type PageProps = { params: Promise<{ orgSlug: string; id: string }> };
@@ -57,6 +61,35 @@ export default async function JobDetailPage({ params }: PageProps) {
     highRisk: 0,
     callsDue: 0,
   };
+
+  // Screening: the screen attached to this job, its funnel/outcomes, and the
+  // org's published screens available to attach — all managed from here so a
+  // recruiter never digs through settings to manage a job's screen.
+  const screenKey = job.screen_key;
+  const attachedTemplate = screenKey ? resolveScreen(screenKey) : null;
+  const attachedScreenId = templateIdForKey(screenKey);
+  const attachedRecord = attachedScreenId
+    ? listScreens(organization.id).find((s) => s.id === attachedScreenId) ?? null
+    : null;
+  const attached = attachedTemplate
+    ? {
+        label: resolveScreenLabel(screenKey) || attachedTemplate.label,
+        isBuiltin: isScreenKey(screenKey),
+        screenId: attachedScreenId,
+        questionCount: attachedTemplate.questions.length,
+        minutes: estimateMinutes(attachedTemplate.questions),
+        version: attachedRecord ? attachedRecord.publishedVersion : 0,
+        newerAvailable: Boolean(
+          attachedRecord &&
+            attachedRecord.publishedVersionId &&
+            attachedRecord.publishedVersionId !== screenKey,
+        ),
+      }
+    : null;
+  const screeningMetrics = getJobScreeningMetrics(job.id, organization.id);
+  const publishedScreens = listScreens(organization.id)
+    .filter((s) => s.status === "published" && s.publishedVersionId)
+    .map((s) => ({ id: s.id, title: s.title, version: s.publishedVersion }));
 
   const assigned = assignedCandidatesForJob(organization.id, id);
   const assignedIds = new Set(assigned.map((a) => a.candidateId));
@@ -152,6 +185,17 @@ export default async function JobDetailPage({ params }: PageProps) {
             No applicants yet. Share this job&apos;s apply link or attach candidates from your pool.
           </p>
         )}
+      </section>
+
+      <section id="screening" className="scroll-mt-6">
+        <JobScreeningPanel
+          orgSlug={orgSlug}
+          jobId={job.id}
+          writable={writable}
+          attached={attached}
+          metrics={screeningMetrics}
+          options={publishedScreens}
+        />
       </section>
 
       <section id="distribution" className="scroll-mt-6">

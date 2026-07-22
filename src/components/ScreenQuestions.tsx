@@ -64,10 +64,47 @@ function renderInput(
     );
   }
 
+  if (question.type === "multi_select") {
+    const selected = Array.isArray(value) ? (value as (string | number)[]).map(Number) : [];
+    const selectedSet = new Set(selected);
+    function toggle(i: number) {
+      const next = new Set(selectedSet);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      onChange(
+        question.id,
+        [...next].sort((a, b) => a - b),
+      );
+    }
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-zinc-500">Select all that apply.</p>
+        {(question.options ?? []).map((option, i) => (
+          <label
+            key={i}
+            className={`flex cursor-pointer items-start gap-3 rounded-lg border px-4 py-3 text-sm transition ${
+              selectedSet.has(i) ? "border-brand-600 bg-brand-50" : "border-zinc-200 hover:border-zinc-300"
+            }`}
+          >
+            <input
+              type="checkbox"
+              name={question.id}
+              checked={selectedSet.has(i)}
+              onChange={() => toggle(i)}
+              className="mt-0.5 h-4 w-4 accent-brand-600"
+            />
+            <span className="text-zinc-800">{option}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   if (question.type === "ranking") {
     const items = question.items ?? [];
     // Current order = stored ids, defaulting to the presented order.
-    const order = Array.isArray(value) && value.length === items.length ? value : items.map((it) => it.id);
+    const order: string[] =
+      Array.isArray(value) && value.length === items.length ? (value as (string | number)[]).map(String) : items.map((it) => it.id);
     const byId = new Map(items.map((it) => [it.id, it.text]));
 
     function move(from: number, to: number) {
