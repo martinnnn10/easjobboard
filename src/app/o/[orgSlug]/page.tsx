@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublishedJobsByOrganization } from "@/lib/jobs";
-import { getBrandColor, getOrganizationBySlug } from "@/lib/organizations";
+import { getBrandColor, getOrganizationBySlug, organizationHasLogo } from "@/lib/organizations";
 import { getOrgUrl, getPlatformName } from "@/lib/env";
 import type { Job } from "@/lib/db";
 
@@ -50,6 +50,7 @@ export default async function OrgCareersPage({ params }: PageProps) {
 
   const jobs = getPublishedJobsByOrganization(organization.id);
   const brandColor = getBrandColor(organization);
+  const hasLogo = organizationHasLogo(organization.id);
   const initials = organization.name
     .split(/\s+/)
     .slice(0, 2)
@@ -67,10 +68,19 @@ export default async function OrgCareersPage({ params }: PageProps) {
         <div className="mx-auto w-full max-w-6xl px-4 py-16 md:py-20">
           <div className="flex items-center gap-5">
             <div
-              className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-2xl font-bold text-white shadow-sm ring-1 ring-black/5"
-              style={{ backgroundColor: brandColor }}
+              className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl text-2xl font-bold text-white shadow-sm ring-1 ring-black/5"
+              style={hasLogo ? { backgroundColor: "#fff" } : { backgroundColor: brandColor }}
             >
-              {initials || "•"}
+              {hasLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/o/${orgSlug}/logo`}
+                  alt={organization.name}
+                  className="h-full w-full object-contain p-1"
+                />
+              ) : (
+                initials || "•"
+              )}
             </div>
             <div className="min-w-0">
               <p className="eyebrow" style={{ color: brandColor }}>

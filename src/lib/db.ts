@@ -452,6 +452,35 @@ function initDb(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_users_org ON users(organization_id);
   `);
 
+  // Per-org logo, kept in its own table so the hot organizations SELECT * never
+  // loads the image BLOB. Served publicly at /o/<slug>/logo; optional (falls
+  // back to name initials when absent).
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS organization_logos (
+      organization_id TEXT PRIMARY KEY,
+      data BLOB NOT NULL,
+      content_type TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+  `);
+
+  // Password-reset tokens. Only a SHA-256 HASH of the token is stored, so a DB
+  // leak can't be used to reset accounts. Single-use (used_at) and short-lived
+  // (expires_at). Self-service, additive — never touches login/session logic.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      organization_id TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id);
+  `);
+
   // Migration: add branding to databases created before it existed.
   if (!columnExists(database, "organizations", "brand_color")) {
     database.exec("ALTER TABLE organizations ADD COLUMN brand_color TEXT NOT NULL DEFAULT ''");

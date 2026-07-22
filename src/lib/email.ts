@@ -98,6 +98,30 @@ export async function sendApplicationEmail(input: ApplicationEmailInput): Promis
   });
 }
 
+/** Password-reset link email (self-service). Caller builds the absolute URL. */
+export async function sendPasswordResetEmail(input: {
+  to: string;
+  name: string;
+  resetUrl: string;
+}): Promise<void> {
+  const { smtp, transporter } = createTransport();
+  await transporter.sendMail({
+    from: `"${smtp.fromName}" <${smtp.fromEmail}>`,
+    to: input.to,
+    subject: `Reset your ${getPlatformName()} password`,
+    text: [
+      `Hi ${input.name || "there"},`,
+      "",
+      `We received a request to reset your ${getPlatformName()} password.`,
+      "Use the link below to choose a new one. It expires in 1 hour and can be used once:",
+      "",
+      input.resetUrl,
+      "",
+      "If you didn't request this, you can safely ignore this email — your password won't change.",
+    ].join("\n"),
+  });
+}
+
 /**
  * Recruiter-composed email to a candidate, sent from the platform on behalf of
  * the organization. Replies go to the org's hiring inbox.

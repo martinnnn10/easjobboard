@@ -186,3 +186,32 @@ export function updateOrganization(
 
   return getOrganizationById(id);
 }
+
+/** Store (or replace) an organization's careers-page logo. */
+export function setOrganizationLogo(organizationId: string, data: Buffer, contentType: string): void {
+  getDb()
+    .prepare(
+      `INSERT INTO organization_logos (organization_id, data, content_type, updated_at)
+       VALUES (@id, @data, @ct, @now)
+       ON CONFLICT(organization_id) DO UPDATE SET data = @data, content_type = @ct, updated_at = @now`,
+    )
+    .run({ id: organizationId, data, ct: contentType, now: nowIso() });
+}
+
+/** Remove an organization's logo (reverting the careers page to initials). */
+export function deleteOrganizationLogo(organizationId: string): void {
+  getDb().prepare("DELETE FROM organization_logos WHERE organization_id = ?").run(organizationId);
+}
+
+/** The logo bytes + content type for the public serve route, or null if unset. */
+export function getOrganizationLogo(organizationId: string): { data: Buffer; contentType: string } | null {
+  const row = getDb()
+    .prepare("SELECT data, content_type FROM organization_logos WHERE organization_id = ?")
+    .get(organizationId) as { data: Buffer; content_type: string } | undefined;
+  return row ? { data: Buffer.from(row.data), contentType: row.content_type } : null;
+}
+
+/** Cheap presence check (no BLOB load) for deciding logo-vs-initials in the UI. */
+export function organizationHasLogo(organizationId: string): boolean {
+  return Boolean(getDb().prepare("SELECT 1 FROM organization_logos WHERE organization_id = ?").get(organizationId));
+}

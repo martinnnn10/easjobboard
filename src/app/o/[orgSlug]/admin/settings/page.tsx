@@ -5,7 +5,8 @@ import { isLlmConfigured } from "@/lib/anthropic";
 import { requireOrgSession } from "@/lib/auth";
 import { getBillingState } from "@/lib/billing";
 import { getPlatformEmail, getPublicBaseUrl, hasConfiguredPublicDomain } from "@/lib/env";
-import { getOrganizationBySlug } from "@/lib/organizations";
+import { getBrandColor, getOrganizationBySlug, organizationHasLogo } from "@/lib/organizations";
+import { LogoUpload } from "@/components/LogoUpload";
 import { canManageTeam } from "@/lib/roles";
 import { isSourcingConfigured } from "@/lib/sourcing";
 
@@ -71,6 +72,23 @@ export default async function SettingsPage({ params }: PageProps) {
           organization_type: organization.organization_type,
         }}
       />
+
+      <section className="card space-y-3">
+        <div>
+          <h2 className="text-base font-semibold text-zinc-900">Careers page logo</h2>
+          <p className="text-sm text-zinc-600">Your company logo, shown on your public careers page and job posts.</p>
+        </div>
+        <LogoUpload
+          orgSlug={orgSlug}
+          hasLogo={organizationHasLogo(organization.id)}
+          brandColor={getBrandColor(organization)}
+          initials={organization.name
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((word) => word[0]?.toUpperCase() ?? "")
+            .join("")}
+        />
+      </section>
 
       <section className="card space-y-1">
         <h2 className="text-base font-semibold text-zinc-900">Public domain</h2>

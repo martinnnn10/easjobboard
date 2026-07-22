@@ -96,6 +96,12 @@ export async function verifyUserPassword(user: User, password: string): Promise<
   return bcrypt.compare(password, user.password_hash);
 }
 
+/** Set a user's password (same bcrypt cost as signup). Used by password reset. */
+export function setUserPassword(userId: string, newPassword: string): void {
+  const passwordHash = bcrypt.hashSync(newPassword, 10);
+  getDb().prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, userId);
+}
+
 export function listUsersByOrganization(organizationId: string): User[] {
   return getDb()
     .prepare("SELECT * FROM users WHERE organization_id = ? ORDER BY created_at ASC")
