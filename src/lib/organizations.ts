@@ -28,9 +28,11 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-const DEFAULT_BRAND_COLOR = "#2563eb";
+// EAS brand green (brand-700 "Recruit" wordmark green). White text on this
+// clears AA contrast for the careers-page employment badge.
+const DEFAULT_BRAND_COLOR = "#4a761b";
 
-/** The org's brand color, falling back to the platform default blue. */
+/** The org's brand color, falling back to the platform default EAS green. */
 export function getBrandColor(organization: Organization): string {
   return /^#[0-9a-fA-F]{6}$/.test(organization.brand_color)
     ? organization.brand_color
