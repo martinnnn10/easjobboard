@@ -784,7 +784,7 @@ export function JobForm({
         </label>
 
         {showTitleHint && titleSuggestion && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+          <div className="rounded-lg border border-brand-200 bg-brand-50 p-3">
             <div className="flex items-center justify-between">
               <p className="text-sm text-blue-800">
                 <span className="font-medium">Auto-fill available:</span> We can pre-populate employment type, salary range, and a description template for this role.
@@ -837,7 +837,7 @@ export function JobForm({
       </label>
 
       {/* Attach skills screen — the differentiator */}
-      <fieldset className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+      <fieldset className="space-y-3 rounded-lg border border-brand-200 bg-brand-50/40 p-4">
         <legend className="px-2 text-sm font-semibold text-blue-800">Attach skills screen</legend>
         <p className="text-sm text-zinc-700">
           Every applicant answers a short, role-specific screen so you can see who can actually troubleshoot — before
@@ -919,8 +919,8 @@ export function JobForm({
                     key={`${entry.city}-${entry.stateCode}`}
                     type="button"
                     onClick={() => selectCity(entry)}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
-                      index === activeSuggestionIndex ? "bg-blue-100" : ""
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-brand-50 ${
+                      index === activeSuggestionIndex ? "bg-brand-100" : ""
                     }`}
                   >
                     <span className="font-medium">{entry.city}</span>

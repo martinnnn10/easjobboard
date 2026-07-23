@@ -24,7 +24,7 @@ export type PipelineCard = {
 };
 
 const COLUMN_ACCENTS: Record<ApplicationStatus, string> = {
-  new: "border-t-blue-400",
+  new: "border-t-brand-400",
   screening: "border-t-amber-400",
   interview: "border-t-slate-400",
   offer: "border-t-teal-400",
@@ -93,7 +93,7 @@ export function PipelineBoard({
                 if (id) void moveCard(id, status);
               }}
               className={`flex min-h-48 flex-col rounded-xl border border-zinc-200 border-t-4 bg-zinc-50 ${COLUMN_ACCENTS[status]} ${
-                overColumn === status ? "ring-2 ring-blue-300" : ""
+                overColumn === status ? "ring-2 ring-brand-300" : ""
               }`}
             >
               <div className="flex items-center justify-between px-3 py-2">

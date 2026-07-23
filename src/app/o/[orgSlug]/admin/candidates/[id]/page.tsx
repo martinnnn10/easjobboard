@@ -217,7 +217,7 @@ export default async function CandidateProfilePage({ params }: PageProps) {
                     href={candidate.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700 hover:underline"
+                    className="rounded-full bg-brand-50 px-2 py-0.5 font-medium text-blue-700 hover:underline"
                   >
                     View source profile ↗
                   </a>

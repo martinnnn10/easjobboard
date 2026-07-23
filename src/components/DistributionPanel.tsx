@@ -6,7 +6,7 @@ import type { ChannelView, StatusTone } from "@/lib/distribution";
 
 const TONE_CLASS: Record<StatusTone, string> = {
   live: "bg-green-100 text-green-800",
-  eligible: "bg-blue-100 text-blue-800",
+  eligible: "bg-brand-100 text-blue-800",
   ready: "bg-amber-100 text-amber-800",
   off: "bg-zinc-100 text-zinc-500",
 };

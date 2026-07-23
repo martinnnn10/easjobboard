@@ -23,7 +23,7 @@ const QUIET_STATUSES: CandidateCrmStatus[] = ["internal_record", "not_interested
 const STATUS_ACCENT: Record<string, string> = {
   replied: "border-l-emerald-500",
   needs_outreach: "border-l-amber-500",
-  interested: "border-l-blue-500",
+  interested: "border-l-brand-500",
   contacted: "border-l-zinc-400",
 };
 
@@ -47,7 +47,7 @@ function CandidateRow({ orgSlug, candidate }: { orgSlug: string; candidate: Cand
             </span>
           ) : null}
           {candidate.ownerName ? (
-            <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
+            <span className="rounded-full bg-brand-50 px-2 py-0.5 font-medium text-blue-700">
               {candidate.ownerName}
             </span>
           ) : null}
