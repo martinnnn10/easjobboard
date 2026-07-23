@@ -13,7 +13,7 @@ import { getPublicBaseUrl } from "@/lib/env";
 import { canSeeJob, getJobAccess } from "@/lib/job-visibility";
 import { getJobById } from "@/lib/jobs";
 import { canWrite } from "@/lib/roles";
-import { createScreenInvite } from "@/lib/screen-invites";
+import { createScreenInvite, markInviteDelivered, markInviteFailed } from "@/lib/screen-invites";
 import { resolveScreenLabel, screenBelongsToOrg, screenExists } from "@/lib/screen-store";
 
 export const runtime = "nodejs";
@@ -118,11 +118,12 @@ export async function POST(request: Request, context: RouteContext) {
     const link = `${getPublicBaseUrl()}/screen/${invite.token}`;
     const screenLabel = resolveScreenLabel(screenKey);
 
-    // Deliver by email when we can; always return the link for copy-send.
+    // Deliver by email when we can; always return the link for copy-send. Record
+    // a first-class delivered/failed signal on the invite (link stays valid).
     let emailed = false;
     if (isEmailConfigured()) {
       try {
-        await sendScreenInviteEmail({
+        const { delivered } = await sendScreenInviteEmail({
           organization,
           to: candidate.email,
           candidateName: candidate.name || candidate.email,
@@ -131,8 +132,11 @@ export async function POST(request: Request, context: RouteContext) {
           message,
         });
         emailed = true;
+        if (delivered) markInviteDelivered(invite.id);
       } catch (emailError) {
-        console.error("Screen invite email failed (link still valid):", emailError);
+        // Persist a SAFE failure category only — never the raw SMTP error.
+        markInviteFailed(invite.id, "smtp_error");
+        console.error("Screen invite email failed (link still valid).");
       }
     }
 

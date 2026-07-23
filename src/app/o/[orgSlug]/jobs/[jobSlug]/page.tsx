@@ -6,7 +6,8 @@ import { getOrgJobUrl } from "@/lib/env";
 import { buildGoogleJobPostingJsonLd, serializeJsonLd } from "@/lib/feeds/google-jobs";
 import { getJobByOrgAndSlug } from "@/lib/jobs";
 import { getBrandColor, getOrganizationBySlug } from "@/lib/organizations";
-import { getScreen, toPublicScreen } from "@/lib/screens";
+import { resolveScreen } from "@/lib/screen-store";
+import { toPublicScreen } from "@/lib/screens";
 
 type PageProps = {
   params: Promise<{ orgSlug: string; jobSlug: string }>;
@@ -76,7 +77,7 @@ export default async function OrgJobPage({ params, searchParams }: PageProps) {
   };
 
   const jsonLd = buildGoogleJobPostingJsonLd(organization, job);
-  const template = getScreen(job.screen_key);
+  const template = resolveScreen(job.screen_key);
   const publicScreen = template ? toPublicScreen(template) : null;
 
   const brandColor = getBrandColor(organization);

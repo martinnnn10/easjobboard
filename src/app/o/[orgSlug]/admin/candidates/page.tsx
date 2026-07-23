@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoBadge } from "@/components/DemoBadge";
 import { ScreenScoreBadge, ScreenSignalBadges } from "@/components/ScreenSignals";
+import { BulkSendScreen } from "@/components/BulkSendScreen";
 import { SendScreenForm } from "@/components/SendScreenForm";
 import { APPLICATION_STATUSES, APPLICATION_STATUS_LABELS, type ApplicationStatus } from "@/lib/application-status";
 import { requireOrgSession } from "@/lib/auth";
@@ -112,6 +113,15 @@ export default async function CandidatesPage({ params, searchParams }: PageProps
           ) : null}
         </div>
       </div>
+
+      {writable ? (
+        <BulkSendScreen
+          orgSlug={orgSlug}
+          candidates={candidates.map((c) => ({ id: c.id, name: c.name, email: c.email }))}
+          jobs={jobs}
+          screenOptions={screenOptions}
+        />
+      ) : null}
 
       {/* Tabs — Applicants / Sourced / Needs follow-up / High risk are views of
           this one pool, not separate pages, so nobody has to guess where a

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { PublicScreenForm } from "@/components/PublicScreenForm";
 import { getJobById } from "@/lib/jobs";
 import { getOrganizationById } from "@/lib/organizations";
-import { getInviteByToken, markInviteStarted } from "@/lib/screen-invites";
+import { getInviteByToken, markInviteOpened } from "@/lib/screen-invites";
 import { estimateMinutes, resolveScreen } from "@/lib/screen-store";
 import { toPublicScreen } from "@/lib/screens";
 
@@ -72,9 +72,9 @@ export default async function ScreenTokenPage({ params }: PageProps) {
     );
   }
 
-  // Record the first open for the recruiter's funnel (idempotent; never changes
-  // status, never touches a completed invite).
-  markInviteStarted(invite.token);
+  // Record the first OPEN for the recruiter's funnel (idempotent; never changes
+  // status). "Started" is stamped separately when the candidate begins answering.
+  markInviteOpened(invite.token);
 
   const organization = getOrganizationById(invite.organization_id);
   const job = invite.job_id ? getJobById(invite.job_id) : null;

@@ -13,10 +13,13 @@ const WEAK = 45;
 
 export type JobScreeningMetrics = {
   invited: number;
+  delivered: number;
+  opened: number;
   started: number;
   completed: number;
   pending: number;
   expired: number;
+  failed: number;
   scored: number;
   averageScore: number | null;
   strongFit: number;
@@ -28,7 +31,11 @@ export function getJobScreeningMetrics(jobId: string, orgId: string): JobScreeni
   const invites = getInvitesForJob(jobId, orgId);
   const invited = invites.length;
   const completed = invites.filter((i) => i.status === "completed").length;
+  // Opened = loaded the page; Started = began answering — kept distinct.
+  const opened = invites.filter((i) => i.status === "completed" || i.opened_at || i.started_at).length;
   const started = invites.filter((i) => i.status === "completed" || i.started_at).length;
+  const delivered = invites.filter((i) => i.delivered_at).length;
+  const failed = invites.filter((i) => i.failed_at && !i.delivered_at && i.status !== "completed").length;
   const expired = invites.filter((i) => i.status === "expired").length;
   const pending = invites.filter((i) => i.status === "pending").length;
 
@@ -57,10 +64,13 @@ export function getJobScreeningMetrics(jobId: string, orgId: string): JobScreeni
 
   return {
     invited,
+    delivered,
+    opened,
     started,
     completed,
     pending,
     expired,
+    failed,
     scored,
     averageScore: scored === 0 ? null : Math.round(sum / scored),
     strongFit,

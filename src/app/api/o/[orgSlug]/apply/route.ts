@@ -14,9 +14,12 @@ import { getOrganizationBySlug } from "@/lib/organizations";
 import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { extractResumeText } from "@/lib/resume-parsing";
 import { scoreResume } from "@/lib/scoring";
+import { createScreenInvite } from "@/lib/screen-invites";
 import { evaluateKnockout, scoreScreen, type ScreenAnswers } from "@/lib/screen-scoring";
+import { resolveScreen } from "@/lib/screen-store";
 import { saveScreenSubmission } from "@/lib/screen-submissions";
-import { DIMENSION_LABELS, getScreen, type ScreenDimension } from "@/lib/screens";
+import { DIMENSION_LABELS, type ScreenDimension } from "@/lib/screens";
+import { getPublicBaseUrl } from "@/lib/env";
 import type { ScreenStatus } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -153,7 +156,10 @@ export async function POST(request: Request, context: RouteContext) {
     // Parse the candidate's screen answers (if the job has a screen attached),
     // score them, and assess pay/commute/tenure risk. Never fail the submission
     // over scoring problems — degrade to "pending"/no-score and store the rest.
-    const screen = getScreen(job.screen_key);
+    // Resolve built-in AND custom (sv_…) screens so a job with a self-service
+    // custom screen offers it on the public apply page too, pinned to the exact
+    // version attached to the job at application time.
+    const screen = resolveScreen(job.screen_key);
     let screenAnswers: ScreenAnswers = {};
     if (screenAnswersRaw) {
       try {
@@ -294,6 +300,28 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
 
+    // Offer the skills screen for LATER completion: when the job has a screen but
+    // the candidate applied resume-only (skipped), mint a secure, version-pinned
+    // invite so they can return and complete it without re-applying. This never
+    // blocks or fails the application, and it pins job.screen_key (the exact
+    // version attached at application time).
+    let screenLink = "";
+    if (screen && screenStatus === "skipped") {
+      try {
+        const invite = createScreenInvite({
+          organization_id: organization.id,
+          candidate_id: application.candidate_id,
+          job_id: job.id,
+          application_id: application.id,
+          screen_key: job.screen_key,
+          source: "apply",
+        });
+        screenLink = `${getPublicBaseUrl()}/screen/${invite.token}`;
+      } catch {
+        console.error("Post-apply screen invite creation failed (application still saved).");
+      }
+    }
+
     // Fire-and-forget the recruiter/org notification email: the application is
     // already saved, so the applicant shouldn't wait on (or be failed by) a
     // slow/unreachable SMTP server. Gated on the job's notify_on_apply flag —
@@ -343,7 +371,14 @@ export async function POST(request: Request, context: RouteContext) {
           }
         : null;
 
-    return NextResponse.json({ ok: true, report });
+    // screenLink is present only when a screen was offered and skipped — the
+    // confirmation UI uses it to invite the candidate to complete it later.
+    return NextResponse.json({
+      ok: true,
+      report,
+      screenLink: screenLink || undefined,
+      screenTitle: screen ? screen.shortLabel : undefined,
+    });
   } catch (error) {
     console.error("Application failed:", error);
     return NextResponse.json(

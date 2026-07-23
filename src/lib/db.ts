@@ -865,6 +865,46 @@ function initDb(database: Database.Database): void {
   if (!columnExists(database, "screen_invites", "started_at")) {
     database.exec("ALTER TABLE screen_invites ADD COLUMN started_at TEXT NOT NULL DEFAULT ''");
   }
+  // First-class invitation lifecycle (Deploy 22). opened_at = candidate loaded
+  // the screen page; started_at (above) = candidate began answering — kept
+  // separate. delivered_at set only when the mail provider accepts the message;
+  // failed_at + failure_reason persist a SAFE category (never SMTP secrets).
+  for (const col of ["opened_at", "delivered_at", "failed_at"]) {
+    if (!columnExists(database, "screen_invites", col)) {
+      database.exec(`ALTER TABLE screen_invites ADD COLUMN ${col} TEXT NOT NULL DEFAULT ''`);
+    }
+  }
+  if (!columnExists(database, "screen_invites", "failure_reason")) {
+    database.exec("ALTER TABLE screen_invites ADD COLUMN failure_reason TEXT NOT NULL DEFAULT ''");
+  }
+  // Bulk send batches (Deploy 22): one row per recruiter bulk-invite action.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS screen_invite_batches (
+      id TEXT PRIMARY KEY,
+      organization_id TEXT NOT NULL,
+      job_id TEXT NOT NULL DEFAULT '',
+      screen_key TEXT NOT NULL DEFAULT '',
+      created_by TEXT NOT NULL DEFAULT '',
+      total_selected INTEGER NOT NULL DEFAULT 0,
+      sent INTEGER NOT NULL DEFAULT 0,
+      skipped INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_screen_invite_batches_org ON screen_invite_batches(organization_id);
+  `);
+  // Durable, PM2-restart-surviving rate limiting for app-level auth endpoints
+  // the proxy doesn't intercept (forgot/reset password). Same fixed-window
+  // design as the Deploy 20 proxy limiter — one shared mechanism, not a second.
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS auth_rate_limits (
+      bucket_key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL DEFAULT 0,
+      reset_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_rate_limits_reset ON auth_rate_limits(reset_at);
+  `);
   // Demo labelling: mark sample rows so they can be badged and never mistaken
   // for real candidates in a real workspace.
   if (!columnExists(database, "applications", "is_demo")) {

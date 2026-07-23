@@ -147,6 +147,13 @@ export async function sendCandidateEmail(input: {
  * Skills-screen invitation to a candidate: a short, respectful ask with the
  * secure link. Sent from the org; replies route to the org's hiring inbox.
  */
+/**
+ * Delivery signal for the invitation funnel. `delivered` is true only when the
+ * mail provider ACCEPTED the recipient (nodemailer `accepted`) — the closest
+ * confirmation available without provider webhooks.
+ */
+export type EmailDeliveryResult = { delivered: boolean };
+
 export async function sendScreenInviteEmail(input: {
   organization: Organization;
   to: string;
@@ -154,12 +161,12 @@ export async function sendScreenInviteEmail(input: {
   jobTitle: string;
   link: string;
   message?: string;
-}): Promise<void> {
+}): Promise<EmailDeliveryResult> {
   const { smtp, transporter } = createTransport();
   const firstName = input.candidateName.split(/\s+/)[0] || "there";
   const roleSuffix = input.jobTitle ? ` for ${input.jobTitle}` : "";
 
-  await transporter.sendMail({
+  const info = (await transporter.sendMail({
     from: `"${input.organization.name}" <${smtp.fromEmail}>`,
     to: input.to,
     replyTo: input.organization.application_email,
@@ -177,7 +184,11 @@ export async function sendScreenInviteEmail(input: {
     ]
       .filter((line) => line !== null)
       .join("\n"),
-  });
+  })) as { accepted?: unknown[]; rejected?: unknown[] };
+
+  const delivered = Array.isArray(info?.accepted) && info.accepted.length > 0 &&
+    (!Array.isArray(info?.rejected) || info.rejected.length === 0);
+  return { delivered };
 }
 
 /**

@@ -30,10 +30,64 @@ export type ScreenInvite = {
   message: string;
   sent_by: string;
   sent_at: string;
+  /** Candidate loaded the screen page (distinct from started_at). */
+  opened_at: string;
+  /** Candidate began answering (a beacon fires on first interaction). */
   started_at: string;
   completed_at: string;
   expires_at: string;
+  /** Mail provider accepted the message (empty when SMTP unconfigured). */
+  delivered_at: string;
+  /** When an email send failed (link still valid — invite is not lost). */
+  failed_at: string;
+  /** SAFE failure category/message — never SMTP credentials or secrets. */
+  failure_reason: string;
   created_at: string;
+};
+
+/**
+ * First-class display status for the invitation, derived most-advanced-first
+ * from the lifecycle timestamps. Opened and Started are separate signals.
+ */
+export type ScreenInviteDisplayStatus =
+  | "completed"
+  | "started"
+  | "opened"
+  | "delivered"
+  | "sent"
+  | "expired"
+  | "failed";
+
+export function deriveInviteDisplayStatus(invite: ScreenInvite): ScreenInviteDisplayStatus {
+  if (invite.status === "completed" || invite.completed_at) return "completed";
+  if (invite.status === "expired") return "expired";
+  if (invite.started_at) return "started";
+  if (invite.opened_at) return "opened";
+  // A delivery failure only surfaces when the candidate hasn't progressed past it.
+  if (invite.failed_at && !invite.delivered_at) return "failed";
+  if (invite.delivered_at) return "delivered";
+  return "sent";
+}
+
+export const INVITE_STATUS_LABELS: Record<ScreenInviteDisplayStatus, string> = {
+  sent: "Sent",
+  delivered: "Delivered",
+  opened: "Opened",
+  started: "Started",
+  completed: "Completed",
+  expired: "Expired",
+  failed: "Email failed",
+};
+
+/** On-brand badge classes (EAS steel/slate/green/amber — never purple). */
+export const INVITE_STATUS_BADGE: Record<ScreenInviteDisplayStatus, string> = {
+  sent: "bg-slate-100 text-slate-700",
+  delivered: "bg-sky-50 text-sky-700",
+  opened: "bg-teal-50 text-teal-700",
+  started: "bg-amber-50 text-amber-700",
+  completed: "bg-green-50 text-green-700",
+  expired: "bg-zinc-100 text-zinc-500",
+  failed: "bg-red-50 text-red-700",
 };
 
 function rowToInvite(row: Record<string, unknown>): ScreenInvite {
@@ -50,9 +104,13 @@ function rowToInvite(row: Record<string, unknown>): ScreenInvite {
     message: (row.message as string | undefined) ?? "",
     sent_by: (row.sent_by as string | undefined) ?? "",
     sent_at: (row.sent_at as string | undefined) ?? "",
+    opened_at: (row.opened_at as string | undefined) ?? "",
     started_at: (row.started_at as string | undefined) ?? "",
     completed_at: (row.completed_at as string | undefined) ?? "",
     expires_at: (row.expires_at as string | undefined) ?? "",
+    delivered_at: (row.delivered_at as string | undefined) ?? "",
+    failed_at: (row.failed_at as string | undefined) ?? "",
+    failure_reason: (row.failure_reason as string | undefined) ?? "",
     created_at: row.created_at as string,
   };
 }
@@ -60,6 +118,40 @@ function rowToInvite(row: Record<string, unknown>): ScreenInvite {
 /** Unguessable, URL-safe token (32 chars). */
 function newToken(): string {
   return randomBytes(24).toString("base64url");
+}
+
+/** Persist one bulk-send batch (org-scoped) and return its id. */
+export function recordInviteBatch(input: {
+  organization_id: string;
+  job_id: string;
+  screen_key: string;
+  created_by: string;
+  total_selected: number;
+  sent: number;
+  skipped: number;
+  failed: number;
+}): string {
+  const id = randomUUID();
+  getDb()
+    .prepare(
+      `INSERT INTO screen_invite_batches (
+         id, organization_id, job_id, screen_key, created_by,
+         total_selected, sent, skipped, failed, created_at
+       ) VALUES (@id, @org, @job, @screen, @by, @total, @sent, @skipped, @failed, @now)`,
+    )
+    .run({
+      id,
+      org: input.organization_id,
+      job: input.job_id,
+      screen: input.screen_key,
+      by: input.created_by,
+      total: input.total_selected,
+      sent: input.sent,
+      skipped: input.skipped,
+      failed: input.failed,
+      now: new Date().toISOString(),
+    });
+  return id;
 }
 
 export function createScreenInvite(input: {
@@ -141,15 +233,59 @@ export function getInvitesForJob(jobId: string, organizationId: string): ScreenI
 }
 
 /**
- * Stamp the moment a candidate first opened their screen link (once). Never
- * changes status or touches a completed invite — purely a funnel signal.
+ * Stamp the moment a candidate first OPENED their screen link (loaded the page).
+ * Distinct from started (began answering). Idempotent; never touches a completed
+ * invite or its status.
+ */
+export function markInviteOpened(token: string): void {
+  getDb()
+    .prepare("UPDATE screen_invites SET opened_at = ? WHERE token = ? AND opened_at = '' AND status = 'pending'")
+    .run(new Date().toISOString(), token);
+}
+
+/**
+ * Stamp the moment a candidate STARTED answering (a beacon fires on first
+ * interaction). Distinct from opened. Idempotent; pending invites only.
  */
 export function markInviteStarted(token: string): void {
   getDb()
-    .prepare(
-      "UPDATE screen_invites SET started_at = ? WHERE token = ? AND started_at = '' AND status = 'pending'",
-    )
+    .prepare("UPDATE screen_invites SET started_at = ? WHERE token = ? AND started_at = '' AND status = 'pending'")
     .run(new Date().toISOString(), token);
+}
+
+/** Record that the mail provider accepted the message (best delivery signal). */
+export function markInviteDelivered(id: string): void {
+  getDb()
+    .prepare("UPDATE screen_invites SET delivered_at = ?, failed_at = '', failure_reason = '' WHERE id = ?")
+    .run(new Date().toISOString(), id);
+}
+
+/**
+ * Record an email-send failure with a SAFE, short category — never the raw SMTP
+ * error (which can contain host/credentials). The invite link stays valid.
+ */
+export function markInviteFailed(id: string, reason: string): void {
+  const safe = (reason || "send_failed").replace(/[\r\n]+/g, " ").slice(0, 120);
+  getDb()
+    .prepare("UPDATE screen_invites SET failed_at = ?, failure_reason = ? WHERE id = ? AND delivered_at = ''")
+    .run(new Date().toISOString(), safe, id);
+}
+
+/**
+ * The current ACTIVE (pending, non-expired) invite for a candidate on a job, if
+ * any — used to avoid duplicate invitations unless the recruiter forces resend.
+ */
+export function findActiveInvite(candidateId: string, jobId: string, organizationId: string): ScreenInvite | null {
+  const nowIso = new Date().toISOString();
+  const row = getDb()
+    .prepare(
+      `SELECT * FROM screen_invites
+       WHERE candidate_id = ? AND job_id = ? AND organization_id = ? AND status = 'pending'
+         AND (expires_at = '' OR expires_at > ?)
+       ORDER BY sent_at DESC LIMIT 1`,
+    )
+    .get(candidateId, jobId, organizationId, nowIso) as Record<string, unknown> | undefined;
+  return row ? rowToInvite(row) : null;
 }
 
 /**

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ScreenQuestions } from "@/components/ScreenQuestions";
 import type { PublicScreen } from "@/lib/screens";
 import type { ScreenAnswerValue } from "@/lib/screen-scoring";
@@ -26,6 +26,7 @@ export function PublicScreenForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const startedRef = useRef(false);
 
   const total = screen.questions.length;
   const answered = useMemo(
@@ -37,6 +38,12 @@ export function PublicScreenForm({
   );
 
   function setAnswer(id: string, value: ScreenAnswerValue) {
+    // Fire the "started answering" beacon once, on first interaction. Fire-and-
+    // forget: never block the candidate on it.
+    if (!startedRef.current) {
+      startedRef.current = true;
+      void fetch(`/api/screen/${token}/start`, { method: "POST" }).catch(() => {});
+    }
     setAnswers((prev) => ({ ...prev, [id]: value }));
   }
 

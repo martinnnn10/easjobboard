@@ -22,7 +22,7 @@ import { listEventsByCandidate, type CandidateEventType } from "@/lib/candidate-
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam, canWrite } from "@/lib/roles";
-import { getInvitesForCandidate } from "@/lib/screen-invites";
+import { deriveInviteDisplayStatus, getInvitesForCandidate, INVITE_STATUS_BADGE, INVITE_STATUS_LABELS } from "@/lib/screen-invites";
 import { getScreenSubmission } from "@/lib/screen-submissions";
 import { listPublishedScreenOptions, resolveScreenLabel } from "@/lib/screen-store";
 import { DIMENSION_LABELS, SCREEN_OPTIONS, type ScreenDimension } from "@/lib/screens";
@@ -341,13 +341,17 @@ export default async function CandidateProfilePage({ params }: PageProps) {
           </>
         ) : pendingInvite ? (
           <div className="space-y-1">
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
-              Skills screen sent — waiting for candidate completion.
-            </p>
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
+              <span className="text-sm font-medium text-amber-800">Skills screen in progress</span>
+              <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${INVITE_STATUS_BADGE[deriveInviteDisplayStatus(pendingInvite)]}`}>
+                {INVITE_STATUS_LABELS[deriveInviteDisplayStatus(pendingInvite)]}
+              </span>
+            </div>
             <p className="text-xs text-zinc-500">
               Sent {new Date(pendingInvite.sent_at).toLocaleDateString()}
               {pendingInvite.sent_by ? ` by ${pendingInvite.sent_by}` : ""}
-              {resolveScreenLabel(pendingInvite.screen_key) ? ` · ${resolveScreenLabel(pendingInvite.screen_key)}` : ""}. Their
+              {resolveScreenLabel(pendingInvite.screen_key) ? ` · ${resolveScreenLabel(pendingInvite.screen_key)}` : ""}
+              {pendingInvite.failed_at && !pendingInvite.delivered_at ? " · email delivery failed (link still valid)" : ""}. Their
               demonstrated-ability score and the intelligence below light up the moment they finish.
             </p>
           </div>

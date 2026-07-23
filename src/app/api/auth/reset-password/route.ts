@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { consumePasswordResetToken } from "@/lib/password-reset";
+import { getClientIp } from "@/lib/rate-limit";
+import { durableRateLimit } from "@/lib/rate-limit-db";
 import { revokeSessions, setUserPassword } from "@/lib/users";
 
 export const runtime = "nodejs";
+
+// Durable limit: 10 submission attempts per IP per 15 minutes.
+const RESET_LIMIT = 10;
+const RESET_WINDOW_MS = 15 * 60 * 1000;
 
 /**
  * Complete a password reset: validate + consume the single-use token, set the
@@ -10,6 +16,15 @@ export const runtime = "nodejs";
  * session can't outlive the reset. Additive — no changes to login/session code.
  */
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const limit = durableRateLimit(`reset-ip:${ip}`, RESET_LIMIT, RESET_WINDOW_MS);
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   const body = (await request.json().catch(() => ({}))) as { token?: unknown; password?: unknown };
   const token = typeof body.token === "string" ? body.token : "";
   const password = typeof body.password === "string" ? body.password : "";

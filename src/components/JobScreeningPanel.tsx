@@ -165,14 +165,21 @@ export function JobScreeningPanel({
 
       {/* Funnel + outcomes */}
       {hasFunnel ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          <Metric label="Invited" value={metrics.invited} />
-          <Metric label="Started" value={metrics.started} />
-          <Metric label="Completed" value={metrics.completed} />
-          <Metric label="Avg score" value={metrics.averageScore ?? "—"} />
-          <Metric label="Strong-fit" value={metrics.strongFit} tone="green" />
-          <Metric label="Review" value={metrics.review} tone="amber" />
-          <Metric label="High-risk" value={metrics.highRisk} tone="red" />
+        <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <Metric label="Invited" value={metrics.invited} />
+            <Metric label="Delivered" value={metrics.delivered} />
+            <Metric label="Opened" value={metrics.opened} />
+            <Metric label="Started" value={metrics.started} />
+            <Metric label="Completed" value={metrics.completed} />
+            <Metric label="Failed" value={metrics.failed} tone={metrics.failed > 0 ? "red" : undefined} />
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Metric label="Avg score" value={metrics.averageScore ?? "—"} />
+            <Metric label="Strong-fit" value={metrics.strongFit} tone="green" />
+            <Metric label="Review" value={metrics.review} tone="amber" />
+            <Metric label="High-risk" value={metrics.highRisk} tone="red" />
+          </div>
         </div>
       ) : attached ? (
         <p className="text-sm text-zinc-500">

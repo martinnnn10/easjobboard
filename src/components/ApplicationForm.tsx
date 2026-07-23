@@ -42,6 +42,7 @@ export function ApplicationForm({
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [report, setReport] = useState<ApplyReport | null>(null);
+  const [screenLink, setScreenLink] = useState("");
 
   // The skills check is optional: answers start empty and only count once the
   // candidate actually engages, so skipping submits a clean resume-only app.
@@ -104,7 +105,12 @@ export function ApplicationForm({
       body: formData,
     });
 
-    const data = (await response.json()) as { error?: string; report?: ApplyReport | null };
+    const data = (await response.json()) as {
+      error?: string;
+      report?: ApplyReport | null;
+      screenLink?: string;
+      screenTitle?: string;
+    };
 
     if (!response.ok) {
       setStatus("error");
@@ -113,6 +119,7 @@ export function ApplicationForm({
     }
 
     setReport(data.report ?? null);
+    setScreenLink(data.screenLink ?? "");
     setStatus("success");
     setMessage(
       submittingScreen
@@ -134,6 +141,24 @@ export function ApplicationForm({
           <h2 className="text-lg font-semibold">Application submitted ✓</h2>
           <p className="mt-1 text-sm">{message}</p>
         </div>
+
+        {/* Skipped the optional screen — offer completing it later via a secure,
+            version-pinned link. The application is already valid without it. */}
+        {!report && screenLink ? (
+          <div className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+            <p className="text-sm font-semibold text-brand-900">Want to stand out? Complete your skills check</p>
+            <p className="mt-1 text-sm text-brand-800">
+              It only takes a few minutes and shows the hiring team what you can actually do — your application is
+              already in either way.
+            </p>
+            <a href={screenLink} className="btn-primary mt-3 inline-block text-sm">
+              Complete the skills check →
+            </a>
+            <p className="mt-2 text-xs text-brand-700">
+              Bookmark this secure link — you can come back and finish it any time.
+            </p>
+          </div>
+        ) : null}
 
         {report ? (
           <div className="space-y-4">
