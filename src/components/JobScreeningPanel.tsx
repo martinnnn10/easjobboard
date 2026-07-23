@@ -168,9 +168,9 @@ export function JobScreeningPanel({
         <div className="space-y-2">
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
             <Metric label="Invited" value={metrics.invited} />
-            <Metric label="Delivered" value={metrics.delivered} />
-            <Metric label="Opened" value={metrics.opened} />
-            <Metric label="Started" value={metrics.started} />
+            <Metric label="Accepted" value={metrics.delivered} title="Mail server accepted the message — inbox delivery not independently confirmed." />
+            <Metric label="Opened" value={metrics.opened} title="Secure link was accessed (scanners may occasionally trigger this)." />
+            <Metric label="Started" value={metrics.started} title="Candidate began answering." />
             <Metric label="Completed" value={metrics.completed} />
             <Metric label="Failed" value={metrics.failed} tone={metrics.failed > 0 ? "red" : undefined} />
           </div>
@@ -199,10 +199,12 @@ function Metric({
   label,
   value,
   tone,
+  title,
 }: {
   label: string;
   value: number | string;
   tone?: "green" | "amber" | "red";
+  title?: string;
 }) {
   const toneCls =
     tone === "green"
@@ -213,7 +215,7 @@ function Metric({
           ? "text-red-600"
           : "text-zinc-900";
   return (
-    <div className="rounded-lg border border-zinc-200 bg-white p-2.5 text-center">
+    <div className="rounded-lg border border-zinc-200 bg-white p-2.5 text-center" title={title}>
       <p className={`text-xl font-bold ${toneCls}`}>{value}</p>
       <p className="text-[11px] text-zinc-500">{label}</p>
     </div>

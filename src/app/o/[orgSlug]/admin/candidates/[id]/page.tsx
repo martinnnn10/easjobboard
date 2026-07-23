@@ -22,7 +22,7 @@ import { listEventsByCandidate, type CandidateEventType } from "@/lib/candidate-
 import { listJobsByOrganization } from "@/lib/jobs";
 import { getOrganizationBySlug } from "@/lib/organizations";
 import { canManageTeam, canWrite } from "@/lib/roles";
-import { deriveInviteDisplayStatus, getInvitesForCandidate, INVITE_STATUS_BADGE, INVITE_STATUS_LABELS } from "@/lib/screen-invites";
+import { deriveInviteDisplayStatus, getInvitesForCandidate, INVITE_STATUS_BADGE, INVITE_STATUS_HELP, INVITE_STATUS_LABELS } from "@/lib/screen-invites";
 import { getScreenSubmission } from "@/lib/screen-submissions";
 import { listPublishedScreenOptions, resolveScreenLabel } from "@/lib/screen-store";
 import { DIMENSION_LABELS, SCREEN_OPTIONS, type ScreenDimension } from "@/lib/screens";
@@ -347,6 +347,11 @@ export default async function CandidateProfilePage({ params }: PageProps) {
                 {INVITE_STATUS_LABELS[deriveInviteDisplayStatus(pendingInvite)]}
               </span>
             </div>
+            {INVITE_STATUS_HELP[deriveInviteDisplayStatus(pendingInvite)] ? (
+              <p className="text-xs italic text-zinc-400">
+                {INVITE_STATUS_HELP[deriveInviteDisplayStatus(pendingInvite)]}
+              </p>
+            ) : null}
             <p className="text-xs text-zinc-500">
               Sent {new Date(pendingInvite.sent_at).toLocaleDateString()}
               {pendingInvite.sent_by ? ` by ${pendingInvite.sent_by}` : ""}

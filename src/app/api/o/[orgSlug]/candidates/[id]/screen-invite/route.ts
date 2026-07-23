@@ -133,7 +133,7 @@ export async function POST(request: Request, context: RouteContext) {
         });
         emailed = true;
         if (delivered) markInviteDelivered(invite.id);
-      } catch (emailError) {
+      } catch {
         // Persist a SAFE failure category only — never the raw SMTP error.
         markInviteFailed(invite.id, "smtp_error");
         console.error("Screen invite email failed (link still valid).");

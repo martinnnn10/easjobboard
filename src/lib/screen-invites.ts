@@ -69,14 +69,39 @@ export function deriveInviteDisplayStatus(invite: ScreenInvite): ScreenInviteDis
   return "sent";
 }
 
+/**
+ * Truthful labels: we only observe what our own systems can see. "Email
+ * accepted" (not "Delivered") because Nodemailer's `accepted` means the relay
+ * took the message, NOT that it reached an inbox — that needs a provider
+ * delivery webhook we don't have. "Link opened" (not "Opened") because a page
+ * load can be triggered by an email-security scanner, not only the candidate.
+ */
 export const INVITE_STATUS_LABELS: Record<ScreenInviteDisplayStatus, string> = {
   sent: "Sent",
-  delivered: "Delivered",
+  delivered: "Email accepted",
+  opened: "Link opened",
+  started: "Started",
+  completed: "Completed",
+  expired: "Expired",
+  failed: "Failed",
+};
+
+/** Short labels for compact funnel tiles (avoid overclaiming). */
+export const INVITE_STATUS_SHORT: Record<ScreenInviteDisplayStatus, string> = {
+  sent: "Sent",
+  delivered: "Accepted",
   opened: "Opened",
   started: "Started",
   completed: "Completed",
   expired: "Expired",
-  failed: "Email failed",
+  failed: "Failed",
+};
+
+/** Helper copy that keeps each status honest about what it does and doesn't prove. */
+export const INVITE_STATUS_HELP: Partial<Record<ScreenInviteDisplayStatus, string>> = {
+  delivered: "The receiving mail server accepted the message. Inbox delivery is not independently confirmed.",
+  opened: "The secure screen link was accessed. Automated email-security scanners may occasionally trigger this status.",
+  failed: "The email could not be sent. The secure link is still valid — you can copy and send it another way.",
 };
 
 /** On-brand badge classes (EAS steel/slate/green/amber — never purple). */
