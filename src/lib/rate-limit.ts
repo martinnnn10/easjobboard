@@ -52,14 +52,38 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
 }
 
 /**
- * Best-effort client IP from proxy headers, falling back to a shared bucket so
- * limits still apply when no IP is available.
+ * Number of trusted reverse-proxy hops in front of this app. Matches the
+ * source-controlled start.js proxy's TRUSTED_PROXY_HOPS so the app and proxy
+ * agree on which X-Forwarded-For entry is the real client.
+ */
+const TRUSTED_PROXY_HOPS = Math.max(1, parseInt(process.env.TRUSTED_PROXY_HOPS || "1", 10) || 1);
+
+/** Strip IPv6-mapped prefix, brackets, and zone id so keys are stable. */
+function cleanIp(ip: string): string {
+  const out = ip.replace(/^::ffff:/i, "").replace(/^\[|\]$/g, "").split("%")[0];
+  return out || "unknown";
+}
+
+/**
+ * Trusted client IP for rate-limit keys.
+ *
+ * The app runs behind Nginx → the start.js proxy → Next. Nginx appends the real
+ * peer to X-Forwarded-For and the proxy forwards the header unchanged, so the
+ * trusted client is the Nth-from-the-END entry (the hop our own edge appended) —
+ * NOT the first entry, which is entirely attacker-controlled. Taking the first
+ * entry let an attacker rotate X-Forwarded-For to mint a fresh rate-limit bucket
+ * on every request, defeating the limit. This mirrors start.js `normalizeIp`.
  */
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length) {
+      const idx = parts.length - TRUSTED_PROXY_HOPS;
+      return cleanIp(parts[idx >= 0 ? idx : parts.length - 1]);
+    }
   }
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
+  const real = request.headers.get("x-real-ip")?.trim();
+  if (real) return cleanIp(real);
+  return "unknown";
 }
