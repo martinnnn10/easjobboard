@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build/deploy artifacts and host-only dirs — never app source.
+    "deploy-dist/**",
+    "backups/**",
+    // Operational Node launchers / scripts (CommonJS + ESM ops tooling, not app
+    // code) — linting them against the Next app rules is noise.
+    "start.js",
+    "scripts/**",
   ]),
 ]);
 

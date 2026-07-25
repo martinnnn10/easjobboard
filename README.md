@@ -54,6 +54,9 @@ Platform contact email: `eas@eautomatedstaffing.com`
 | `AUTH_SECRET` | Session signing secret |
 | `BASE_URL` | Public HTTPS URL when deployed |
 | `SMTP_*` | Platform mail server for delivering applications to org inboxes |
+| `APOLLO_API_KEY` | Optional. Enables outbound candidate sourcing (Apollo People Search) from a job. When unset, the "Source candidates" page shows a configure-me notice. |
+| `ANTHROPIC_API_KEY` | Optional. Enables Claude-backed resume scoring, candidate outreach drafting, and AI job-description generation. Each feature falls back to its offline path when unset. |
+| `ANTHROPIC_MODEL` | Optional. Overrides the Claude model used for the AI features (default: `claude-opus-4-8`). |
 
 Each organization sets its own **resume delivery email** during signup. Applications are sent to that address with the resume attached, and also stored in the admin portal for download.
 
@@ -68,3 +71,17 @@ Register each organization's feed URL with job boards after deploying to HTTPS:
 
 - SQLite database: `./data/jobs.db` (persist on your host)
 - Platform SMTP sends mail on behalf of EAS Recruit to each organization's configured inbox
+- After a new deployment, browser tabs left open on the old build may briefly show a
+  "Server Action" cache error on their next submit. This is stale client JavaScript, not a
+  server fault — a hard refresh (reload) clears it.
+
+## Billing
+
+Billing is served in **two places** today (see `DEPLOYMENT.md` → "Production entrypoint"):
+
+- **In the app source:** per-organization routes under `/o/{org-slug}/billing/*` (`checkout`, `portal`).
+- **In the production proxy (`start.js`, not in source):** the top-level `/api/stripe/checkout`,
+  `/api/stripe/portal`, `/api/stripe/status`, `/api/stripe/team`, `/api/stripe/grant-free`, and
+  `/api/stripe/webhook` routes, plus the `/subscription/paywall` gate. These run in the reverse
+  proxy that fronts the Next.js server in production and are **not reproducible from this repo yet.**
+  Reconciling the proxy paywall into the app is tracked as a follow-up (see DEPLOYMENT.md).

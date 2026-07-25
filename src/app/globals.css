@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f4f5;
+  --background: #f6f7f5;
   --foreground: #18181b;
 }
 
@@ -12,28 +12,138 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* EAS Recruit brand green. Remapping the blue-600/700/800 tokens recolors every
+ * primary button, link, and accent app-wide from one place, so the whole UI
+ * stays cohesive with the logo (silver-on-green mark, green "Recruit"
+ * wordmark). Values are dark enough that green links read on white and white
+ * button text meets WCAG AA. Lighter blues (50–400) stay as gentle info tints
+ * for badges and rings. The `brand` scale powers the logo lockup, focus rings,
+ * and the bright lime accents on the dark hero. */
+@theme {
+  --color-blue-600: #4a7d1e; /* links, focus borders (AA on white) */
+  --color-blue-700: #3f6b19; /* primary button ground (white text, AA) */
+  --color-blue-800: #345812; /* button hover */
+
+  --color-brand-50: #f1f7e6;
+  --color-brand-100: #e2efcb;
+  --color-brand-200: #cbe3a4;
+  --color-brand-300: #b0d579;
+  --color-brand-400: #8ec63f; /* bright lime — logo bolt + dark-hero accents */
+  --color-brand-500: #6fae2a;
+  --color-brand-600: #5c9022; /* "Recruit" wordmark green */
+  --color-brand-700: #4a761b;
+  --color-brand-800: #3d5917;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+.page-shell {
+  @apply mx-auto w-full max-w-6xl px-4 py-10;
+}
+
+/* ── Inputs ─────────────────────────────────────────────── */
 .field-input {
-  @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100;
+  @apply w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-blue-600 focus:ring-4 focus:ring-brand-100;
 }
 
+/* ── Buttons ────────────────────────────────────────────── */
 .btn-primary {
-  @apply rounded-lg bg-blue-600 px-4 py-2.5 font-medium text-white hover:bg-blue-700 disabled:opacity-60;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-blue-800 focus:ring-4 focus:ring-brand-200 disabled:opacity-60;
 }
 
 .btn-secondary {
-  @apply rounded-lg border border-zinc-300 bg-white px-4 py-2.5 font-medium text-zinc-700 hover:bg-zinc-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2.5 font-semibold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:opacity-60;
 }
 
-.page-shell {
-  @apply mx-auto w-full max-w-5xl px-4 py-10;
+/* Premium near-white CTA — sits on the graphite hero/CTA grounds. */
+.btn-accent {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 font-semibold text-zinc-900 shadow-sm transition hover:bg-zinc-100 focus:ring-4 focus:ring-white/20 disabled:opacity-60;
 }
 
+/* ── Cards ──────────────────────────────────────────────── */
 .card {
-  @apply rounded-xl border border-zinc-200 bg-white p-6 shadow-sm;
+  @apply rounded-2xl border border-zinc-200 bg-white p-6;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.card-hover {
+  @apply transition duration-150;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -12px rgba(15, 23, 42, 0.22);
+}
+
+/* ── Typographic accents ────────────────────────────────── */
+.section-label {
+  @apply text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500;
+}
+
+.stat-value {
+  @apply text-3xl font-bold tracking-tight text-zinc-900;
+}
+
+/* ── Premium graphite ground with a faint electric-steel glow ─────── */
+.hero-dark {
+  background-color: #131418;
+  background-image:
+    radial-gradient(56% 74% at 16% -10%, rgba(142, 198, 63, 0.18), transparent 64%),
+    radial-gradient(48% 66% at 100% 108%, rgba(148, 163, 184, 0.14), transparent 60%);
+  color: #f4f4f2;
+}
+
+/* Marketing eyebrow — green, restrained, premium. */
+.eyebrow {
+  @apply text-xs font-semibold uppercase tracking-[0.2em] text-brand-700;
+}
+
+/* A framed white panel with a refined shadow, for large marketing sections. */
+.surface-panel {
+  @apply rounded-3xl border border-zinc-200 bg-white;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 24px 48px -32px rgba(15, 23, 42, 0.18);
+}
+
+/* Subtle steel wash for alternating sections, keeps the industrial-tech feel. */
+.surface-steel {
+  background-image: linear-gradient(180deg, #f7f8f7 0%, #eef1ef 100%);
+}
+
+/* Premium feature card: clean, quiet, lifts on hover. */
+.feature-card {
+  @apply rounded-2xl border border-zinc-200 bg-white p-6 transition duration-150;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.feature-card:hover {
+  transform: translateY(-2px);
+  border-color: rgb(203 227 164);
+  box-shadow: 0 16px 32px -18px rgba(15, 23, 42, 0.22);
+}
+
+/* Icon tile inside feature cards — green-tinted steel square. */
+.icon-tile {
+  @apply inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100;
+}
+
+/* Neutral meta chip for public content pages (brand-neutral so it never fights
+ * a customer's white-labelled brand colour). */
+.pill {
+  @apply inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700;
+}
+
+/* Refined back / breadcrumb link. */
+.back-link {
+  @apply inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-900;
 }

@@ -1,0 +1,50 @@
+import { getDb } from "./db";
+import { hiddenJobsSql, type JobAccess } from "./job-visibility";
+
+/**
+ * The renewal number. Converts screening data already stored into hours and
+ * dollars saved: every completed screen that came back a clear reject or a
+ * high-risk applicant is an interview the team did NOT have to run blind. No
+ * competing ATS can tell a plant manager "you avoided 47 interview-hours /
+ * $4,700" — because it never tested anyone. Deterministic SQL, no LLM.
+ */
+
+// Conservative, defensible assumptions: one loaded panel-hour per interview.
+const HOURS_PER_INTERVIEW = 1;
+const DOLLARS_PER_HOUR = 100;
+// A completed screen below the review floor is a clear reject — an interview the
+// screen let the team skip. High-risk-but-strong candidates are NOT counted:
+// the Call Queue still tells the recruiter to phone them (to clear the flag), so
+// counting them as "avoided" would contradict the product and inflate the number.
+const WASTE_THRESHOLD = 45;
+
+export type RoiStats = {
+  screensCompleted: number;
+  interviewsAvoided: number;
+  hoursSaved: number;
+  dollarsSaved: number;
+  /** Share of completed screens the screen filtered out before a human looked. */
+  filterRatePercent: number;
+};
+
+export function getRoiStats(organizationId: string, access?: JobAccess): RoiStats {
+  const vis = access ? hiddenJobsSql(access, "job_id") : { clause: "", params: [] };
+  const row = getDb()
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL THEN 1 ELSE 0 END) AS completed,
+         SUM(CASE WHEN screen_status = 'completed' AND screen_score IS NOT NULL
+                   AND screen_score < ? THEN 1 ELSE 0 END) AS avoided
+       FROM applications WHERE organization_id = ?${vis.clause}`,
+    )
+    .get(WASTE_THRESHOLD, organizationId, ...vis.params) as { completed: number | null; avoided: number | null };
+
+  const screensCompleted = row.completed ?? 0;
+  const interviewsAvoided = row.avoided ?? 0;
+  const hoursSaved = interviewsAvoided * HOURS_PER_INTERVIEW;
+  const dollarsSaved = hoursSaved * DOLLARS_PER_HOUR;
+  const filterRatePercent =
+    screensCompleted === 0 ? 0 : Math.round((interviewsAvoided / screensCompleted) * 100);
+
+  return { screensCompleted, interviewsAvoided, hoursSaved, dollarsSaved, filterRatePercent };
+}

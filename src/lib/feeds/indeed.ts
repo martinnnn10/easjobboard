@@ -1,5 +1,5 @@
 import type { Job, Organization } from "../db";
-import { getBaseUrl, getOrgJobUrl } from "../env";
+import { getOrgJobUrl, getPublicBaseUrl } from "../env";
 
 function escapeXml(value: string): string {
   return value
@@ -20,7 +20,7 @@ function formatIndeedDate(isoDate: string | null): string {
 }
 
 export function buildIndeedXml(organization: Organization, jobs: Job[]): string {
-  const baseUrl = getBaseUrl();
+  const baseUrl = getPublicBaseUrl();
   const companyWebsite = organization.website || `${baseUrl}/o/${organization.slug}`;
 
   const jobNodes = jobs
